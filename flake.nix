@@ -47,7 +47,7 @@
         nixfmt-check = pkgs.runCommand "nixfmt-check" {
           nativeBuildInputs = [ pkgs.nixfmt-rfc-style ];
         } ''
-          nixfmt --check ${./.}
+          find ${./.} -name "*.nix" | xargs nixfmt --check
           touch $out
         '';
 
@@ -67,18 +67,14 @@
 
         # Template nixosTest: boot private-laptop config, assert multi-user.target.
         # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).
-        test-boot-private-laptop =
-          (import "${nixpkgs}/nixos/lib/testing-python.nix" {
-            inherit system pkgs;
-          }).makeTest {
-            name = "boot-private-laptop";
-            nodes.machine = {
-              imports = [ ./hosts/private-laptop/default.nix ];
-            };
-            testScript = ''
-              machine.wait_for_unit("multi-user.target")
-            '';
-          };
+        test-boot-private-laptop = nixpkgs.lib.nixos.runTest {
+          hostPkgs = pkgs;
+          name = "boot-private-laptop";
+          nodes.machine.imports = [ ./hosts/private-laptop/default.nix ];
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+          '';
+        };
       };
 
       nixosConfigurations = {

@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            extra-system-features = nixos-test
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       - run: nix flake check -L
 
