@@ -8,6 +8,11 @@ Migration tickets, numbered in rough execution order. See
 - File: `NN-kebab-slug.md`
 - Header fields: `Status` (open / in-progress / blocked / done),
   `Depends on`, `Machines`
+
+> **When completing a ticket:** update `Status` in *both* the individual
+> ticket file **and** the index table below. Updating only one causes the
+> next agent to pick up the same ticket as if it were still open.
+
 - Fixed sections in every ticket:
   - **Goal** — what done looks like
   - **Sub-tasks** — checklist
