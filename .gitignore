@@ -1,0 +1,10 @@
+# Nix build artifacts
+result
+result-*
+
+# direnv
+.direnv/
+
+# Editor/IDE
+.idea/
+*.swp
