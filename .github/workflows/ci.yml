@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  flake-check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            extra-system-features = nixos-test
+      - uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Check formatting
+        run: nix fmt . && git diff --exit-code -- '*.nix'
+      - run: nix flake check -L
+
+  build-hosts:
+    name: Build ${{ matrix.host }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        host: [private-laptop, work-laptop, desktop]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@v14
+      - uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Build toplevel
+        run: nix build .#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel -L

@@ -1,6 +1,6 @@
 # 02 — Testing & CI infrastructure
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 01
 - **Machines:** all
 

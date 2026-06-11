@@ -19,33 +19,71 @@
 
   outputs =
     inputs@{
-      self,
       nixpkgs,
       home-manager,
       chaotic,
-      hyprland,
       ...
     }:
     let
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
       mkHost = import ./lib/mkHost.nix {
-        inherit inputs nixpkgs home-manager chaotic;
+        inherit
+          inputs
+          nixpkgs
+          home-manager
+          chaotic
+          ;
+      };
+      testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
+        inherit system pkgs;
       };
     in
     {
-      formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt-rfc-style;
+      formatter.${system} = pkgs.nixfmt-rfc-style;
 
-      devShells.x86_64-linux.default =
-        let
-          pkgs = nixpkgs.legacyPackages.x86_64-linux;
-        in
-        pkgs.mkShell {
-          packages = with pkgs; [
-            nil
-            statix
-            deadnix
-            nixfmt-rfc-style
-          ];
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [
+          nil
+          statix
+          deadnix
+          nixfmt-rfc-style
+        ];
+      };
+
+      checks.${system} = {
+        statix-check =
+          pkgs.runCommand "statix-check"
+            {
+              nativeBuildInputs = [ pkgs.statix ];
+            }
+            ''
+              statix check ${./.}
+              touch $out
+            '';
+
+        deadnix-check =
+          pkgs.runCommand "deadnix-check"
+            {
+              nativeBuildInputs = [ pkgs.deadnix ];
+            }
+            ''
+              deadnix --fail ${./.}
+              touch $out
+            '';
+
+        # Template nixosTest: boot private-laptop config, assert multi-user.target.
+        # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).
+        test-boot-private-laptop = testLib.makeTest {
+          name = "boot-private-laptop";
+          nodes.machine = {
+            imports = [ ./hosts/private-laptop/default.nix ];
+          };
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+          '';
         };
+      };
 
       nixosConfigurations = {
         private-laptop = mkHost {
