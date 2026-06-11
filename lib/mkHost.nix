@@ -1,4 +1,9 @@
-{ inputs, nixpkgs, home-manager, chaotic }:
+{
+  inputs,
+  nixpkgs,
+  home-manager,
+  chaotic,
+}:
 {
   hostname,
   modules,
@@ -8,14 +13,13 @@
 nixpkgs.lib.nixosSystem {
   inherit system;
   specialArgs = { inherit inputs hostname; };
-  modules =
-    [
-      home-manager.nixosModules.home-manager
-      {
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
-      }
-    ]
-    ++ (if withChaotic then [ chaotic.nixosModules.default ] else [ ])
-    ++ modules;
+  modules = [
+    home-manager.nixosModules.home-manager
+    {
+      home-manager.useGlobalPkgs = true;
+      home-manager.useUserPackages = true;
+    }
+  ]
+  ++ (if withChaotic then [ chaotic.nixosModules.default ] else [ ])
+  ++ modules;
 }
