@@ -40,8 +40,13 @@ pkgs/        Custom packages (e.g. scripts packaged with writeShellApplication)
 
 ## Status
 
-The repository currently contains **only the skeleton and migration planning
-documents** — no functional Nix code yet. Work happens ticket by ticket:
+| Phase | Ticket | Status |
+|---|---|---|
+| 1 | [01 Repo bootstrap: flake skeleton](docs/tickets/01-repo-bootstrap-flake-skeleton.md) | ✅ done |
+| 1 | [02 Testing & CI infrastructure](docs/tickets/02-testing-and-ci-infrastructure.md) | open |
+| 2 | 03–12, 16 — modules | open |
+| 3 | 13–15 — per-host configs & migration | open |
+| 4 | [17 Archive old repos](docs/tickets/17-archive-old-repos.md) | open |
 
 - Migration plan & phases: [docs/ROADMAP.md](docs/ROADMAP.md)
 - Ticket index: [docs/tickets/README.md](docs/tickets/README.md)

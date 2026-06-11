@@ -55,3 +55,31 @@ the work laptop, then the gaming desktop.
 
 **Consequences:** Gaming/CachyOS stack (Ticket 11) is validated last on real
 hardware, even though it can be developed and CI-built earlier.
+
+---
+
+## 005 — nixpkgs channel: nixos-unstable (2026-06-11)
+
+**Context:** The desktop host requires the CachyOS kernel via chaotic-nyx (ADR
+003), which tracks nixos-unstable. Hyprland also moves fast and is better
+supported on unstable.
+
+**Decision:** Use `nixpkgs/nixos-unstable` for all hosts.
+
+**Consequences:** System packages are always close to upstream; occasional
+evaluation or build breakage is possible when nixpkgs is in flux. Stable
+per-release pinning can be revisited later; for now unstable simplifies
+keeping chaotic-nyx and Hyprland inputs aligned.
+
+---
+
+## 006 — Username: maudi on all three machines (2026-06-11)
+
+**Context:** All three machines are personal machines managed by a single owner.
+
+**Decision:** Use the same username `maudi` across all hosts, passed as
+`specialArgs.username` via `lib/mkHost.nix`.
+
+**Consequences:** Shared modules can reference `username` without per-host
+overrides. If a machine ever needs a different username, `mkHost` accepts an
+override via `extraSpecialArgs`.
