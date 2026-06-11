@@ -1,5 +1,4 @@
-_:
-{
+_: {
   networking.hostName = "private-laptop";
   system.stateVersion = "25.05";
 
