@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!flake.lock"
+  path_instructions:
+    - path: "**/*.nix"
+      instructions: |
+        Review for correctness, idiomatic style, and security:
+        - Options must use correct types and defaults
+        - Formatting follows nixfmt-rfc-style conventions
+        - No deprecated option paths
+        - Use mkDefault/mkForce only where precedence must be explicit
+        - Sensitive options (boot, networking, security.*) warrant extra scrutiny
+    - path: "hosts/**"
+      instructions: |
+        Host files contain only host-specific overrides.
+        Generic logic belongs in modules/ — flag anything that looks reusable.
+    - path: "modules/**"
+      instructions: |
+        Modules must declare options with types and defaults.
+        No hard-coded hostnames or usernames — use config.networking.hostName
+        or specialArgs instead.
+    - path: "lib/**"
+      instructions: |
+        Helper functions should be pure and minimal.
+        Check for edge cases in argument handling.
+    - path: "pkgs/**"
+      instructions: |
+        Scripts via writeShellApplication must pass shellcheck.
+        Watch for unquoted variables and missing error handling.
+chat:
+  auto_reply: true

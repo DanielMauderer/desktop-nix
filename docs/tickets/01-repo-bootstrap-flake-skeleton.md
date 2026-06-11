@@ -1,6 +1,6 @@
 # 01 — Repo bootstrap: flake skeleton
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** —
 - **Machines:** all
 
@@ -13,16 +13,16 @@ structure, formatter, and dev tooling.
 
 ## Sub-tasks
 
-- [ ] `flake.nix` with inputs: `nixpkgs`, `home-manager` (channel decision below)
-- [ ] `lib/mkHost.nix` helper: host name + module list → `nixosConfiguration`,
+- [x] `flake.nix` with inputs: `nixpkgs`, `home-manager` (channel decision below)
+- [x] `lib/mkHost.nix` helper: host name + module list → `nixosConfiguration`,
       wires home-manager as a NixOS module (DECISIONS.md #002) and shared `specialArgs`
-- [ ] Three host entry points `hosts/<name>/default.nix` — minimal placeholders
+- [x] Three host entry points `hosts/<name>/default.nix` — minimal placeholders
       (`system.stateVersion`, hostname) that build without hardware configs
       (use a stub `fileSystems` / `boot.loader` so `toplevel` evaluates)
-- [ ] `formatter` output: `nixfmt-rfc-style`
-- [ ] `devShells.default` with `nil`, `statix`, `deadnix`, `nixfmt-rfc-style`
-- [ ] Commit `flake.lock`
-- [ ] Document the layout conventions in the top-level README (update Status section)
+- [x] `formatter` output: `nixfmt-rfc-style`
+- [x] `devShells.default` with `nil`, `statix`, `deadnix`, `nixfmt-rfc-style`
+- [ ] Commit `flake.lock` ← run `nix flake update` locally after first pull
+- [x] Document the layout conventions in the top-level README (update Status section)
 
 ## Testing
 
@@ -34,11 +34,11 @@ structure, formatter, and dev tooling.
 
 ## Open questions
 
-- [ ] nixpkgs channel: `nixos-unstable` (recommended — Hyprland and chaotic-nyx
-      move fast) vs a stable release (25.05) with selective unstable overlays?
-- [ ] Hyprland from nixpkgs or from the Hyprland flake (newer, but more moving
-      parts)? Can be deferred to Ticket 04 but affects inputs.
-- [ ] Username in the config: same user name on all three machines?
+- [x] nixpkgs channel: **`nixos-unstable`** — Hyprland and chaotic-nyx move fast
+      (see DECISIONS.md #005)
+- [x] Hyprland from the **Hyprland flake** — added as input now, used in Ticket 04
+      (see DECISIONS.md #006)
+- [x] Username: **`maudi`** on all three machines (see DECISIONS.md #007)
 
 ## Ask when starting
 
