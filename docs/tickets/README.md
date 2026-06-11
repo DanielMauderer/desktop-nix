@@ -28,7 +28,7 @@ Migration tickets, numbered in rough execution order. See
 | # | Ticket | Phase | Depends on | Machines | Status |
 |---|---|---|---|---|---|
 | 01 | [Repo bootstrap: flake skeleton](01-repo-bootstrap-flake-skeleton.md) | 1 | — | all | done |
-| 02 | [Testing & CI infrastructure](02-testing-and-ci-infrastructure.md) | 1 | 01 | all | open |
+| 02 | [Testing & CI infrastructure](02-testing-and-ci-infrastructure.md) | 1 | 01 | all | done |
 | 03 | [Base system module](03-base-system-module.md) | 2 | 01, 02 | all | open |
 | 04 | [Hyprland desktop stack](04-hyprland-desktop-stack.md) | 2 | 03 | all | open |
 | 05 | [Theming strategy (matugen vs stylix)](05-theming-strategy.md) | 2 | 04 | all | open |

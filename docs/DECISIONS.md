@@ -86,6 +86,49 @@ per-host overrides. If this ever changes, one value to update.
 
 ---
 
+## 008 — CI binary cache: magic-nix-cache (2026-06-11)
+
+**Context:** Ticket 02 required choosing a binary cache strategy for CI to
+avoid rebuilding the world on every run.
+
+**Decision:** Use `DeterminateSystems/magic-nix-cache-action`. Zero-config,
+integrates with GitHub Actions cache automatically, no account or token needed.
+
+**Consequences:** Cache is scoped to the GitHub Actions cache of the repo
+(7 GB limit, evicted after 7 days of inactivity). Works out-of-the-box on
+push/PR. If cache requirements outgrow the limit, revisit cachix.
+
+---
+
+## 009 — Pre-commit hooks: CI only (2026-06-11)
+
+**Context:** Ticket 02 considered whether to enforce lint/format checks via
+git-hooks.nix locally in addition to CI.
+
+**Decision:** CI only. No local pre-commit hook setup required.
+
+**Consequences:** Developers can commit un-linted code locally; CI catches
+it and the PR stays red until fixed. Reduces friction for work-in-progress
+commits. The `devShell` already ships `statix`, `deadnix`, and `nixfmt-rfc-style`
+so manual checks are one command away.
+
+---
+
+## 010 — nixosTest coverage bar: assert multi-user.target (2026-06-11)
+
+**Context:** Ticket 02 required deciding how far to take `nixosTest` for
+graphical stacks (Hyprland can start headless in a VM).
+
+**Decision:** The baseline nixosTest asserts `multi-user.target` reached.
+Later tickets extend this pattern (e.g. assert Hyprland session unit active,
+libvirtd active) by copying the template in `checks.x86_64-linux`.
+
+**Consequences:** Boot-level regression is caught automatically from Ticket 02
+onward. Graphical assertions are left to the relevant ticket (04 for Hyprland,
+09 for libvirt) rather than being forced into the baseline.
+
+---
+
 ## 004 — Migration order: private-laptop → work-laptop → desktop (2026-06-11)
 
 **Context:** Three machines with different risk profiles.
