@@ -8,6 +8,11 @@ Migration tickets, numbered in rough execution order. See
 - File: `NN-kebab-slug.md`
 - Header fields: `Status` (open / in-progress / blocked / done),
   `Depends on`, `Machines`
+
+> **When completing a ticket:** update `Status` in *both* the individual
+> ticket file **and** the index table below. Updating only one causes the
+> next agent to pick up the same ticket as if it were still open.
+
 - Fixed sections in every ticket:
   - **Goal** — what done looks like
   - **Sub-tasks** — checklist
@@ -22,7 +27,7 @@ Migration tickets, numbered in rough execution order. See
 
 | # | Ticket | Phase | Depends on | Machines | Status |
 |---|---|---|---|---|---|
-| 01 | [Repo bootstrap: flake skeleton](01-repo-bootstrap-flake-skeleton.md) | 1 | — | all | open |
+| 01 | [Repo bootstrap: flake skeleton](01-repo-bootstrap-flake-skeleton.md) | 1 | — | all | done |
 | 02 | [Testing & CI infrastructure](02-testing-and-ci-infrastructure.md) | 1 | 01 | all | open |
 | 03 | [Base system module](03-base-system-module.md) | 2 | 01, 02 | all | open |
 | 04 | [Hyprland desktop stack](04-hyprland-desktop-stack.md) | 2 | 03 | all | open |
