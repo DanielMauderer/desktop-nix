@@ -129,6 +129,73 @@ onward. Graphical assertions are left to the relevant ticket (04 for Hyprland,
 
 ---
 
+## 011 — Update strategy: system.autoUpgrade from git main (2026-06-11)
+
+**Context:** Ticket 03 had to replace maudiblue's `rpm-ostreed-automatic.timer`
+staged auto-updates. Options were manual `nixos-rebuild` only, or
+`system.autoUpgrade` pointed at a flake ref.
+
+**Decision:** Enable `system.autoUpgrade` on every host, pulling
+`github:DanielMauderer/desktop-nix` (the `main` branch) on a weekly timer with
+`allowReboot = false`.
+
+**Consequences:** Hosts track `main` automatically, closest to the old staged
+behavior. Because nixpkgs is `nixos-unstable` (DECISIONS 005), an upstream
+break could land via auto-upgrade — mitigated by CI gating `main` and by
+no automatic reboots (kernel/initrd changes apply on the next manual reboot).
+Switching a host to manual-only is a one-line `enable = false` override.
+
+---
+
+## 012 — Bluetooth: stack only in base, GUI deferred (2026-06-11)
+
+**Context:** Ticket 03 asked whether the base module should ship a Bluetooth
+GUI (blueman) or leave it to the bar/desktop layer.
+
+**Decision:** base enables only `hardware.bluetooth` (the stack). Any GUI /
+applet is the desktop module's job (Ticket 04, alongside waybar).
+
+**Consequences:** Headless hosts (none today, but e.g. a future server) don't
+pull a GTK pairing tool. The desktop ticket owns the pairing UX end-to-end.
+
+---
+
+## 013 — CLI tool placement: minimal base, user CLI in home-manager (2026-06-11)
+
+**Context:** Ticket 03 listed `bat fd ripgrep fzf tree btop` as base CLI, but
+its open question recommended pushing user-facing CLI into home-manager.
+
+**Decision:** base keeps only system-level essentials (git, vim, wget, curl,
+wireguard-tools, pciutils, usbutils). User-facing CLI tools move to
+home-manager in Ticket 06.
+
+**Consequences:** The system closure stays small; user CLI lives with the rest
+of the user's environment and is per-user overridable. wireguard-tools stays
+in base because VPN is a system concern (and pairs with secrets in Ticket 12).
+
+---
+
+## 014 — Drop homebrew and the firstboot dotfiles clone (2026-06-11)
+
+**Context:** Ticket 03's "ask when starting" flagged maudiblue's
+`firstboot.service` (clones MyLinux + runs setup.sh) and the homebrew module.
+On Fedora atomic, homebrew was the pragmatic way to get host-level CLI tools
+without rpm-ostree layering (reboots) or toolbox (poor device/host
+integration, e.g. serial `tio`).
+
+**Decision:** Drop both. firstboot is obsolete — configuration is now
+declarative. homebrew is redundant on NixOS: `environment.systemPackages`,
+home-manager packages, and `nix shell` cover everything brew did, with no
+immutability workaround. Brew-installed tools migrate to nixpkgs in their
+respective tickets (CLI → 06, dev → 08).
+
+**Consequences:** No `/home/linuxbrew`, no brew auto-update timers. The
+concrete brew formula → nixpkgs mapping is a parity item: the user supplies
+`brew leaves` / `brew list --cask`, tracked against Tickets 06/08 and the
+final parity sweep (Ticket 17).
+
+---
+
 ## 004 — Migration order: private-laptop → work-laptop → desktop (2026-06-11)
 
 **Context:** Three machines with different risk profiles.
