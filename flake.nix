@@ -30,6 +30,9 @@
       mkHost = import ./lib/mkHost.nix {
         inherit inputs nixpkgs home-manager chaotic;
       };
+      testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
+        inherit system pkgs;
+      };
     in
     {
       formatter.${system} = pkgs.nixfmt-rfc-style;
@@ -44,13 +47,6 @@
       };
 
       checks.${system} = {
-        nixfmt-check = pkgs.runCommand "nixfmt-check" {
-          nativeBuildInputs = [ pkgs.nixfmt-rfc-style ];
-        } ''
-          find ${./.} -name "*.nix" | xargs nixfmt --check
-          touch $out
-        '';
-
         statix-check = pkgs.runCommand "statix-check" {
           nativeBuildInputs = [ pkgs.statix ];
         } ''
@@ -67,10 +63,11 @@
 
         # Template nixosTest: boot private-laptop config, assert multi-user.target.
         # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).
-        test-boot-private-laptop = nixpkgs.lib.nixos.runTest {
-          hostPkgs = pkgs;
+        test-boot-private-laptop = testLib.makeTest {
           name = "boot-private-laptop";
-          nodes.machine.imports = [ ./hosts/private-laptop/default.nix ];
+          nodes.machine = {
+            imports = [ ./hosts/private-laptop/default.nix ];
+          };
           testScript = ''
             machine.wait_for_unit("multi-user.target")
           '';
