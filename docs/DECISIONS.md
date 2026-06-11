@@ -46,6 +46,46 @@ trust the chaotic cache or skip the kernel build.
 
 ---
 
+## 005 — nixpkgs channel: nixos-unstable (2026-06-11)
+
+**Context:** Ticket 01 required choosing between `nixos-unstable` and a stable
+release for the nixpkgs input.
+
+**Decision:** Use `nixos-unstable`. Hyprland and chaotic-nyx move fast and
+both track unstable; using a stable branch would require constant back-porting
+or overlay pinning.
+
+**Consequences:** System is on rolling nixpkgs; occasional evaluation breakage
+is possible. Mitigated by CI catching broken builds before they reach hardware.
+
+---
+
+## 006 — Hyprland from the Hyprland flake, not nixpkgs (2026-06-11)
+
+**Context:** Ticket 04 (Hyprland desktop stack) needs Hyprland. It is also
+packaged in nixpkgs, but the upstream flake ships newer commits and the
+Hyprland project recommends it.
+
+**Decision:** Add `github:hyprwm/Hyprland` as a flake input, following
+nixpkgs. The input was added in Ticket 01 so the lock file is established
+early; the module wiring happens in Ticket 04.
+
+**Consequences:** Hyprland version follows the upstream flake, independent of
+the nixpkgs Hyprland package. Adds one extra flake input to track.
+
+---
+
+## 007 — Username: `maudi` on all machines (2026-06-11)
+
+**Context:** All three machines are personal, single-user.
+
+**Decision:** The primary user account is `maudi` on all three machines.
+
+**Consequences:** Modules can use a shared username constant rather than
+per-host overrides. If this ever changes, one value to update.
+
+---
+
 ## 004 — Migration order: private-laptop → work-laptop → desktop (2026-06-11)
 
 **Context:** Three machines with different risk profiles.

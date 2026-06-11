@@ -40,9 +40,17 @@ pkgs/        Custom packages (e.g. scripts packaged with writeShellApplication)
 
 ## Status
 
-The repository currently contains **only the skeleton and migration planning
-documents** — no functional Nix code yet. Work happens ticket by ticket:
+| Ticket | Description | Status |
+|--------|-------------|--------|
+| [01](docs/tickets/01-repo-bootstrap-flake-skeleton.md) | Repo bootstrap: flake skeleton | ✅ done |
+| [02](docs/tickets/02-testing-and-ci-infrastructure.md) | Testing & CI infrastructure | open |
+| 03–17 | Modules, hosts, archive | open |
+
+**Next step:** run `nix flake update` locally after pulling to generate
+`flake.lock`, then verify with `nix flake check` and
+`nix build .#nixosConfigurations.<host>.config.system.build.toplevel`.
 
 - Migration plan & phases: [docs/ROADMAP.md](docs/ROADMAP.md)
 - Ticket index: [docs/tickets/README.md](docs/tickets/README.md)
+- Architecture decisions: [docs/DECISIONS.md](docs/DECISIONS.md)
 - What's being migrated: [docs/INVENTORY.md](docs/INVENTORY.md)
