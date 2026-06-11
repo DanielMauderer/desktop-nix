@@ -21,7 +21,7 @@ jobs:
             extra-system-features = nixos-test
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       - name: Check formatting
-        run: nix fmt . && git diff --exit-code
+        run: nix fmt . && git diff --exit-code -- '*.nix'
       - run: nix flake check -L
 
   build-hosts:

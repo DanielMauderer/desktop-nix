@@ -28,7 +28,12 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       mkHost = import ./lib/mkHost.nix {
-        inherit inputs nixpkgs home-manager chaotic;
+        inherit
+          inputs
+          nixpkgs
+          home-manager
+          chaotic
+          ;
       };
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -47,19 +52,25 @@
       };
 
       checks.${system} = {
-        statix-check = pkgs.runCommand "statix-check" {
-          nativeBuildInputs = [ pkgs.statix ];
-        } ''
-          statix check ${./.}
-          touch $out
-        '';
+        statix-check =
+          pkgs.runCommand "statix-check"
+            {
+              nativeBuildInputs = [ pkgs.statix ];
+            }
+            ''
+              statix check ${./.}
+              touch $out
+            '';
 
-        deadnix-check = pkgs.runCommand "deadnix-check" {
-          nativeBuildInputs = [ pkgs.deadnix ];
-        } ''
-          deadnix --fail ${./.}
-          touch $out
-        '';
+        deadnix-check =
+          pkgs.runCommand "deadnix-check"
+            {
+              nativeBuildInputs = [ pkgs.deadnix ];
+            }
+            ''
+              deadnix --fail ${./.}
+              touch $out
+            '';
 
         # Template nixosTest: boot private-laptop config, assert multi-user.target.
         # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).
