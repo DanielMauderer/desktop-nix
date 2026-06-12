@@ -14,7 +14,8 @@ package layering from maudiblue's `recipe.yml` (see
 ## Sub-tasks
 
 - [x] Boot: systemd-boot + EFI (`base/boot.nix`; centralised out of host stubs)
-- [x] Locale, timezone, console keymap (`base/locale.nix`, German defaults via mkDefault)
+- [x] Locale, timezone, console keymap (`base/locale.nix`: EurKEY `eu` layout
+      ported from MyLinux, set system-wide; `console.useXkbConfig`)
 - [x] User account, `users.users.maudi.shell = pkgs.fish` (replaces `chsh` in setup.sh),
       groups (wheel, networkmanager, dialout; libvirtd/gamemode later via their modules)
 - [x] Networking: NetworkManager (`nmtui` is included — replaces `NetworkManager-tui` layer)
