@@ -1,5 +1,8 @@
 _: {
-  imports = [ ../../modules/nixos/base ];
+  imports = [
+    ../../modules/nixos/base
+    ../../modules/nixos/desktop
+  ];
 
   networking.hostName = "private-laptop";
   system.stateVersion = "25.05";

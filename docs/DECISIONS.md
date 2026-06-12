@@ -205,3 +205,100 @@ the work laptop, then the gaming desktop.
 
 **Consequences:** Gaming/CachyOS stack (Ticket 11) is validated last on real
 hardware, even though it can be developed and CI-built earlier.
+
+---
+
+## 015 — Greeter: greetd + tuigreet (2026-06-12)
+
+**Context:** Ticket 04 needed a login manager to launch the Hyprland session.
+Options were greetd+tuigreet, SDDM, or autologin.
+
+**Decision:** Use `greetd` with `tuigreet`, launching `Hyprland` directly.
+
+**Consequences:** A minimal, Wayland-native TUI greeter with no Qt/X
+dependency. Themed via tuigreet flags rather than a GUI theme engine. If a
+graphical greeter is ever wanted (e.g. fingerprint UX), SDDM is a drop-in swap
+in `modules/nixos/desktop/greetd.nix`.
+
+---
+
+## 016 — Lock screen: swaylock + swayidle (2026-06-12)
+
+**Context:** The old config mixed `swaylock`/`swayidle` (hyprland.conf
+exec-once, SUPER+L) with `hyprlock`/`hypridle` (XF86Lock, power.sh, an unbound
+waybar toggle). Two idle/lock stacks for one machine.
+
+**Decision:** Standardise on `swaylock` (the `swaylock-effects` package, so the
+matugen-generated config in Ticket 05 keeps its `image=`/`fade-in`/`grace`
+options) driven by `swayidle`. `hyprlock`/`hypridle` and their scripts are
+dropped.
+
+**Consequences:** One idle/lock stack. swaylock's PAM service is enabled
+system-side (`security.pam.services.swaylock`). Ticket 05 themes the lock
+screen; Ticket 11's gamemode is unaffected.
+
+---
+
+## 017 — Monitor management: kanshi (2026-06-12)
+
+**Context:** The old setup cycled monitor/workspace layouts by **rewriting**
+`conf/monitor.conf` and `conf/workspace.conf` inside the config dir
+(`monitor-hotplug.sh`, `switch_hypr_env.sh`) — incompatible with read-only
+home-manager-managed config.
+
+**Decision:** Use `kanshi`, which applies the first output profile whose
+monitors are all connected. The old per-resolution `.conf` files become kanshi
+profiles (desktop dual-head, work-laptop docked/undocked, laptop-internal).
+Dock/undock is automatic; no keybind or file writes.
+
+**Consequences:** `monitor-hotplug.sh`/`switch_hypr_env.sh` are dropped. Output
+names/modes are lifted from the old configs and verified on hardware in Tickets
+13–15, where per-host workspace→monitor assignment is also layered in.
+
+---
+
+## 018 — Polkit agent: hyprpolkitagent (2026-06-12)
+
+**Context:** maudiblue shipped `lxqt-policykit`. Ticket 04 had to pick a polkit
+authentication agent for the Hyprland session.
+
+**Decision:** Use `hyprpolkitagent` (hyprwm), matching the upstream-flake
+Hyprland stack. Started from the user session via `exec-once`.
+
+**Consequences:** One fewer Qt/LXQt dependency; the agent tracks the Hyprland
+project. `security.polkit.enable` is set system-side.
+
+---
+
+## 019 — Hyprland config form: native home-manager settings (2026-06-12)
+
+**Context:** Ticket 04 could keep the old modular `hypr/conf/*.conf` files
+verbatim (`xdg.configFile`) or translate them into
+`wayland.windowManager.hyprland.settings`.
+
+**Decision:** Translate to native home-manager settings. Window rules are
+expressed in the unified `windowrule` string form; the colour variables used by
+the gradient borders are static defaults that Ticket 05 replaces with matugen
+output.
+
+**Consequences:** The config is type-checked Nix and store-path references to
+packaged scripts are exact. The trade-off is an up-front translation; the old
+modular file layout is not preserved. `configType = "hyprlang"` is pinned (the
+HM default flips to Lua at stateVersion 26.05).
+
+---
+
+## 020 — Desktop runtime state: $XDG_STATE_HOME/desktop-nix (2026-06-12)
+
+**Context:** focus-mode and gamemode kept their on/off flags in
+`~/.config/ml4w/settings/` — inside the (now read-only) HM config tree, under
+the leftover ML4W namespace.
+
+**Decision:** Move runtime flags to `$XDG_STATE_HOME/desktop-nix/`
+(`~/.local/state/desktop-nix/`). focus-mode is additionally redesigned to apply
+its workspace rule with `hyprctl keyword` instead of rewriting a tracked
+`focus-mode-rules.conf`.
+
+**Consequences:** No runtime writes into the HM-managed config dir. The `ml4w`
+namespace is retired. Ticket 05's matugen wallpaper/colour cache will follow the
+same writable-path pattern.
