@@ -1,0 +1,163 @@
+/* Default Material You palette (from the old apply_matugen.sh fallbacks).
+ * Ticket 05 replaces this block with matugen-generated colours; the rest of
+ * the stylesheet is the old waybar/style.css verbatim (its two @import lines,
+ * mocha.css and the runtime-generated matugen.css, are folded in here). */
+@define-color text #e2e2e9;
+@define-color subtext1 #c4c6d0;
+@define-color subtext0 #8e9099;
+@define-color overlay2 #33353a;
+@define-color overlay1 #282a2f;
+@define-color overlay0 #1e2025;
+@define-color base #111318;
+@define-color mantle #282a2f;
+@define-color crust #0c0e13;
+@define-color mauve #abc7ff;
+@define-color red #ffb4ab;
+@define-color sky #bec6dc;
+@define-color green #ddbce0;
+
+* {
+    min-height: 0;
+    font-family: "JetBrainsMonoNL Nerd Font", "Fira Sans Semibold", "Font Awesome 6 Free", FontAwesome, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+}
+/* Waybar */
+#waybar {
+    background-color: transparent;
+}
+
+#waybar .module {
+    color: @text;
+    padding: 0px 0px;
+    margin: -10px 6px -10px;
+    padding-left: 2px;
+    margin: -10px 7px -10px;
+    border: 2px;
+}
+
+#waybar .module:hover {
+    color: @subtext1;
+
+}
+
+#window#waybar {
+    color: @text;
+    background-color: @base;
+    transition-property:  background-color;
+    transition-duration: 0.5s;
+    border: 2px solid @mauve;
+}
+
+button {
+    box-shadow: inset 0 -3px transparent;
+    border: none;
+    border-radius: 2px;
+    padding: 0px 5px;
+    margin: 5px 0px;
+}
+
+button:hover {
+    background: inherit;
+    box-shadow: inset 0 -3px transparent;
+}
+
+#workspaces button {
+    box-shadow: none;
+    text-shadow: none;
+    padding: 0px;
+    border-radius: 8px;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    margin-left: 0px;
+    padding-left: 3px;
+    padding-right: 3px;
+    margin-right: 0px;
+    color: @text;
+    animation: ws_normal 20s ease-in-out 1;
+}
+
+#workspaces button.active {
+    background: @mauve;
+    color: @crust;
+    border-radius:  4.5pt;
+    margin-left: 0px;
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-right: 0px;
+    animation: ws_active 20s ease-in-out 1;
+    transition: all 0.4s cubic-bezier(.55,-0.68,.48,1.682);
+}
+
+#workspaces button:hover {
+    background: @mantle;
+    color: @text;
+    animation: ws_hover 20s ease-in-out 1;
+    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.682);
+}
+
+#clock {
+    font-size: 14px;
+}
+
+#custom-notification {
+    color: @text;
+}
+
+#group-10,
+#group-9,
+#group-8,
+#group-7,
+#group-6,
+#group-10,
+#group-5,
+#group-4,
+#group-3,
+#group-2,
+#group-1 {
+    border-radius: 4.5pt;
+    background: @base;
+    margin: 0px 3px;
+    border-radius: 6px;
+    background: @base;
+    border: 2px;
+}
+
+#custom-next, #custom-pause, #custom-previous {
+  font-size: 15px;
+}
+
+#network.disconnected,
+#pulseaudio.muted,
+#wireplumber.muted {
+    color: @red;
+}
+
+#battery.charging,
+#battery.plugged {
+    color: @green;
+}
+
+label:focus {
+    background-color: @base;
+}
+
+#battery.critical:not(.charging) {
+    color: @red;
+    animation-name: blink;
+    animation-duration: 0.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+#custom-vpn {
+    padding: 0 10px;
+}
+
+#custom-vpn.connected {
+    color: #a6e3a1;
+}
+
+#custom-vpn.disconnected {
+    color: #f38ba8;
+}

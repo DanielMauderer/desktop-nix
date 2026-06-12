@@ -1,0 +1,153 @@
+/* Ported from the old rofi/theme.rasi. The original `@import "colors"`
+ * (matugen, generated at runtime) is replaced by the static default palette
+ * below; Ticket 05 reintroduces matugen-driven colours. */
+* {
+    bg:           #111318;
+    bg-alt:       #1e2025;
+    bg-trans:     #111318ee;
+    fg:           #e2e2e9;
+    fg-alt:       #c4c6d0;
+    fg-disabled:  #8e9099;
+    accent:       #abc7ff;
+    urgent:       #ffb4ab;
+    border:       #abc7ff;
+}
+
+* {
+    background-color:       transparent;
+    text-color:             @fg;
+    margin:                 0;
+    padding:                0;
+    spacing:                0;
+}
+
+window {
+    location:               center;
+    width:                  680px;
+    border-radius:          16px;
+    background-color:       @bg-trans;
+    border:                 2px solid;
+    border-color:           @border;
+}
+
+mainbox {
+    padding:                16px;
+    spacing:                16px;
+}
+
+inputbar {
+    padding:                12px 16px;
+    spacing:                12px;
+    children:               [ icon-search, entry ];
+    background-color:       @bg-alt;
+    border-radius:          12px;
+}
+
+icon-search {
+    expand:                 false;
+    filename:               "search";
+    size:                   20px;
+    vertical-align:         0.5;
+}
+
+icon-search, entry, element-icon, element-text {
+    vertical-align:         0.5;
+}
+
+entry {
+    placeholder:            "Search...";
+    placeholder-color:      @fg-disabled;
+    font:                   "JetBrainsMono Nerd Font 12";
+}
+
+message {
+    background-color:       @bg-alt;
+    border-radius:          12px;
+}
+
+textbox {
+    padding:                12px 16px;
+}
+
+listview {
+    lines:                  8;
+    columns:                1;
+    fixed-height:           false;
+    spacing:                4px;
+}
+
+element {
+    padding:                10px 16px;
+    spacing:                16px;
+    border-radius:          10px;
+}
+
+element normal normal {
+    text-color:             @fg;
+}
+
+element normal urgent {
+    text-color:             @urgent;
+}
+
+element normal active {
+    text-color:             @accent;
+}
+
+element selected normal,
+element selected active {
+    background-color:       @accent;
+    text-color:             @bg;
+}
+
+element selected urgent {
+    background-color:       @urgent;
+    text-color:             @bg;
+}
+
+element alternate normal {
+    text-color:             @fg;
+}
+
+element alternate urgent {
+    text-color:             @urgent;
+}
+
+element alternate active {
+    text-color:             @accent;
+}
+
+element-icon {
+    size:                   28px;
+}
+
+element-text {
+    text-color:             inherit;
+    highlight:              bold underline;
+}
+
+mode-switcher {
+    padding:                8px;
+    spacing:                8px;
+    background-color:       @bg-alt;
+    border-radius:          12px;
+}
+
+button {
+    padding:                8px 16px;
+    border-radius:          8px;
+    text-color:             @fg-alt;
+    font:                   "JetBrainsMono Nerd Font 10";
+}
+
+button selected {
+    background-color:       @accent;
+    text-color:             @bg;
+}
+
+scrollbar {
+    handle-width:           4px;
+    handle-color:           @accent;
+    border-radius:          4px;
+    margin:                 0 0 0 8px;
+}

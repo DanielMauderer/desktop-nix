@@ -38,6 +38,20 @@
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
       };
+
+      # Shared nixosTest node: the private-laptop host plus the home-manager
+      # NixOS module and `inputs` that mkHost normally supplies (the host now
+      # pulls in modules/nixos/desktop, which configures home-manager and reads
+      # the Hyprland flake input).
+      testNode = {
+        imports = [
+          home-manager.nixosModules.home-manager
+          ./hosts/private-laptop/default.nix
+        ];
+        _module.args.inputs = inputs;
+        home-manager.useGlobalPkgs = true;
+        home-manager.useUserPackages = true;
+      };
     in
     {
       formatter.${system} = pkgs.nixfmt-rfc-style;
@@ -76,9 +90,7 @@
         # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).
         test-boot-private-laptop = testLib.makeTest {
           name = "boot-private-laptop";
-          nodes.machine = {
-            imports = [ ./hosts/private-laptop/default.nix ];
-          };
+          nodes.machine = testNode;
           testScript = ''
             machine.wait_for_unit("multi-user.target")
           '';
@@ -89,9 +101,7 @@
         # module, so booting it exercises modules/nixos/base.
         test-base-system = testLib.makeTest {
           name = "base-system";
-          nodes.machine = {
-            imports = [ ./hosts/private-laptop/default.nix ];
-          };
+          nodes.machine = testNode;
           testScript = ''
             machine.wait_for_unit("multi-user.target")
 
@@ -107,6 +117,35 @@
 
             # Fonts actually land.
             machine.succeed("fc-list | grep -i 'JetBrainsMono Nerd Font'")
+          '';
+        };
+
+        # Desktop stack (Ticket 04): the host now imports modules/nixos/desktop,
+        # so booting it exercises the Hyprland session registration, greeter,
+        # polkit agent and the maudi home-manager generation (waybar, swaylock).
+        test-desktop = testLib.makeTest {
+          name = "desktop";
+          nodes.machine = testNode;
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+
+            # Greeter is up and the Hyprland session binary is installed.
+            machine.wait_for_unit("greetd.service")
+            machine.succeed("test -x /run/current-system/sw/bin/Hyprland")
+
+            # Power-profile backend for the waybar module is running.
+            machine.wait_for_unit("power-profiles-daemon.service")
+
+            # maudi's home generation built the user desktop: the bar, the lock
+            # binary and the polkit agent unit are all present in the profile.
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/waybar")
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/swaylock")
+            machine.succeed(
+                "test -e /etc/profiles/per-user/maudi/share/systemd/user/hyprpolkitagent.service"
+            )
+
+            # The Hyprland user config was rendered by home-manager.
+            machine.succeed("test -e /home/maudi/.config/hypr/hyprland.conf")
           '';
         };
       };

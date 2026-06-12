@@ -14,17 +14,17 @@ Status legend: `open` → `migrated` / `dropped`.
 |---|---|---|---|---|
 | fish | login shell | `programs.fish` + user shell | 03/06 | open |
 | fastfetch | system info | home package + config port | 06 | open |
-| wlogout | logout menu | hyprland desktop module | 04 | open |
+| wlogout | logout menu | hyprland desktop module | 04 | migrated |
 | NetworkManager-tui | network TUI | NetworkManager (nmtui included) | 03 | migrated |
 | waydroid | Android container | `virtualisation.waydroid` (keep? ask) | 16 | open |
 | virt-manager, libvirt, qemu-kvm, virt-viewer | VMs | `virtualisation.libvirtd` module | 09 | open |
-| lxqt-policykit | polkit agent | desktop module (or alternative agent) | 04 | open |
-| swaylock | lock screen | desktop module | 04 | open |
+| lxqt-policykit | polkit agent | hyprpolkitagent instead (DECISIONS 018) | 04 | migrated |
+| swaylock | lock screen | desktop module (swaylock-effects) | 04 | migrated |
 | podman-compose | containers | dev module (podman + compose) | 08 | open |
 | wireguard-tools | VPN | base + secrets for configs | 03/12 | migrated |
 | bat, fd-find, ripgrep, fzf, tree, btop | CLI tools | home-manager (moved out of base, DECISIONS 013) | 06 | open |
 | neovim, python3-neovim | editor | neovim module | 07 | open |
-| swaybg, swayidle | wallpaper / idle | desktop module | 04 | open |
+| swaybg, swayidle | wallpaper / idle | desktop module | 04 | migrated |
 | papirus-icon-theme | icons | theming module | 05 | open |
 
 ## 2. maudiblue — flatpaks
@@ -58,11 +58,11 @@ Status legend: `open` → `migrated` / `dropped`.
 
 | Dir | App | Target | Ticket | Status |
 |---|---|---|---|---|
-| `hypr/` | Hyprland + scripts | HM hyprland module + `pkgs/` scripts | 04 | open |
-| `waybar/` | status bar | HM module | 04 | open |
-| `dunst/` | notifications | HM module | 04 | open |
-| `rofi/` | launcher | HM module | 04 | open |
-| `wlogout/` | logout menu | HM module | 04 | open |
+| `hypr/` | Hyprland + scripts | HM hyprland module + `pkgs/` scripts | 04 | migrated |
+| `waybar/` | status bar | HM module | 04 | migrated |
+| `dunst/` | notifications | HM module (dir was empty; shipped defaults) | 04 | migrated |
+| `rofi/` | launcher | HM module | 04 | migrated |
+| `wlogout/` | logout menu | HM module (text labels, no PNG icons) | 04 | migrated |
 | `kitty/` | terminal | HM module | 06 | open |
 | `fish/` | shell | `programs.fish` | 06 | open |
 | `fastfetch/` | system info | HM module | 06 | open |
@@ -81,7 +81,7 @@ Status legend: `open` → `migrated` / `dropped`.
 | eza | cargo install (toolbox) | nixpkgs | 06 | open |
 | matugen | cargo install (toolbox) | nixpkgs | 05 | open |
 | cargo-nextest, bacon | cargo install (toolbox) | nixpkgs | 08 | open |
-| hyprshot | git clone → `~/.local/bin` | nixpkgs | 04 | open |
+| hyprshot | git clone → `~/.local/bin` | nixpkgs | 04 | migrated |
 | fisher + tide prompt | interactive fish install | `fishPlugins.tide` or HM-managed fisher | 06 | open |
 | nvm / node | fisher plugin + nvm | nix per-project or global node | 08 | open |
 | fish as default shell | `chsh` | `users.users.maudi.shell = pkgs.fish` | 03 | migrated |
@@ -92,9 +92,9 @@ Status legend: `open` → `migrated` / `dropped`.
 |---|---|---|---|
 | `hypr/cache/current_wallpaper.png` | cache in `~/.config`; hardcoded path in hyprland.conf + scripts | 05 | open |
 | matugen-generated files (kitty/waybar/dunst/rofi/hypr/swaylock colors) | written into config dir at runtime — clashes with read-only HM symlinks | 05 | open |
-| `monitor.conf` / `workspace.conf` rewritten by `monitor-hotplug.sh` | runtime mutation of config dir | 04 | open |
-| `focus-mode-rules.conf` rewritten by `focus-mode.sh` | runtime mutation of config dir | 04 | open |
-| `~/.config/ml4w/settings/{focusmode,gamemode}-enabled` | state in config dir, dir not in repo | 04 | open |
+| `monitor.conf` / `workspace.conf` rewritten by `monitor-hotplug.sh` | runtime mutation of config dir | 04 | migrated (kanshi, DECISIONS 017) |
+| `focus-mode-rules.conf` rewritten by `focus-mode.sh` | runtime mutation of config dir | 04 | migrated (`hyprctl keyword`, DECISIONS 020) |
+| `~/.config/ml4w/settings/{focusmode,gamemode}-enabled` | state in config dir, dir not in repo | 04 | migrated (`$XDG_STATE_HOME/desktop-nix`, DECISIONS 020) |
 
 ## 8. Known issues in the old config (resolve in "Ask when starting")
 
