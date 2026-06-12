@@ -133,8 +133,10 @@
             machine.wait_for_unit("greetd.service")
             machine.succeed("test -x /run/current-system/sw/bin/Hyprland")
 
-            # Power-profile backend for the waybar module is running.
-            machine.wait_for_unit("power-profiles-daemon.service")
+            # Power-profile backend for the waybar module. It is D-Bus
+            # activated (inactive at boot), so verify it is installed and
+            # actually starts rather than waiting for it.
+            machine.succeed("systemctl start power-profiles-daemon.service")
 
             # maudi's home generation built the user desktop: the bar, the lock
             # binary and the polkit agent unit are all present in the profile.
