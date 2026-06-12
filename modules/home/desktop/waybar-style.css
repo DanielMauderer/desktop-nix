@@ -29,7 +29,6 @@
 #waybar .module {
     color: @text;
     padding: 0px 0px;
-    margin: -10px 6px -10px;
     padding-left: 2px;
     margin: -10px 7px -10px;
     border: 2px;
@@ -114,8 +113,6 @@ button:hover {
 #group-3,
 #group-2,
 #group-1 {
-    border-radius: 4.5pt;
-    background: @base;
     margin: 0px 3px;
     border-radius: 6px;
     background: @base;
