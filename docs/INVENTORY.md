@@ -15,14 +15,14 @@ Status legend: `open` → `migrated` / `dropped`.
 | fish | login shell | `programs.fish` + user shell | 03/06 | open |
 | fastfetch | system info | home package + config port | 06 | open |
 | wlogout | logout menu | hyprland desktop module | 04 | open |
-| NetworkManager-tui | network TUI | NetworkManager (nmtui included) | 03 | open |
+| NetworkManager-tui | network TUI | NetworkManager (nmtui included) | 03 | migrated |
 | waydroid | Android container | `virtualisation.waydroid` (keep? ask) | 16 | open |
 | virt-manager, libvirt, qemu-kvm, virt-viewer | VMs | `virtualisation.libvirtd` module | 09 | open |
 | lxqt-policykit | polkit agent | desktop module (or alternative agent) | 04 | open |
 | swaylock | lock screen | desktop module | 04 | open |
 | podman-compose | containers | dev module (podman + compose) | 08 | open |
-| wireguard-tools | VPN | base + secrets for configs | 03/12 | open |
-| bat, fd-find, ripgrep, fzf, tree, btop | CLI tools | base CLI set | 03 | open |
+| wireguard-tools | VPN | base + secrets for configs | 03/12 | migrated |
+| bat, fd-find, ripgrep, fzf, tree, btop | CLI tools | home-manager (moved out of base, DECISIONS 013) | 06 | open |
 | neovim, python3-neovim | editor | neovim module | 07 | open |
 | swaybg, swayidle | wallpaper / idle | desktop module | 04 | open |
 | papirus-icon-theme | icons | theming module | 05 | open |
@@ -40,16 +40,16 @@ Status legend: `open` → `migrated` / `dropped`.
 
 | Fonts | Target | Ticket | Status |
 |---|---|---|---|
-| Nerd Fonts: FiraCode, Hack, SourceCodePro, Terminus, JetBrainsMono, SymbolsOnly | `fonts.packages` (`nerd-fonts.*`) | 03 | open |
-| Google Fonts: Roboto, Open Sans | `fonts.packages` | 03 | open |
+| Nerd Fonts: FiraCode, Hack, SourceCodePro, Terminus, JetBrainsMono, SymbolsOnly | `fonts.packages` (`nerd-fonts.*`) | 03 | migrated |
+| Google Fonts: Roboto, Open Sans | `fonts.packages` | 03 | migrated |
 
 ## 4. maudiblue — services & mechanisms
 
 | Item | Target | Ticket | Status |
 |---|---|---|---|
-| firstboot.service (clones MyLinux, runs setup.sh) | **obsolete** — config is declarative (confirm drop) | 03 | open |
-| rpm-ostreed-automatic.timer (staged auto-updates) | `system.autoUpgrade` decision | 03 | open |
-| homebrew/linuxbrew module | **drop** — nixpkgs replaces it (confirm) | 03 | open |
+| firstboot.service (clones MyLinux, runs setup.sh) | **dropped** — config is declarative (DECISIONS 014) | 03 | dropped |
+| rpm-ostreed-automatic.timer (staged auto-updates) | `system.autoUpgrade` from main (DECISIONS 011) | 03 | migrated |
+| homebrew/linuxbrew module | **dropped** — nixpkgs replaces it (DECISIONS 014); tool parity → 06/08/17 | 03 | dropped |
 | libvirtd.service enabled | virtualisation module | 09 | open |
 | BlueBuild GitHub Action (daily image build) | disabled at archive time | 17 | open |
 | cosign image signing | n/a on NixOS (flake.lock + git history instead) | 17 | open |
@@ -84,7 +84,7 @@ Status legend: `open` → `migrated` / `dropped`.
 | hyprshot | git clone → `~/.local/bin` | nixpkgs | 04 | open |
 | fisher + tide prompt | interactive fish install | `fishPlugins.tide` or HM-managed fisher | 06 | open |
 | nvm / node | fisher plugin + nvm | nix per-project or global node | 08 | open |
-| fish as default shell | `chsh` | `users.users.<user>.shell` | 03 | open |
+| fish as default shell | `chsh` | `users.users.maudi.shell = pkgs.fish` | 03 | migrated |
 
 ## 7. MyLinux — runtime state & generated files (need writable-path design)
 

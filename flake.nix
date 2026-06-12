@@ -83,6 +83,32 @@
             machine.wait_for_unit("multi-user.target")
           '';
         };
+
+        # Base system module: user + fish login shell, NetworkManager, PipeWire,
+        # and that the configured fonts actually land. The host imports the base
+        # module, so booting it exercises modules/nixos/base.
+        test-base-system = testLib.makeTest {
+          name = "base-system";
+          nodes.machine = {
+            imports = [ ./hosts/private-laptop/default.nix ];
+          };
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+
+            # User exists with fish as its login shell.
+            machine.succeed("id maudi")
+            machine.succeed("getent passwd maudi | grep -q 'bin/fish'")
+
+            # NetworkManager is up.
+            machine.wait_for_unit("NetworkManager.service")
+
+            # PipeWire is wired into the user session (socket unit installed).
+            machine.succeed("test -e /etc/systemd/user/sockets.target.wants/pipewire.socket")
+
+            # Fonts actually land.
+            machine.succeed("fc-list | grep -i 'JetBrainsMono Nerd Font'")
+          '';
+        };
       };
 
       nixosConfigurations = {
