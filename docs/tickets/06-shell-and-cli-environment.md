@@ -1,6 +1,6 @@
 # 06 — Shell & CLI environment
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 03
 - **Machines:** all
 
@@ -14,47 +14,53 @@ lazygit.
 
 ## Sub-tasks
 
-- [ ] `programs.fish` with content from `fish/config.fish`, `aliases.fish`,
-      `functions.fish` (mkcd, extract, killf, gst, …)
-- [ ] Audit aliases for NixOS-isms: `tb`/`tbr` (toolbox) are obsolete —
-      replace with devshell equivalents (Ticket 08); `docker`→`podman` stays;
-      update-related aliases (`rpm-ostree upgrade`) → `nixos-rebuild` wrappers
-- [ ] Prompt: tide via `fishPlugins.tide` (declarative) vs keep fisher
-      imperative — decide; if tide: pin its settings declaratively instead of
-      relying on `tide configure`'s universal variables
-- [ ] CLI tools as `home.packages`: `eza` (was cargo/toolbox), `zoxide`,
-      whatever `aliases.fish`/`functions.fish` reference — audit and list
-- [ ] kitty: port `kitty.conf` (color include hook per Ticket 05)
-- [ ] fastfetch: port `config.jsonc`
-- [ ] lazygit: port config
-- [ ] Node/nvm: the fisher nvm plugin goes away — decide global node vs
-      per-project (hand off to Ticket 08)
-- [ ] Retire `setup.sh` symlink + fisher logic (document in INVENTORY.md)
+- [x] `programs.fish` with content from `fish/config.fish`, `aliases.fish`,
+      `functions.fish` (mkcd, extract, killf, gst, …) →
+      `modules/home/cli/fish.nix`
+- [x] Audit aliases for NixOS-isms: `tb`/`tbr` removed; `docker`→`podman`
+      kept (dormant until Ticket 08); `update` is now
+      `sudo nixos-rebuild switch --flake ~/desktop-nix`; the cargo/`gs`
+      aliases stay dormant until Ticket 08
+- [x] Prompt: **starship** (`programs.starship`), not tide — declarative and
+      stylix-themed, so no `tide configure` / universal-var dependence
+      (DECISIONS 023)
+- [x] CLI tools as `home.packages`: `eza zoxide bat fd ripgrep fzf tree btop
+      fastfetch delta` (zoxide via `programs.zoxide` for the fish hook) →
+      `modules/home/cli/default.nix`
+- [x] kitty: ported to `programs.kitty` (colours/font owned by stylix, old
+      `include colors.conf` dropped; opacity via `stylix.opacity.terminal`)
+- [x] fastfetch: ported `config.jsonc` → `programs.fastfetch.settings`
+- [x] lazygit: `pkgs.lazygit` + vendored `config.yml` via `xdg.configFile`
+      (not `programs.lazygit`, whose module clobbers the verbatim file)
+- [x] Node/nvm: the fisher nvm plugin + `load_nvm` removed; node handed off
+      to Ticket 08
+- [x] Retire `setup.sh` symlink + fisher logic (documented in INVENTORY.md
+      §5/§6)
 
 ## Testing
 
-- [ ] Baseline: flake check, linters, all host builds, CI green
-- [ ] `nixosTest`: login as user in VM, run `fish -c` smoke tests — aliases
-      resolve (`type ls` → eza, `type cat` → bat), custom functions defined,
-      no startup errors/warnings on first launch
-- [ ] Tide prompt renders without running `tide configure` (fresh-home test:
-      VM has no pre-existing universal variables)
-- [ ] kitty starts with the config (config-parse check; full render test on
-      hardware)
+- [x] Baseline: extended `baseAssertions` (fish + starship enabled) and the
+      `test-base-system` nixosTest (configs rendered, aliases/functions
+      resolve, CLI tools on PATH) — runs in `nix flake check`
+- [x] `nixosTest`: `fish -ic` smoke tests — `type ls` → eza, `type cat` →
+      bat, `mkcd`/`gst` defined, `fish -ic true` exits cleanly
+- [x] Prompt renders declaratively on a fresh home: starship binary present,
+      `functions -q starship`, and tide is asserted absent (no universal-var
+      setup needed)
+- [x] kitty config rendered (`~/.config/kitty/kitty.conf`); full render test
+      on hardware in Tickets 13–15
 
 ## Open questions
 
-- [ ] tide via nixpkgs `fishPlugins.tide` vs fisher — and how to make tide's
-      settings (normally universal vars written by `tide configure`)
-      declarative and reproducible on a fresh machine?
-- [ ] Keep the `fpi`-style flatpak aliases (depends on Ticket 10's outcome)?
-- [ ] eza/bat/fd exist both as maudiblue system packages (Ticket 03) and
-      user tools — single home for them? (Recommendation: HM here.)
+- [x] Prompt — resolved: **starship**, not tide/fisher (DECISIONS 023).
+- [x] flatpak aliases — resolved: **dropped** until Ticket 10 decides flatpak.
+- [x] eza/bat/fd home — resolved: home-manager only (base never shipped them,
+      DECISIONS 013).
 
 ## Ask when starting
 
-- `fish_plugins` lists fisher+tide but the generated functions are gitignored
-  and installed interactively by setup.sh (not idempotent) — confirm full
-  declarative management is wanted (no fisher self-update flow anymore).
-- Some aliases reference toolbox paths (`~/.cargo/bin` inside dev-tools) that
-  won't exist — confirm cleanup as part of this ticket.
+- Full declarative management confirmed: fisher/tide retired, no self-update
+  flow; the prompt is starship.
+- toolbox/cargo-path aliases confirmed for cleanup: `tb`/`tbr` removed; the
+  cargo and `gs` aliases are kept but dormant until their tools land in
+  Ticket 08.

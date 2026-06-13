@@ -2,12 +2,11 @@
 # modules call. Programs with their own home-manager module (waybar, rofi,
 # wlogout, swaylock, dunst) are NOT listed here.
 #
-# kitty is installed so the terminal bind works; its configuration is owned by
-# Ticket 06. Flatpak apps (zen-browser, spotify, …) are Ticket 10.
+# kitty (the SUPER+RETURN terminal) is provided by `programs.kitty` in the cli
+# module (Ticket 06). Flatpak apps (zen-browser, spotify, …) are Ticket 10.
 { pkgs, ... }:
 {
   home.packages = with pkgs; [
-    kitty # SUPER+RETURN terminal (config: Ticket 06)
     thunar # SUPER+E file manager
     hyprshot # SUPER+S / SUPER+SHIFT+S screenshots
     hyprpicker # colour picker (layerrule)
