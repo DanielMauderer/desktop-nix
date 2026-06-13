@@ -82,7 +82,7 @@ Status legend: `open` → `migrated` / `dropped`.
 | matugen | cargo install (toolbox) | nixpkgs | 05 | open |
 | cargo-nextest, bacon | cargo install (toolbox) | nixpkgs | 08 | open |
 | hyprshot | git clone → `~/.local/bin` | nixpkgs | 04 | migrated |
-| fisher + tide prompt | interactive fish install | **dropped** — starship instead (DECISIONS 023) | 06 | migrated |
+| fisher + tide prompt | interactive fish install | **dropped** — starship instead (DECISIONS 023) | 06 | dropped |
 | nvm / node | fisher plugin + nvm | nix per-project or global node | 08 | open |
 | fish as default shell | `chsh` | `users.users.maudi.shell = pkgs.fish` | 03 | migrated |
 

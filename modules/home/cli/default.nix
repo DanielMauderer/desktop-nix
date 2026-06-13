@@ -15,16 +15,31 @@
     ./lazygit.nix
   ];
 
-  home.packages = with pkgs; [
-    eza # ls replacement (was cargo/toolbox in the old setup)
-    bat # cat/less/more replacement
-    fd # find replacement
-    ripgrep # rg
-    fzf # fuzzy finder
-    tree # directory tree
-    btop # top replacement
-    delta # diff pager used by lazygit
-  ];
+  home = {
+    packages = with pkgs; [
+      eza # ls replacement (was cargo/toolbox in the old setup)
+      bat # cat/less/more replacement
+      fd # find replacement
+      ripgrep # rg
+      fzf # fuzzy finder
+      tree # directory tree
+      btop # top replacement
+      delta # diff pager used by lazygit
+    ];
+
+    sessionVariables = {
+      EDITOR = "nvim";
+      VISUAL = "nvim";
+      GIT_EDITOR = "nvim";
+    };
+
+    # Replaces `set -gx PATH $PATH ~/.local/bin` from config.fish.
+    sessionPath = [ "$HOME/.local/bin" ];
+
+    # mkDefault so this module is self-sufficient on a hypothetical host that
+    # loads base but not the desktop module (which also sets 25.05).
+    stateVersion = lib.mkDefault "25.05";
+  };
 
   # zoxide ships a fish hook (the `z`/`zi` smart-cd) — enable its integration
   # rather than just dropping the binary in.
@@ -42,17 +57,4 @@
   # agent per shell. The home-manager service starts one agent and exports
   # SSH_AUTH_SOCK for the session instead.
   services.ssh-agent.enable = true;
-
-  home.sessionVariables = {
-    EDITOR = "nvim";
-    VISUAL = "nvim";
-    GIT_EDITOR = "nvim";
-  };
-
-  # Replaces `set -gx PATH $PATH ~/.local/bin` from config.fish.
-  home.sessionPath = [ "$HOME/.local/bin" ];
-
-  # mkDefault so this module is self-sufficient on a hypothetical host that
-  # loads base but not the desktop module (which also sets 25.05).
-  home.stateVersion = lib.mkDefault "25.05";
 }

@@ -1,6 +1,6 @@
 # 06 — Shell & CLI environment
 
-- **Status:** migrated
+- **Status:** done
 - **Depends on:** 03
 - **Machines:** all
 
@@ -30,7 +30,8 @@ lazygit.
 - [x] kitty: ported to `programs.kitty` (colours/font owned by stylix, old
       `include colors.conf` dropped; opacity via `stylix.opacity.terminal`)
 - [x] fastfetch: ported `config.jsonc` → `programs.fastfetch.settings`
-- [x] lazygit: `programs.lazygit` + vendored `config.yml`
+- [x] lazygit: `pkgs.lazygit` + vendored `config.yml` via `xdg.configFile`
+      (not `programs.lazygit`, whose module clobbers the verbatim file)
 - [x] Node/nvm: the fisher nvm plugin + `load_nvm` removed; node handed off
       to Ticket 08
 - [x] Retire `setup.sh` symlink + fisher logic (documented in INVENTORY.md

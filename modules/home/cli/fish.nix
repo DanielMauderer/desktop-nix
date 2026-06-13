@@ -114,9 +114,15 @@ _: {
         end
       '';
 
-      # Find and kill processes matching a pattern.
+      # Find and kill processes matching a pattern. pgrep -f matches safely
+      # (no grep-on-ps-aux self-matches); guard the empty-pattern case so we
+      # never feed kill an empty arg list.
       killf = ''
-        ps aux | grep -v grep | grep $argv[1] | awk '{print $2}' | xargs kill -9
+        if test (count $argv) -eq 0
+            echo "usage: killf <pattern>"
+            return 1
+        end
+        pgrep -f -- $argv[1] | xargs --no-run-if-empty kill -9
       '';
 
       # Back up a file next to itself.

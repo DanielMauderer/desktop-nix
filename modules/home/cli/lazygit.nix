@@ -3,13 +3,16 @@
 # it is vendored verbatim rather than re-expressed as a Nix attrset — the same
 # raw-file idiom used for the rofi/waybar/wlogout assets.
 #
-# `programs.lazygit` with empty `settings` installs the package but does not
-# write the config file, leaving the field clear for the vendored source below.
-# The delta pager is provided via ../cli/default.nix's package list. The
+# We install the package directly and drop the config in via xdg.configFile,
+# deliberately *not* using `programs.lazygit`: that module unconditionally
+# defines `home.file.<configHome>/lazygit/config.yml.source` (even with empty
+# `settings`), which collides with our vendored file at equal priority. The `lg`
+# alias is provided by fish.nix; the delta pager by ../cli/default.nix. The
 # gh-based custom PR commands stay dormant until Ticket 08; `editPreset: nvim`
 # is harmless until Ticket 07.
-_: {
-  programs.lazygit.enable = true;
+{ pkgs, ... }:
+{
+  home.packages = [ pkgs.lazygit ];
 
   xdg.configFile."lazygit/config.yml".source = ./config.yml;
 }

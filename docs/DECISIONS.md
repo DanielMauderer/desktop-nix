@@ -428,7 +428,10 @@ owns the shell + CLI environment:
   `stylix.opacity.terminal = 0.7` because stylix's kitty target owns that key.
 - **fastfetch** translated to `programs.fastfetch.settings`; **lazygit** keeps
   its large hand-tuned `config.yml` vendored verbatim (the rofi/waybar
-  raw-file idiom) under `programs.lazygit.enable`.
+  raw-file idiom). lazygit is installed as a plain `pkgs.lazygit` with the file
+  dropped via `xdg.configFile`, *not* through `programs.lazygit`: that module
+  unconditionally writes its own `config.yml` (even with empty `settings`),
+  which collides with the vendored file at equal priority.
 
 **Consequences:** The prompt looks different from the old tide setup, but is
 fully reproducible on a fresh home with no interactive step. git-spice/gh and

@@ -32,7 +32,10 @@ _: {
     selection_foreground = "none";
     selection_background = "none";
 
+    # Per-user runtime socket (0700, owned by us) rather than world-accessible
+    # /tmp; kitty expands $XDG_RUNTIME_DIR and appends the PID so instances do
+    # not collide.
     allow_remote_control = "yes";
-    listen_on = "unix:/tmp/kitty";
+    listen_on = "unix:$XDG_RUNTIME_DIR/kitty";
   };
 }
