@@ -3,15 +3,37 @@
 # module definitions in the old config are dropped. Script on-clicks point at
 # the packaged wrappers in pkgs/. Runs as a systemd user service bound to the
 # Hyprland session.
-{ desktopScripts, ... }:
+{ config, desktopScripts, ... }:
 let
   floatTop = "kitty --class dotfiles-floating -e fish -c 'top; exec fish'";
+
+  # Colours come from the stylix palette (DECISIONS 022). The stylix waybar
+  # target is disabled below so it doesn't restyle the bar; instead we map the
+  # base16 palette onto the semantic @define-color names waybar-style.css uses.
+  c = config.lib.stylix.colors.withHashtag;
+  colorCss = ''
+    @define-color text ${c.base05};
+    @define-color subtext1 ${c.base04};
+    @define-color subtext0 ${c.base03};
+    @define-color overlay2 ${c.base02};
+    @define-color overlay1 ${c.base01};
+    @define-color overlay0 ${c.base01};
+    @define-color base ${c.base00};
+    @define-color mantle ${c.base01};
+    @define-color crust ${c.base00};
+    @define-color mauve ${c.base0D};
+    @define-color red ${c.base08};
+    @define-color sky ${c.base0C};
+    @define-color green ${c.base0B};
+  '';
 in
 {
+  stylix.targets.waybar.enable = false;
+
   programs.waybar = {
     enable = true;
     systemd.enable = true;
-    style = builtins.readFile ./waybar-style.css;
+    style = colorCss + builtins.readFile ./waybar-style.css;
 
     settings.mainBar = {
       layer = "top";

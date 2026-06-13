@@ -1,21 +1,6 @@
-/* Default Material You palette (from the old apply_matugen.sh fallbacks).
- * Ticket 05 replaces this block with matugen-generated colours; the rest of
- * the stylesheet is the old waybar/style.css verbatim (its two @import lines,
- * mocha.css and the runtime-generated matugen.css, are folded in here). */
-@define-color text #e2e2e9;
-@define-color subtext1 #c4c6d0;
-@define-color subtext0 #8e9099;
-@define-color overlay2 #33353a;
-@define-color overlay1 #282a2f;
-@define-color overlay0 #1e2025;
-@define-color base #111318;
-@define-color mantle #282a2f;
-@define-color crust #0c0e13;
-@define-color mauve #abc7ff;
-@define-color red #ffb4ab;
-@define-color sky #bec6dc;
-@define-color green #ddbce0;
-
+/* The @define-color palette (text, base, mauve, …) is prepended by waybar.nix
+ * from the stylix base16 palette (DECISIONS 022); the rest of this stylesheet
+ * is the old waybar/style.css verbatim. */
 * {
     min-height: 0;
     font-family: "JetBrainsMonoNL Nerd Font", "Fira Sans Semibold", "Font Awesome 6 Free", FontAwesome, Roboto, Helvetica, Arial, sans-serif;

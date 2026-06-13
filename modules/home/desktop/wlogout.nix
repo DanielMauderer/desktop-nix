@@ -1,7 +1,16 @@
 # Logout / power menu. Ported from the old wlogout/layout. The per-button PNG
-# icon backgrounds are dropped (text labels only); the style is otherwise the
-# old one with its mocha/matugen @imports folded into a static default colour.
-_: {
+# icon backgrounds are dropped (text labels only). stylix has no wlogout target,
+# so the @base/@mauve colours are prepended from the stylix palette here
+# (DECISIONS 022).
+{ config, ... }:
+let
+  c = config.lib.stylix.colors.withHashtag;
+  colorCss = ''
+    @define-color base ${c.base00};
+    @define-color mauve ${c.base0D};
+  '';
+in
+{
   programs.wlogout = {
     enable = true;
     layout = [
@@ -42,6 +51,6 @@ _: {
         keybind = "h";
       }
     ];
-    style = builtins.readFile ./wlogout-style.css;
+    style = colorCss + builtins.readFile ./wlogout-style.css;
   };
 }

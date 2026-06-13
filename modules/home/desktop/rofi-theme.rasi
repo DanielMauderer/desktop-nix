@@ -1,18 +1,6 @@
 /* Ported from the old rofi/theme.rasi. The original `@import "colors"`
- * (matugen, generated at runtime) is replaced by the static default palette
- * below; Ticket 05 reintroduces matugen-driven colours. */
-* {
-    bg:           #111318;
-    bg-alt:       #1e2025;
-    bg-trans:     #111318ee;
-    fg:           #e2e2e9;
-    fg-alt:       #c4c6d0;
-    fg-disabled:  #8e9099;
-    accent:       #abc7ff;
-    urgent:       #ffb4ab;
-    border:       #abc7ff;
-}
-
+ * (matugen) is replaced by the palette `* { … }` block that rofi.nix prepends
+ * from the stylix palette (DECISIONS 022). */
 * {
     background-color:       transparent;
     text-color:             @fg;

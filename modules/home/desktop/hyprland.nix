@@ -5,12 +5,12 @@
 # uses the upstream Hyprland flake — DECISIONS 006), so package/portalPackage
 # are null here: this module only owns ~/.config/hypr.
 #
-# Colours: the $material* variables below are static defaults lifted from the
-# old colors.conf. Ticket 05 (theming) replaces them with matugen output from a
-# writable path; until then they keep the gradient borders working.
+# Colours: the gradient-border variables below are sourced from the stylix
+# base16 palette (DECISIONS 022). stylix's own hyprland target is disabled (see
+# below) so it does not flatten the multi-stop gradient into a single colour or
+# pull in hyprpaper — swaybg keeps painting `stylix.image`.
 {
   config,
-  pkgs,
   desktopScripts,
   ...
 }:
@@ -30,23 +30,25 @@ let
     "$mainMod CTRL, ${workspaceKey n}, exec, ${desktopScripts.hypr-move-to}/bin/hypr-move-to ${toString n}"
   ) workspaces;
 
-  # Material You palette (old hypr/colors.conf). Referenced by the gradient
-  # border colours below. Replaced by matugen in Ticket 05.
+  # Gradient-border palette, derived from the stylix base16 colours so the
+  # borders track the wallpaper. base0D/0C/0E are the accent hues, base02/03
+  # the muted surface/outline tones the inactive border used.
+  c = config.lib.stylix.colors;
   colors = {
-    "$primary" = "rgba(abc7ffff)";
-    "$secondary" = "rgba(bec6dcff)";
-    "$tertiary" = "rgba(ddbce0ff)";
-    "$surface_variant" = "rgba(44474eff)";
-    "$outline_variant" = "rgba(44474eff)";
+    "$primary" = "rgba(${c.base0D}ff)";
+    "$secondary" = "rgba(${c.base0C}ff)";
+    "$tertiary" = "rgba(${c.base0E}ff)";
+    "$surface_variant" = "rgba(${c.base02}ff)";
+    "$outline_variant" = "rgba(${c.base03}ff)";
   };
 in
 {
-  home.pointerCursor = {
-    name = "Bibata-Modern-Ice";
-    package = pkgs.bibata-cursors;
-    size = 24;
-    gtk.enable = true;
-  };
+  # Cursor is owned by stylix.cursor (modules/nixos/desktop/theming.nix), which
+  # sets home.pointerCursor for us.
+
+  # stylix would otherwise theme hyprland (single-colour borders + hyprpaper);
+  # we drive the gradient borders ourselves and keep swaybg, so turn it off.
+  stylix.targets.hyprland.enable = false;
 
   wayland.windowManager.hyprland = {
     enable = true;
@@ -85,9 +87,9 @@ in
       exec-once = [
         "hyprctl setcursor Bibata-Modern-Ice 24"
         "systemctl --user start hyprpolkitagent.service"
-        # Wallpaper path is finalised in Ticket 05; swaybg simply no-ops if the
-        # cache file is not present yet.
-        "swaybg -i ${config.home.homeDirectory}/.config/hypr/cache/current_wallpaper.png -m fill"
+        # swaybg paints the stylix wallpaper (a store path; the picker swaps it
+        # live and triggers a rebuild that re-derives the palette).
+        "swaybg -i ${config.stylix.image} -m fill"
       ];
 
       input = {
@@ -313,6 +315,7 @@ in
         "$mainMod, S, exec, hyprshot -m region --clipboard-only --freeze"
         "$mainMod SHIFT, S, exec, hyprshot -m window --clipboard-only"
         "$mainMod, Z, exec, ${desktopScripts.hypr-focus-mode}/bin/hypr-focus-mode"
+        "$mainMod, W, exec, ${desktopScripts.theme-wallpaper-select}/bin/theme-wallpaper-select"
 
         # Workspace navigation
         "$mainMod, Tab, workspace, m+1"

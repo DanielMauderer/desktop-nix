@@ -15,6 +15,14 @@
       url = "github:hyprwm/Hyprland";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Theming engine (Ticket 05 / DECISIONS 022): derives one base16 palette
+    # from a wallpaper image at build time and themes GTK/Qt/kitty/rofi/waybar/
+    # hyprland/swaylock/swaync declaratively.
+    stylix = {
+      url = "git+https://github.com/nix-community/stylix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -93,6 +101,10 @@
         {
           name = "home-manager manages maudi";
           assertion = cfg.home-manager.users ? maudi;
+        }
+        {
+          name = "stylix enabled with a wallpaper (Ticket 05)";
+          assertion = cfg.stylix.enable && cfg.stylix.image != null;
         }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
@@ -316,9 +328,15 @@
                 "test -e /home/maudi/.config/systemd/user/hyprland-session.target.wants/kanshi.service"
             )
 
-            # dunst: user unit installed and dunstrc rendered with our font.
-            machine.succeed("test -e /home/maudi/.config/systemd/user/dunst.service")
-            machine.succeed("grep -q 'JetBrainsMono Nerd Font 10' /home/maudi/.config/dunst/dunstrc")
+            # swaync: notification daemon unit installed and config rendered
+            # (replaces dunst — DECISIONS 022).
+            machine.succeed("test -e /home/maudi/.config/systemd/user/swaync.service")
+            machine.succeed("test -e /home/maudi/.config/swaync/config.json")
+
+            # stylix theming reached the user config: the waybar palette block
+            # is prepended from the base16 colours, and swaync got a stylix style.
+            machine.succeed("grep -q '@define-color base ' /home/maudi/.config/waybar/style.css")
+            machine.succeed("test -e /home/maudi/.config/swaync/style.css")
 
             # swayidle: wanted by graphical-session.target, locks via swaylock.
             machine.succeed(
@@ -326,9 +344,11 @@
             )
             machine.succeed("grep -q swaylock /home/maudi/.config/systemd/user/swayidle.service")
 
-            # rofi launcher config + ported rasi theme; wlogout; swaylock config.
+            # rofi launcher config + ported rasi theme (referenced from
+            # config.rasi via @theme, generated with the stylix palette);
+            # wlogout; swaylock config.
             machine.succeed("test -e /home/maudi/.config/rofi/config.rasi")
-            machine.succeed("test -e /home/maudi/.local/share/rofi/themes/rofi-theme.rasi")
+            machine.succeed("grep -q '@theme' /home/maudi/.config/rofi/config.rasi")
             machine.succeed("test -e /home/maudi/.config/wlogout/layout")
             machine.succeed("test -e /home/maudi/.config/wlogout/style.css")
             machine.succeed("test -e /home/maudi/.config/swaylock/config")
