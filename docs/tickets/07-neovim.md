@@ -1,6 +1,6 @@
 # 07 — Neovim
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 06
 - **Machines:** all
 

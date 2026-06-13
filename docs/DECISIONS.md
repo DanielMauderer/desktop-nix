@@ -439,3 +439,62 @@ the cargo toolchain are referenced by dormant aliases/commands until Ticket 08
 installs them. Tests assert fish/starship are enabled (eval-level) and that the
 configs render, aliases/functions resolve and the tools are on PATH (the
 `test-base-system` VM, since base now wires the cli module).
+
+---
+
+## 024 — Neovim config strategy: keep-as-is via mkOutOfStoreSymlink (2026-06-13)
+
+**Context:** Ticket 07 had to choose between (a) keeping the existing ~40-plugin
+lazy.nvim config editable by symlinking it into `~/.config/nvim` and (b) a full
+nixvim rewrite where every plugin and option is declared in Nix.
+
+**Decision:** Keep the existing config as-is, linked via
+`config.lib.file.mkOutOfStoreSymlink "${home}/desktop-nix/nvim"` in
+`modules/home/neovim/default.nix`. Changes to `nvim/lua/plugins/*.lua` take
+effect immediately on next nvim launch without a rebuild.
+
+**Consequences:** The config is editable during development — the trade-off is
+that it is not purely declarative (lazy-lock.json pins plugins, but plugins
+themselves live in `~/.local/share/nvim/`, outside the Nix store). A nixvim
+rewrite is deferred until after the migration is stable.
+
+---
+
+## 025 — Mason strategy on NixOS: UI layer only, no auto-install (2026-06-13)
+
+**Context:** The existing config used `mason-tool-installer` to auto-install LSP
+servers and formatters, and `mason-nvim-dap` to install DAP adapters. On NixOS,
+Mason-downloaded binaries fail due to dynamic-linking (they reference glibc/libstdc++
+paths that don't exist outside the Nix store).
+
+**Decision:** Keep `mason.nvim` as a UI layer (`:Mason` still shows status) but
+set `ensure_installed = {}` and `automatic_installation = false` everywhere Mason
+is configured. All LSP servers (lua_ls, gopls, clangd, html/cssls/jsonls,
+yamlls, rust-analyzer), formatters (stylua, prettierd, isort, ruff, gofumpt,
+clang-format, jq, sqruff), and DAP adapters (gdb, js-debug-adapter) are
+provided via `home.packages` in `modules/home/neovim/default.nix`. LSP servers
+are enabled explicitly with `vim.lsp.enable()` rather than via mason-lspconfig's
+`automatic_enable`.
+
+**Consequences:** `:Mason` shows all tools as "not installed" (they come from
+Nix, Mason doesn't know about them). The LSP Manager custom picker (`<leader>lm`)
+will show an empty list since it calls `mason-lspconfig.get_installed_servers()`.
+Core LSP/formatting/debugging functionality is unaffected — binaries are on
+PATH and found automatically by lspconfig/conform/dap.
+
+---
+
+## 026 — lazy-lock.json: committed for plugin reproducibility (2026-06-13)
+
+**Context:** Ticket 07's open question: commit `lazy-lock.json` in the repo for
+pinned plugin versions, or leave it untracked (each machine floats to latest).
+
+**Decision:** Commit `lazy-lock.json`. Plugin versions are pinned to what was
+tested in MyLinux. Updating plugins is a deliberate `lazy.nvim` `:Lazy update`
+step followed by committing the updated lockfile.
+
+**Consequences:** Fresh installs get the exact plugin set from the lockfile.
+The lockfile lives at `nvim/lazy-lock.json`; lazy.nvim writes it to
+`~/.config/nvim/lazy-lock.json` which, via the mkOutOfStoreSymlink, resolves
+back into the repo checkout at `~/desktop-nix/nvim/lazy-lock.json`. Updates
+are committed normally.
