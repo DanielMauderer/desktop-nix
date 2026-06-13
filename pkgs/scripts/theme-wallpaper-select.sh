@@ -25,16 +25,20 @@ if [ ! -d "$wallpaper_dir" ]; then
     exit 1
 fi
 
-# Collect candidate images and present their basenames in rofi.
+# Collect candidate images as paths relative to $wallpaper_dir (via -printf
+# '%P'), so the rofi menu stays readable, nested files are supported, and the
+# selection round-trips back to a real file (basenames alone would collide
+# across subdirectories and break the reconstruction below).
 mapfile -t images < <(find -L "$wallpaper_dir" -type f \
-    \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) | sort)
+    \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
+    -printf '%P\n' | sort)
 
 if [ "${#images[@]}" -eq 0 ]; then
     notify-send -u critical "Wallpaper picker" "No images found in $wallpaper_dir"
     exit 1
 fi
 
-choice="$(printf '%s\n' "${images[@]##*/}" | rofi -dmenu -i -p "Wallpaper")"
+choice="$(printf '%s\n' "${images[@]}" | rofi -dmenu -i -p "Wallpaper")"
 [ -n "$choice" ] || exit 0
 
 selected="$wallpaper_dir/$choice"
