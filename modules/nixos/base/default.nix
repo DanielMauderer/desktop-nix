@@ -7,6 +7,7 @@ _: {
     ./audio.nix
     ./boot.nix
     ./fonts.nix
+    ./home.nix
     ./locale.nix
     ./networking.nix
     ./nix.nix

@@ -106,6 +106,14 @@
           name = "stylix enabled with a wallpaper (Ticket 05)";
           assertion = cfg.stylix.enable && cfg.stylix.image != null;
         }
+        {
+          name = "fish managed in home (Ticket 06)";
+          assertion = cfg.home-manager.users.maudi.programs.fish.enable;
+        }
+        {
+          name = "starship prompt enabled (Ticket 06)";
+          assertion = cfg.home-manager.users.maudi.programs.starship.enable;
+        }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -289,6 +297,35 @@
 
             # Fonts actually land.
             machine.succeed("fc-list | grep -i 'JetBrainsMono Nerd Font'")
+
+            # Shell & CLI environment (Ticket 06): base now wires the cli home
+            # module, so the maudi home generation built fish + the tool configs.
+            machine.wait_for_unit("home-manager-maudi.service")
+
+            # Configs rendered for fish, kitty, fastfetch and lazygit.
+            machine.succeed("test -e /home/maudi/.config/fish/config.fish")
+            machine.succeed("test -e /home/maudi/.config/kitty/kitty.conf")
+            machine.succeed("test -e /home/maudi/.config/fastfetch/config.jsonc")
+            machine.succeed("test -e /home/maudi/.config/lazygit/config.yml")
+
+            # fish starts cleanly and the ported aliases/functions resolve.
+            machine.succeed("su maudi -c 'fish -ic \"true\"'")
+            machine.succeed("su maudi -c 'fish -ic \"type ls\"' | grep -q eza")
+            machine.succeed("su maudi -c 'fish -ic \"type cat\"' | grep -q bat")
+            machine.succeed(
+                "su maudi -c 'fish -ic \"functions -q mkcd; and functions -q gst\"'"
+            )
+
+            # Prompt is declarative starship (no tide / no universal-var setup):
+            # the binary is installed and fish's interactive init sources it.
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/starship")
+            machine.succeed("grep -q 'starship init fish' /home/maudi/.config/fish/config.fish")
+
+            # The migrated CLI tools are on maudi's PATH.
+            machine.succeed(
+                "for b in eza bat fd rg btop zoxide delta tree fzf lazygit fastfetch; do "
+                "test -x /etc/profiles/per-user/maudi/bin/$b; done"
+            )
           '';
         };
 

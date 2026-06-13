@@ -33,6 +33,11 @@
     image = ./wallpaper.png;
     imageScalingMode = "fill";
 
+    # Terminal transparency, ported from the old kitty.conf (background_opacity
+    # 0.7). Set here because stylix's kitty target owns `background_opacity`
+    # (Ticket 06 / DECISIONS 022).
+    opacity.terminal = 0.7;
+
     cursor = {
       package = pkgs.bibata-cursors;
       name = "Bibata-Modern-Ice";

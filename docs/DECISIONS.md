@@ -389,3 +389,50 @@ restores the committed default `wallpaper.png` unless the change is committed.
 The default wallpaper is committed with a deliberately wide luminance range so
 the auto-generated dark scheme keeps readable bg/fg contrast. One more flake
 input (`stylix`) to track; it follows nixpkgs.
+
+---
+
+## 023 — Shell & CLI environment: fish in home-manager, starship prompt (2026-06-13)
+
+**Context:** Ticket 06 migrates the old MyLinux fish environment (config,
+aliases, functions, prompt) and the small tool configs (kitty, fastfetch,
+lazygit) off the `setup.sh` symlink + fisher/toolbox flow into declarative
+home-manager. The prompt was the crux: the old setup ran fisher to install
+`tide`, whose configuration lives in fish **universal variables** written
+interactively by `tide configure` — not reproducible on a fresh machine.
+
+**Decision:** A new `modules/home/cli/` module (wired for every host via
+`modules/nixos/base/home.nix`, mirroring `modules/nixos/desktop/home.nix`)
+owns the shell + CLI environment:
+
+- **Prompt: starship, not tide.** `programs.starship` is declarative by nature
+  and stylix has a starship target, so the palette is themed automatically.
+  fisher and tide are dropped entirely (no self-update flow, no universal-var
+  state).
+- **fish via `programs.fish`:** aliases as `shellAliases`, the custom helpers
+  (mkcd, extract, killf, backup, duh, gst) as `functions`, greeting/history in
+  `interactiveShellInit`. The nvm fisher plugin and `load_nvm` are dropped
+  (node → Ticket 08); the per-shell `eval (ssh-agent -c)` is replaced by
+  `services.ssh-agent.enable`.
+- **Alias audit:** `tb`/`tbr` (toolbox) removed; `update` is now
+  `sudo nixos-rebuild switch --flake ~/desktop-nix` (matching the wallpaper
+  picker's `FLAKE_DIR`, DECISIONS 022); flatpak aliases dropped pending
+  Ticket 10; the `docker`→`podman`, cargo (`cb`/`ct`/`cw`) and `gs`
+  (git-spice) aliases are kept but **dormant** — their tools arrive in
+  Ticket 08. The no-op self-aliases (`tree`/`fd`/`rg`/`fzf`) are removed.
+- **CLI tools in home-manager** (DECISIONS 013): `eza bat fd ripgrep fzf tree
+  btop fastfetch delta`, plus `zoxide` via `programs.zoxide` for its fish hook.
+- **kitty via `programs.kitty`:** behavioural settings ported; colours and font
+  are left to stylix (the old `include colors.conf` is dropped). Terminal
+  transparency (old `background_opacity 0.7`) is set via
+  `stylix.opacity.terminal = 0.7` because stylix's kitty target owns that key.
+- **fastfetch** translated to `programs.fastfetch.settings`; **lazygit** keeps
+  its large hand-tuned `config.yml` vendored verbatim (the rofi/waybar
+  raw-file idiom) under `programs.lazygit.enable`.
+
+**Consequences:** The prompt looks different from the old tide setup, but is
+fully reproducible on a fresh home with no interactive step. git-spice/gh and
+the cargo toolchain are referenced by dormant aliases/commands until Ticket 08
+installs them. Tests assert fish/starship are enabled (eval-level) and that the
+configs render, aliases/functions resolve and the tools are on PATH (the
+`test-base-system` VM, since base now wires the cli module).

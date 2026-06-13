@@ -12,8 +12,8 @@ Status legend: `open` → `migrated` / `dropped`.
 
 | Package | Purpose | Target | Ticket | Status |
 |---|---|---|---|---|
-| fish | login shell | `programs.fish` + user shell | 03/06 | open |
-| fastfetch | system info | home package + config port | 06 | open |
+| fish | login shell | `programs.fish` + user shell | 03/06 | migrated |
+| fastfetch | system info | home package + config port | 06 | migrated |
 | wlogout | logout menu | hyprland desktop module | 04 | migrated |
 | NetworkManager-tui | network TUI | NetworkManager (nmtui included) | 03 | migrated |
 | waydroid | Android container | `virtualisation.waydroid` (keep? ask) | 16 | open |
@@ -22,7 +22,7 @@ Status legend: `open` → `migrated` / `dropped`.
 | swaylock | lock screen | desktop module (swaylock-effects) | 04 | migrated |
 | podman-compose | containers | dev module (podman + compose) | 08 | open |
 | wireguard-tools | VPN | base + secrets for configs | 03/12 | migrated |
-| bat, fd-find, ripgrep, fzf, tree, btop | CLI tools | home-manager (moved out of base, DECISIONS 013) | 06 | open |
+| bat, fd-find, ripgrep, fzf, tree, btop | CLI tools | home-manager (moved out of base, DECISIONS 013) | 06 | migrated |
 | neovim, python3-neovim | editor | neovim module | 07 | open |
 | swaybg, swayidle | wallpaper / idle | desktop module | 04 | migrated |
 | papirus-icon-theme | icons | theming module | 05 | open |
@@ -63,10 +63,10 @@ Status legend: `open` → `migrated` / `dropped`.
 | `dunst/` | notifications | HM module (dir was empty; shipped defaults) | 04 | migrated |
 | `rofi/` | launcher | HM module | 04 | migrated |
 | `wlogout/` | logout menu | HM module (text labels, no PNG icons) | 04 | migrated |
-| `kitty/` | terminal | HM module | 06 | open |
-| `fish/` | shell | `programs.fish` | 06 | open |
-| `fastfetch/` | system info | HM module | 06 | open |
-| `lazygit/` | git TUI | HM module | 06 | open |
+| `kitty/` | terminal | HM module (`programs.kitty`; colours via stylix) | 06 | migrated |
+| `fish/` | shell | `programs.fish` | 06 | migrated |
+| `fastfetch/` | system info | HM module (`programs.fastfetch`) | 06 | migrated |
+| `lazygit/` | git TUI | HM module (config vendored verbatim) | 06 | migrated |
 | `nvim/` | editor (~40 lazy.nvim plugins) | keep config, nix-provided tools | 07 | open |
 | `matugen/` | theming templates | theming module (matugen vs stylix) | 05 | open |
 | `gtk-3.0/`, `gtk-4.0/` | GTK theming | theming module | 05 | open |
@@ -78,11 +78,11 @@ Status legend: `open` → `migrated` / `dropped`.
 | Item | Current mechanism | Target | Ticket | Status |
 |---|---|---|---|---|
 | toolbox container `dev-tools` | toolbox + dnf (cargo, fish) | **obsolete** — nix packages/devshells | 08 | open |
-| eza | cargo install (toolbox) | nixpkgs | 06 | open |
+| eza | cargo install (toolbox) | nixpkgs | 06 | migrated |
 | matugen | cargo install (toolbox) | nixpkgs | 05 | open |
 | cargo-nextest, bacon | cargo install (toolbox) | nixpkgs | 08 | open |
 | hyprshot | git clone → `~/.local/bin` | nixpkgs | 04 | migrated |
-| fisher + tide prompt | interactive fish install | `fishPlugins.tide` or HM-managed fisher | 06 | open |
+| fisher + tide prompt | interactive fish install | **dropped** — starship instead (DECISIONS 023) | 06 | migrated |
 | nvm / node | fisher plugin + nvm | nix per-project or global node | 08 | open |
 | fish as default shell | `chsh` | `users.users.maudi.shell = pkgs.fish` | 03 | migrated |
 
@@ -106,4 +106,4 @@ Status legend: `open` → `migrated` / `dropped`.
 | Hardcoded wallpaper/home paths in hyprland.conf, apply_matugen.sh, generated swaylock config | MyLinux | 05 |
 | Hard kill/restart reload pattern (`pkill dunst; dunst &`) | apply_matugen.sh | 05 |
 | firstboot.sh ignores failures (`|| true`), hardcoded repo URL | maudiblue | 03 |
-| Tide prompt state in universal variables (not declarative) | fish | 06 |
+| Tide prompt state in universal variables (not declarative) — resolved: replaced by starship (DECISIONS 023) | fish | 06 |
