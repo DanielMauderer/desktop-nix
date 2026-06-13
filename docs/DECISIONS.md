@@ -302,3 +302,32 @@ its workspace rule with `hyprctl keyword` instead of rewriting a tracked
 **Consequences:** No runtime writes into the HM-managed config dir. The `ml4w`
 namespace is retired. Ticket 05's matugen wallpaper/colour cache will follow the
 same writable-path pattern.
+
+---
+
+## 021 — Test layering: eval-level host assertions, VM only for runtime (2026-06-12)
+
+**Context:** CI builds all three host toplevels and boots a VM test, but
+nothing asserted the per-host deltas: chaotic only on desktop, kanshi monitor
+profile ordering (`lib.mkBefore` docked/dual-head profiles vs the
+`laptop-internal` fallback). Spinning up a VM per host just to check evaluated
+config facts is wasteful. The format gate also lived only in CI
+(`nix fmt . && git diff`), violating Ticket 02's "local == CI, no drift" goal.
+
+**Decision:** Extend 010 with an explicit layering. Config *facts* (hostname,
+user/shell, stateVersion, home-manager wiring, chaotic module presence, kanshi
+profile order plus greps over the rendered `kanshi/config`) are asserted at
+flake-check time via a `mkHostCheck` helper in `flake.nix` — a failed
+assertion `throw`s during evaluation, naming every failed assertion for the
+host. VM tests are reserved for behavior that needs a booted system
+(`test-desktop` now also covers dunst/kanshi/swayidle service wiring, rofi,
+wlogout, swaylock, kitty and the xdg portals). Formatting moves into the
+`nixfmt-check` flake check and CI's separate fmt step is removed, so
+`nix flake check -L` is the entire gate locally and in CI. No additional
+linters (actionlint, standalone shellcheck) — Nix-only; raw scripts in
+`pkgs/scripts/` are already shellchecked by `writeShellApplication`.
+
+**Consequences:** Host deltas fail fast at eval time with named assertions —
+no VM boot needed. `nixosConfigurations` is hoisted to a shared `hosts` let
+binding so checks and outputs evaluate each host once. The trade-off is that
+`nix flake check` now evaluates all three hosts even for unrelated checks.

@@ -20,8 +20,8 @@ jobs:
           extra-conf: |
             extra-system-features = nixos-test
       - uses: DeterminateSystems/magic-nix-cache-action@v8
-      - name: Check formatting
-        run: nix fmt . && git diff --exit-code -- '*.nix'
+      # Formatting is covered by the nixfmt-check flake check, so this single
+      # command is the whole gate (local `nix flake check` == CI).
       - run: nix flake check -L
 
   build-hosts:
