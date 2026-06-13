@@ -118,6 +118,7 @@
       testNode = {
         imports = [
           home-manager.nixosModules.home-manager
+          inputs.stylix.nixosModules.stylix
           ./hosts/private-laptop/default.nix
         ];
         _module.args.inputs = inputs;

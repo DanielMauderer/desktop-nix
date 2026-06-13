@@ -17,10 +17,13 @@
 # source their colours from `config.lib.stylix.colors`; their stylix targets
 # are disabled in the matching home modules so stylix does not fight the custom
 # layouts.
-{ inputs, pkgs, ... }:
+#
+# The stylix NixOS module itself is added to the module list in lib/mkHost.nix
+# (and the nixosTest node in flake.nix), not imported here via an `inputs`
+# module argument — the latter infinitely recurses in the test node, where
+# `inputs` is supplied through `_module.args` rather than `specialArgs`.
+{ pkgs, ... }:
 {
-  imports = [ inputs.stylix.nixosModules.stylix ];
-
   stylix = {
     enable = true;
     polarity = "dark";
