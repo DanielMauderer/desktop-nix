@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neovim Cheatsheet</title>
+<style>
+  :root {
+    --bg: #14110f;
+    --bg-card: #1d1916;
+    --bg-row: #25201c;
+    --border: #3a322c;
+    --text: #ece3da;
+    --muted: #9a8d80;
+    --accent: #e0894a;     /* ember orange */
+    --accent2: #c9603b;
+    --kbd-bg: #2c2622;
+    --kbd-border: #4a4039;
+    --kbd-text: #f3d9bf;
+    --mode: #7fae6f;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding-bottom: 4rem;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(180deg, #14110f 70%, rgba(20,17,15,0));
+    padding: 1.2rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(6px);
+  }
+  .title-row {
+    display: flex;
+    align-items: baseline;
+    gap: .75rem;
+    flex-wrap: wrap;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; margin: 0; color: var(--accent); letter-spacing: .5px; }
+  .leader-note { color: var(--muted); font-size: .85rem; }
+  .leader-note kbd { margin: 0 2px; }
+  .controls {
+    max-width: 1400px;
+    margin: .8rem auto 0;
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #search {
+    flex: 1 1 280px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: .55rem .8rem;
+    border-radius: 8px;
+    font-size: .95rem;
+    outline: none;
+  }
+  #search:focus { border-color: var(--accent); }
+  .count { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+  .jump {
+    max-width: 1400px;
+    margin: .7rem auto 0;
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+  }
+  .jump a {
+    font-size: .72rem;
+    color: var(--muted);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    padding: .15rem .5rem;
+    border-radius: 20px;
+    transition: .15s;
+  }
+  .jump a:hover { color: var(--accent); border-color: var(--accent); }
+
+  main {
+    max-width: 1400px;
+    margin: 1.5rem auto 0;
+    padding: 0 1.5rem;
+    column-width: 420px;
+    column-gap: 1.2rem;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin: 0 0 1.2rem;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+  .card h2 {
+    margin: 0;
+    font-size: .95rem;
+    padding: .7rem 1rem;
+    background: var(--bg-row);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .card h2 .ico { font-size: 1.05rem; }
+  .card h2 .badge {
+    margin-left: auto;
+    font-size: .65rem;
+    color: var(--muted);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .row {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    padding: .4rem 1rem;
+    border-bottom: 1px solid rgba(58,50,44,.4);
+  }
+  .row:last-child { border-bottom: none; }
+  .row:hover { background: var(--bg-row); }
+  .keys { flex: 0 0 auto; min-width: 110px; }
+  .desc { color: var(--muted); font-size: .85rem; }
+  .desc .m {
+    color: var(--mode);
+    font-size: .68rem;
+    border: 1px solid rgba(127,174,111,.4);
+    border-radius: 4px;
+    padding: 0 4px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  kbd {
+    background: var(--kbd-bg);
+    border: 1px solid var(--kbd-border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    color: var(--kbd-text);
+    font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+    font-size: .78rem;
+    padding: .08rem .35rem;
+    white-space: nowrap;
+  }
+  .keys .plus { color: var(--muted); font-size: .7rem; margin: 0 1px; }
+  .hidden { display: none !important; }
+  .no-results {
+    text-align: center;
+    color: var(--muted);
+    padding: 3rem;
+    font-style: italic;
+  }
+  footer {
+    max-width: 1400px;
+    margin: 2rem auto 0;
+    padding: 0 1.5rem;
+    color: var(--muted);
+    font-size: .78rem;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="title-row">
+    <h1> Neovim Cheatsheet</h1>
+    <span class="leader-note">Leader = <kbd>Space</kbd> &nbsp;•&nbsp; <span class="m" style="color:var(--mode)">v</span> visual, <span class="m" style="color:var(--mode)">i</span> insert, <span class="m" style="color:var(--mode)">ts</span> text-object</span>
+  </div>
+  <div class="controls">
+    <input id="search" type="text" placeholder="Filter by key or action…  (press / to focus)" autocomplete="off">
+    <span class="count" id="count"></span>
+  </div>
+  <nav class="jump" id="jump"></nav>
+</header>
+
+<main id="grid"></main>
+<div class="no-results hidden" id="noresults">No shortcuts match your filter.</div>
+
+<footer>
+  Generated from <code>~/.dotfiles/nvim/lua/plugins/</code>. Filetype-scoped maps (Rust, TOML, HTTP) only apply in those buffers. Many pickers also live behind <kbd>:Telescope</kbd>-style commands shown in the <code>:Snacks.picker</code> menu.
+</footer>
+
+<script>
+const DATA = [
+  { title: "Core & Diagnostics", ico: "", badge: "", items: [
+    { k: ["Space"], d: "Leader key (no-op alone)" },
+    { k: ["[","d"], d: "Previous diagnostic" },
+    { k: ["]","d"], d: "Next diagnostic" },
+    { k: ["<leader>","e"], d: "Open floating diagnostic" },
+    { k: ["<leader>","q"], d: "Diagnostics to loclist" },
+    { k: ["<leader>","l","m"], d: "LSP Manager picker" },
+    { k: ["<leader>","l","r"], d: "Restart all LSP servers" },
+    { k: ["<leader>","t","h"], d: "Toggle inlay hints" },
+  ]},
+  { title: "LSP Navigation", ico: "", badge: "", items: [
+    { k: ["g","d"], d: "Goto definition" },
+    { k: ["g","D"], d: "Goto declaration" },
+    { k: ["g","r","r"], d: "References" },
+    { k: ["g","r","i"], d: "Implementation" },
+    { k: ["g","r","t"], d: "Type definition" },
+    { k: ["g","r","c"], d: "Incoming calls" },
+    { k: ["g","r","C"], d: "Outgoing calls" },
+    { k: ["g","r","n"], d: "Rename symbol" },
+    { k: ["<leader>","c","a"], d: "Code action (with diff preview)" },
+    { k: ["<leader>","s","s"], d: "Document symbols" },
+    { k: ["<leader>","s","S"], d: "Workspace symbols" },
+    { k: ["<leader>","g","W"], d: "Workspace symbols" },
+  ]},
+  { title: "Completion (blink.cmp)", ico: "", badge: "insert", items: [
+    { k: ["C-Space"], d: "Show menu / toggle docs", m: "i" },
+    { k: ["Tab"], d: "Select next → accept", m: "i" },
+    { k: ["S-Tab"], d: "Select previous", m: "i" },
+    { k: ["CR"], d: "Accept completion", m: "i" },
+    { k: ["C-y"], d: "Select & accept", m: "i" },
+    { k: ["C-n"], d: "Select next", m: "i" },
+    { k: ["C-p"], d: "Select previous", m: "i" },
+    { k: ["C-e"], d: "Hide menu", m: "i" },
+    { k: ["C-f"], d: "Scroll docs down", m: "i" },
+    { k: ["C-b"], d: "Scroll docs up", m: "i" },
+  ]},
+  { title: "Claude Code", ico: "", badge: "", items: [
+    { k: ["<leader>","c","c"], d: "Toggle Claude" },
+    { k: ["<leader>","c","f"], d: "Focus Claude" },
+    { k: ["<leader>","c","r"], d: "Resume session" },
+    { k: ["<leader>","c","C"], d: "Continue session" },
+    { k: ["<leader>","c","m"], d: "Select model" },
+    { k: ["<leader>","c","b"], d: "Add current buffer" },
+    { k: ["<leader>","c","v"], d: "Send selection", m: "v" },
+    { k: ["<leader>","c","y"], d: "Accept diff (yes)" },
+    { k: ["<leader>","c","n"], d: "Deny diff (no)" },
+  ]},
+  { title: "Rust", ico: "", badge: "ft: rust", items: [
+    { k: ["<leader>","r","r"], d: "Runnables" },
+    { k: ["<leader>","r","d"], d: "Debuggables" },
+    { k: ["<leader>","r","m"], d: "Expand macro" },
+    { k: ["<leader>","r","e"], d: "Explain error" },
+    { k: ["<leader>","r","b"], d: "Bacon (cargo watch) terminal" },
+  ]},
+  { title: "Cargo Crates", ico: "", badge: "ft: toml", items: [
+    { k: ["<leader>","r","v"], d: "Show crate versions" },
+    { k: ["<leader>","r","u"], d: "Upgrade crate" },
+    { k: ["<leader>","r","U"], d: "Upgrade all crates" },
+  ]},
+  { title: "Testing (neotest)", ico: "", badge: "ft: rust", items: [
+    { k: ["<leader>","r","t","t"], d: "Run nearest test" },
+    { k: ["<leader>","r","t","f"], d: "Run file tests" },
+    { k: ["<leader>","r","t","l"], d: "Run last test" },
+    { k: ["<leader>","r","t","s"], d: "Toggle summary" },
+    { k: ["<leader>","r","t","o"], d: "Open output" },
+    { k: ["<leader>","r","t","d"], d: "Debug nearest (DAP)" },
+  ]},
+  { title: "Git — Hunks (gitsigns)", ico: "", badge: "", items: [
+    { k: ["]","c"], d: "Next hunk" },
+    { k: ["[","c"], d: "Previous hunk" },
+    { k: ["<leader>","h","s"], d: "Stage hunk", m: "n/v" },
+    { k: ["<leader>","h","r"], d: "Reset hunk", m: "n/v" },
+    { k: ["<leader>","h","S"], d: "Stage buffer" },
+    { k: ["<leader>","h","u"], d: "Undo stage hunk" },
+    { k: ["<leader>","h","R"], d: "Reset buffer" },
+    { k: ["<leader>","h","p"], d: "Preview hunk" },
+    { k: ["<leader>","h","b"], d: "Blame line" },
+    { k: ["<leader>","h","d"], d: "Diff against index" },
+    { k: ["<leader>","h","D"], d: "Diff against last commit" },
+    { k: ["<leader>","T","B"], d: "Toggle line blame" },
+    { k: ["<leader>","T","d"], d: "Toggle show deleted" },
+    { k: ["i","h"], d: "Select hunk (text object)", m: "ts" },
+  ]},
+  { title: "Git — Repo", ico: "", badge: "", items: [
+    { k: ["<leader>","g","g"], d: "Neogit (open UI)" },
+    { k: ["<leader>","g","p"], d: "Pull --rebase" },
+    { k: ["<leader>","g","d"], d: "Git log for file" },
+    { k: ["<leader>","g","b"], d: "Git branches" },
+    { k: ["<leader>","g","f"], d: "Git diffs" },
+    { k: [":","GrugFar"], d: "Find & replace UI" },
+  ]},
+  { title: "File Navigation", ico: "", badge: "", items: [
+    { k: ["<leader>","f","f"], d: "Find files (fff, cwd)" },
+    { k: ["<leader>","F","f"], d: "Find files (git root)" },
+    { k: ["<leader>","f","F"], d: "Find files (smart)" },
+    { k: ["<leader>","f","g"], d: "Git files" },
+    { k: ["<leader>","f","b"], d: "Buffers" },
+    { k: ["<leader>","f","c"], d: "Find config file" },
+    { k: ["<leader>","f","p"], d: "Projects" },
+    { k: ["<leader>","f","r"], d: "Registers" },
+    { k: ["<leader>","f","a"], d: "Aerial code outline" },
+    { k: ["<leader>","t","t"], d: "Neo-tree toggle (left)" },
+    { k: ["<leader>","t","T"], d: "Neo-tree float" },
+    { k: ["<leader>","t","g"], d: "Neo-tree git status" },
+    { k: ["<leader>","t","b"], d: "Neo-tree buffers" },
+    { k: ["<leader>","z"], d: "Zoxide jump" },
+    { k: ["<leader>","R","g"], d: "Ripgrep in chosen dir" },
+    { k: [":","Oil"], d: "Edit filesystem as buffer" },
+  ]},
+  { title: "Search & Pickers (snacks)", ico: "", badge: "", items: [
+    { k: ["<leader>","Space"], d: "Smart find files" },
+    { k: ["<leader>",","], d: "Buffers" },
+    { k: ["<leader>","/"], d: "Grep" },
+    { k: ["<leader>",":"], d: "Command history" },
+    { k: ["<leader>","n"], d: "Notification history" },
+    { k: ["<leader>","s","g"], d: "Grep" },
+    { k: ["<leader>","s","b"], d: "Grep buffer lines" },
+    { k: ["<leader>","s","r"], d: "Registers (fzf-lua)" },
+    { k: ["<leader>","s","\""], d: "Registers" },
+    { k: ["<leader>","s","/"], d: "Search history" },
+    { k: ["<leader>","s","a"], d: "Autocmds" },
+    { k: ["<leader>","s","c"], d: "Command history" },
+    { k: ["<leader>","s","C"], d: "Commands" },
+    { k: ["<leader>","s","d"], d: "Diagnostics" },
+    { k: ["<leader>","s","D"], d: "Buffer diagnostics" },
+    { k: ["<leader>","s","h"], d: "Help pages" },
+    { k: ["<leader>","s","H"], d: "Highlights" },
+    { k: ["<leader>","s","i"], d: "Icons" },
+    { k: ["<leader>","s","j"], d: "Jumps" },
+    { k: ["<leader>","s","k"], d: "Keymaps" },
+    { k: ["<leader>","s","l"], d: "Location list" },
+    { k: ["<leader>","s","m"], d: "Marks" },
+    { k: ["<leader>","s","M"], d: "Man pages" },
+    { k: ["<leader>","s","p"], d: "Plugin specs (lazy)" },
+    { k: ["<leader>","s","q"], d: "Quickfix list" },
+    { k: ["<leader>","s","R"], d: "Resume last picker" },
+    { k: ["<leader>","s","u"], d: "Undo history" },
+    { k: ["<leader>","s","?"], d: "Meta super search" },
+  ]},
+  { title: "Debugging (DAP)", ico: "", badge: "", items: [
+    { k: ["F5"], d: "Start / continue" },
+    { k: ["F10"], d: "Step over" },
+    { k: ["F11"], d: "Step into" },
+    { k: ["F12"], d: "Step out" },
+    { k: ["<leader>","d","b"], d: "Toggle breakpoint" },
+    { k: ["<leader>","d","B"], d: "Conditional breakpoint" },
+    { k: ["<leader>","d","c"], d: "Clear all breakpoints" },
+    { k: ["<leader>","d","u"], d: "Toggle DAP UI" },
+    { k: ["<leader>","d","e"], d: "Evaluate expression", m: "n/v" },
+    { k: ["<leader>","d","f"], d: "Float element" },
+    { k: ["<leader>","d","r"], d: "Open REPL" },
+    { k: ["<leader>","d","l"], d: "Run last" },
+    { k: ["<leader>","d","t"], d: "Terminate session" },
+    { k: ["<leader>","d","R"], d: "Restart session" },
+    { k: ["<leader>","d","h"], d: "Hover variables" },
+    { k: ["<leader>","d","s"], d: "Show scopes" },
+  ]},
+  { title: "Diagnostics (Trouble)", ico: "", badge: "", items: [
+    { k: ["<leader>","x","x"], d: "All diagnostics" },
+    { k: ["<leader>","x","X"], d: "Buffer diagnostics" },
+    { k: ["<leader>","x","q"], d: "Diagnostics list" },
+    { k: ["<leader>","c","s"], d: "Symbols panel" },
+    { k: ["<leader>","c","l"], d: "LSP defs / refs" },
+    { k: ["<leader>","x","L"], d: "Location list" },
+    { k: ["<leader>","x","Q"], d: "Quickfix list" },
+  ]},
+  { title: "Toggles (snacks)", ico: "", badge: "", items: [
+    { k: ["<leader>","u","s"], d: "Spelling" },
+    { k: ["<leader>","u","w"], d: "Line wrap" },
+    { k: ["<leader>","u","L"], d: "Relative numbers" },
+    { k: ["<leader>","u","d"], d: "Diagnostics" },
+    { k: ["<leader>","u","c"], d: "Conceal level" },
+    { k: ["<leader>","u","T"], d: "Treesitter" },
+    { k: ["<leader>","u","b"], d: "Dark / light background" },
+    { k: ["<leader>","u","h"], d: "Inlay hints" },
+    { k: ["<leader>","u","g"], d: "Indent guides" },
+    { k: ["<leader>","u","D"], d: "Dim inactive" },
+    { k: ["<leader>","u","C"], d: "Colorschemes picker" },
+  ]},
+  { title: "Formatting (conform)", ico: "", badge: "", items: [
+    { k: ["<leader>","f","o"], d: "Format buffer" },
+    { k: ["<leader>","f","s"], d: "Format SQL selection", m: "v" },
+  ]},
+  { title: "HTTP (kulala)", ico: "", badge: "ft: http/rest", items: [
+    { k: ["<leader>","k","s"], d: "Send request" },
+    { k: ["<leader>","k","a"], d: "Send all requests" },
+    { k: ["<leader>","k","b"], d: "Open scratchpad" },
+  ]},
+  { title: "Treesitter Text Objects", ico: "", badge: "op/visual", items: [
+    { k: ["a","f"], d: "Around function", m: "ts" },
+    { k: ["i","f"], d: "Inside function", m: "ts" },
+    { k: ["a","c"], d: "Around class", m: "ts" },
+    { k: ["i","c"], d: "Inside class", m: "ts" },
+    { k: ["a","a"], d: "Around parameter", m: "ts" },
+    { k: ["i","a"], d: "Inside parameter", m: "ts" },
+    { k: ["<leader>","a"], d: "Swap parameter next" },
+    { k: ["<leader>","A"], d: "Swap parameter previous" },
+  ]},
+  { title: "Editing Utilities", ico: "", badge: "", items: [
+    { k: ["g","c"], d: "Comment / uncomment", m: "n/v" },
+    { k: ["y","s"], d: "Add surround (nvim-surround)" },
+    { k: ["c","s"], d: "Change surround" },
+    { k: ["d","s"], d: "Delete surround" },
+  ]},
+  { title: "Misc & Commands", ico: "", badge: "", items: [
+    { k: [",","v"], d: "Select Python venv", m: "ft: py" },
+    { k: [":","Mason"], d: "LSP / tool installer UI" },
+    { k: [":","Neogit"], d: "Interactive Git UI" },
+    { k: [":","GrugFar"], d: "Find & replace" },
+    { k: [":","Typr"], d: "Typing practice game" },
+    { k: [":","TyprStats"], d: "Typing stats" },
+  ]},
+];
+
+const grid = document.getElementById('grid');
+const jump = document.getElementById('jump');
+const search = document.getElementById('search');
+const count = document.getElementById('count');
+const noresults = document.getElementById('noresults');
+
+function kbdHtml(keys) {
+  return keys.map(k => {
+    const label = k === "<leader>" ? "Spc" : k === "Space" ? "Space" : k;
+    return `<kbd>${label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</kbd>`;
+  }).join('<span class="plus">+</span>');
+}
+
+let total = 0;
+DATA.forEach((cat, i) => {
+  const id = 'c' + i;
+  const card = document.createElement('section');
+  card.className = 'card';
+  card.id = id;
+  let rows = cat.items.map(it => {
+    total++;
+    const search = (it.k.join(' ') + ' ' + it.d).toLowerCase();
+    const mode = it.m ? `<span class="m">${it.m}</span>` : '';
+    return `<div class="row" data-s="${search.replace(/"/g,'')}">
+      <span class="keys">${kbdHtml(it.k)}</span>
+      <span class="desc">${it.d}${mode}</span></div>`;
+  }).join('');
+  card.innerHTML = `<h2><span class="ico">${cat.ico}</span>${cat.title}
+    ${cat.badge ? `<span class="badge">${cat.badge}</span>` : ''}</h2>${rows}`;
+  grid.appendChild(card);
+
+  const a = document.createElement('a');
+  a.href = '#' + id;
+  a.textContent = cat.title;
+  jump.appendChild(a);
+});
+
+function update(q) {
+  q = q.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('.card').forEach(card => {
+    let any = false;
+    card.querySelectorAll('.row').forEach(row => {
+      const match = !q || row.dataset.s.includes(q);
+      row.classList.toggle('hidden', !match);
+      if (match) { any = true; shown++; }
+    });
+    card.classList.toggle('hidden', !any);
+  });
+  count.textContent = q ? `${shown} match${shown===1?'':'es'}` : `${total} shortcuts`;
+  noresults.classList.toggle('hidden', shown > 0);
+}
+
+search.addEventListener('input', e => update(e.target.value));
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== search) {
+    e.preventDefault(); search.focus();
+  } else if (e.key === 'Escape') {
+    search.value = ''; update(''); search.blur();
+  }
+});
+update('');
+</script>
+</body>
+</html>

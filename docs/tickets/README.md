@@ -33,7 +33,7 @@ Migration tickets, numbered in rough execution order. See
 | 04 | [Hyprland desktop stack](04-hyprland-desktop-stack.md) | 2 | 03 | all | done |
 | 05 | [Theming strategy (matugen vs stylix)](05-theming-strategy.md) | 2 | 04 | all | done |
 | 06 | [Shell & CLI environment](06-shell-and-cli-environment.md) | 2 | 03 | all | done |
-| 07 | [Neovim](07-neovim.md) | 2 | 06 | all | open |
+| 07 | [Neovim](07-neovim.md) | 2 | 06 | all | done |
 | 08 | [Dev environment (replaces toolbox)](08-dev-environment.md) | 2 | 03, 06 | desktop, work-laptop (light: private-laptop) | open |
 | 09 | [Virtualisation: libvirt/KVM](09-virtualisation-libvirt.md) | 2 | 03 | desktop, work-laptop (TBD) | open |
 | 10 | [Flatpak strategy](10-flatpak-strategy.md) | 2 | 03 | all | open |
