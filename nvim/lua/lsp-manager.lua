@@ -15,9 +15,10 @@ local function get_lsp_clients()
 end
 
 local function get_available_servers()
-	local mason_lspconfig = require("mason-lspconfig")
-	local servers = mason_lspconfig.get_installed_servers()
-	return servers
+	-- On NixOS, LSP servers come from Nix packages (home.packages), not Mason.
+	-- Return the servers explicitly configured in nvim-lspconfig.lua instead of
+	-- querying Mason's empty install registry.
+	return { "lua_ls", "gopls", "clangd", "html", "cssls", "jsonls", "yamlls" }
 end
 
 local function get_server_status(server_name)
@@ -31,14 +32,14 @@ local function get_server_status(server_name)
 	local client = clients[server_name]
 
 	if not client then
-		local result = "stopped", "●", "Not running"
+		local status, icon, description = "stopped", "●", "Not running"
 		server_cache[server_name] = {
-			status = result,
-			icon = "●",
-			description = "Not running",
+			status = status,
+			icon = icon,
+			description = description,
 			timestamp = now,
 		}
-		return result
+		return status, icon, description
 	end
 
 	-- Check if attached to current buffer

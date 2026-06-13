@@ -33,13 +33,13 @@ return {
 				desc = "[F]ormat [S]QL of current visual selection",
 			},
 		},
-		default_format_opts = {
-			lsp_format = "prefer",
-			async = true, -- Make formatting non-blocking
-		},
 		---@module "conform"
 		---@type conform.setupOpts
 		opts = {
+			default_format_opts = {
+				lsp_format = "prefer",
+				async = true,
+			},
 			notify_on_error = true,
 			formatters = {
 				sqruff = {

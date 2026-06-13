@@ -3,6 +3,7 @@ return {
 		"mrcjkb/rustaceanvim",
 		version = "^5",
 		lazy = false,
+		dependencies = { "saghen/blink.cmp" },
 		config = function()
 			vim.g.rustaceanvim = function()
 				return {

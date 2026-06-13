@@ -1,5 +1,6 @@
 return {
-	"mistweaverco/kulala.nvim",
+	{
+		"mistweaverco/kulala.nvim",
 	keys = {
 		{ "<leader>ks", desc = "Send request" },
 		{ "<leader>ka", desc = "Send all requests" },
@@ -11,4 +12,5 @@ return {
 		global_keymaps_prefix = "<leader>k",
 		kulala_keymaps_prefix = "",
 	},
+	}
 }

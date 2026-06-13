@@ -37,7 +37,13 @@ return {
 			},
 			{
 				"<leader>xX",
-				"<cmd>Trouble cascade open focus=true filter = { buf=0, severity=vim.diagnostic.severity.ERROR }<cr>",
+				function()
+					require("trouble").open({
+						mode = "cascade",
+						focus = true,
+						filter = { buf = 0, severity = vim.diagnostic.severity.ERROR },
+					})
+				end,
 				desc = "Buffer Diagnostics (Trouble)",
 			},
 			{

@@ -133,7 +133,7 @@ return {
 					string.format(
 						"cargo build --%s %s --message-format json 2>/dev/null | jq -r .executable | grep /",
 						pick.kind,
-						pick.name
+						vim.fn.shellescape(pick.name)
 					)
 				)
 				if not handle then
@@ -213,8 +213,7 @@ return {
 					type = "pwa-node",
 					request = "launch",
 					name = "Launch with tsx",
-					runtimeExecutable = "npm",
-					runtimeArgs = { "tsx" },
+					runtimeExecutable = "tsx",
 					program = "${file}",
 					cwd = "${workspaceFolder}",
 					sourceMaps = ts_source_maps.sourceMaps,

@@ -1,4 +1,5 @@
 return {
+  {
   "letieu/jira.nvim",
   opts = {
     jira = {
@@ -25,4 +26,6 @@ return {
     }
   }
   },
+}
+
 }

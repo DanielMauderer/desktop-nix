@@ -21,7 +21,7 @@ return {
 				function()
 					require("fff").find_in_git_root()
 				end,
-				desc = "Open file picker",
+				desc = "Open file picker (git root)",
 			},
 		},
 	},
