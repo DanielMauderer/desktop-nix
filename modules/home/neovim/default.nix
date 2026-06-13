@@ -1,9 +1,10 @@
 # Neovim home-manager module — Ticket 07, Machines: all.
 #
 # Strategy (DECISIONS 024): keep the existing lazy.nvim config as-is, linked via
-# mkOutOfStoreSymlink so edits inside ~/desktop-nix/nvim/ take effect without
-# a rebuild. Mason is kept as a UI layer only — all LSP servers, formatters, and
-# debuggers come from Nix packages below (dynamic-linking on NixOS breaks
+# home.activation so edits inside ~/desktop-nix/nvim/ take effect without a rebuild.
+# home.activation runs at switch time (not build time), so the symlink is safe in
+# the Nix sandbox. Mason is kept as a UI layer only — all LSP servers, formatters,
+# and debuggers come from Nix packages below (dynamic-linking on NixOS breaks
 # Mason-downloaded binaries). rust_analyzer is managed by rustaceanvim.
 {
   config,
@@ -19,11 +20,17 @@
     viAlias = true;
   };
 
-  # Symlink the repo's nvim/ dir into ~/.config/nvim.
-  # mkOutOfStoreSymlink means changes to lua/plugins/*.lua are instant — no
-  # nixos-rebuild needed. The path matches the FLAKE_DIR convention (DECISIONS 022).
-  xdg.configFile."nvim".source =
-    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/desktop-nix/nvim";
+  # Symlink the repo's nvim/ dir into ~/.config/nvim at activation time.
+  # Using home.activation instead of xdg.configFile avoids the Nix build-sandbox
+  # restriction: xdg.configFile recursively enumerates directory sources at build
+  # time, which fails when the target (~/desktop-nix/nvim) is outside the store.
+  home.activation.nvimConfig = {
+    after = [ "writeBoundary" ];
+    before = [ ];
+    data = ''
+      ln -sfn "${config.home.homeDirectory}/desktop-nix/nvim" "${config.xdg.configHome}/nvim"
+    '';
+  };
 
   home.packages = with pkgs; [
     # ── LSP servers ───────────────────────────────────────────────────────────
