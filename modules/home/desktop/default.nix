@@ -1,13 +1,14 @@
-# Per-user desktop environment (home-manager) — Ticket 04.
+# Per-user desktop environment (home-manager) — Ticket 04, themed in Ticket 05.
 # Ported from the old MyLinux dotfiles, translated to native home-manager
-# settings. Colour/theming (matugen) is deliberately left to Ticket 05; this
-# module ships static fallback colours so the desktop is usable on its own.
+# settings. Colours come from stylix (DECISIONS 022): stylix themes most apps
+# directly, while waybar/wlogout/rofi/hyprland keep their custom layouts and
+# source colours from `config.lib.stylix.colors`.
 { pkgs, ... }:
 {
   imports = [
     ./hyprland.nix
     ./waybar.nix
-    ./dunst.nix
+    ./swaync.nix
     ./rofi.nix
     ./wlogout.nix
     ./lockscreen.nix

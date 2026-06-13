@@ -1,6 +1,6 @@
 # 05 — Theming strategy (matugen vs stylix)
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 04
 - **Machines:** all
 
@@ -14,31 +14,31 @@ architectural decision** of the desktop migration — the current pipeline
 writes generated files straight into `~/.config/*` at runtime, which breaks
 when those paths are HM-managed store symlinks.
 
+**Outcome: Stylix chosen (not matugen). See [DECISIONS 022](../DECISIONS.md).**
+
 ## Sub-tasks
 
-- [ ] **Decision spike:** evaluate the two candidate architectures and record
-      the choice in DECISIONS.md:
-      1. **Keep matugen:** matugen writes generated color files to
-         `$XDG_STATE_HOME/theme/`; static HM-managed configs `include` /
-         `@import` / `source=` those paths (kitty `include`, waybar/wlogout
-         CSS `@import`, hyprland `source=`, rofi `@import`); wallpaper changes
-         re-theme without a rebuild
-      2. **Stylix:** declarative theming from a wallpaper input at build time;
-         wallpaper changes require `nixos-rebuild switch`; less custom glue,
-         but less "live"
-- [ ] Implement the chosen pipeline for: hyprland colors, waybar, kitty,
-      dunst, rofi, wlogout, swaylock
-- [ ] GTK 3/4 + icon theme (papirus) + cursor; Qt: Kvantum/qt5ct/qt6ct or
-      `qt.platformTheme` — make Qt apps follow the palette
-- [ ] Wallpaper flow: where the current wallpaper lives (move out of
-      `~/.config/hypr/cache/` into `$XDG_STATE_HOME` or `$XDG_CACHE_HOME`),
-      wallpaper-picker script, swaybg/swaylock pick it up
-- [ ] If matugen is kept: rewrite `apply_matugen.sh` to actually use the
-      `matugen/templates/` + `config.toml` engine (delete the duplicated
-      inline-bash generation), package it via `writeShellApplication`
-- [ ] Replace kill-based reloads (`pkill dunst; dunst &`) with proper ones
-      (`systemctl --user reload/restart`, `pkill -USR2 waybar`, kitty remote
-      control)
+- [x] **Decision spike:** evaluated matugen vs stylix → **Stylix**
+      (`modules/nixos/desktop/theming.nix`); recorded in DECISIONS 022.
+      Wallpaper-change-equals-rebuild accepted.
+- [x] Implement the chosen pipeline for hyprland colors, waybar, rofi, wlogout,
+      swaylock (kitty config is Ticket 06 — stylix's kitty target themes it
+      automatically once enabled). dunst replaced by **swaync** (DECISIONS 022).
+      waybar/wlogout/rofi/hyprland keep their Ticket-04 layouts and source
+      colours from `config.lib.stylix.colors`; their stylix targets are disabled.
+- [x] GTK 3/4 + icon theme (Papirus via `stylix.icons`) + cursor (Bibata via
+      `stylix.cursor`); Qt via `stylix.targets.qt.platform = "qtct"` (stylix's
+      default; themes Qt through a generated Kvantum theme).
+- [x] Wallpaper flow: `stylix.image` (a committed default
+      `modules/nixos/desktop/wallpaper.png`); picker
+      `pkgs/scripts/theme-wallpaper-select.sh` (SUPER+W) repaints live with
+      swaybg + rebuilds to recolour; swaylock picks up the wallpaper via stylix.
+      The old `~/.config/hypr/cache/` path is gone.
+- [x] matugen not kept — `apply_matugen.sh` + the `matugen/templates/` engine
+      are dropped (the inline-bash generators were already dead code).
+- [x] Kill-based reloads retired: dunst's `pkill dunst; dunst &` is gone with
+      dunst itself (swaync owns its user service); waybar already used
+      `pkill -USR2` / `systemd.enable`.
 
 ## Testing
 
@@ -54,13 +54,11 @@ when those paths are HM-managed store symlinks.
 
 ## Open questions
 
-- [ ] **Matugen vs stylix** — the core decision. Hybrid possible (stylix for
-      GTK/Qt base, matugen for the live Wayland apps)?
-- [ ] dunst has no include mechanism for `dunstrc` — options: dunst's
-      drop-in dir (`dunstrc.d`), full-file generation into a writable path
-      with HM only providing the base, or stylix-managed
-- [ ] Does live re-theming without rebuild actually matter to you, or is
-      wallpaper-change-equals-rebuild acceptable? (Decides 80 % of the above.)
+- [x] **Matugen vs stylix** — resolved: **Stylix** (DECISIONS 022). Not hybrid.
+- [x] dunst include mechanism — moot: dunst replaced by **swaync**, themed by
+      stylix's swaync target.
+- [x] Live re-theming vs rebuild — rebuild accepted; the picker gives an instant
+      swaybg preview to soften the rebuild latency.
 
 ## Ask when starting
 

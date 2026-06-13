@@ -1,10 +1,12 @@
 # Screen lock + idle handling: swaylock (the lock binary, standardised across
 # the config — DECISIONS 016) driven by swayidle. swaybg paints the wallpaper
-# and is launched from the Hyprland exec-once (path finalised in Ticket 05).
+# and is launched from the Hyprland exec-once.
 #
-# swaylock-effects is used so the matugen-generated config in Ticket 05
-# (image=, fade-in, grace-*) has the options it relies on. swaylock's PAM
-# service is enabled system-side in modules/nixos/desktop.
+# swaylock-effects is used so stylix's swaylock target (DECISIONS 022) can set
+# image=/scaling/colours; the layout options below (indicator size, grace,
+# fade-in) are kept on top. stylix points the lock screen at `stylix.image`
+# automatically. swaylock's PAM service is enabled system-side in
+# modules/nixos/desktop.
 { pkgs, ... }:
 {
   home.packages = [ pkgs.swaybg ];

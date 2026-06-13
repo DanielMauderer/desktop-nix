@@ -331,3 +331,61 @@ linters (actionlint, standalone shellcheck) — Nix-only; raw scripts in
 no VM boot needed. `nixosConfigurations` is hoisted to a shared `hosts` let
 binding so checks and outputs evaluate each host once. The trade-off is that
 `nix flake check` now evaluates all three hosts even for unrelated checks.
+
+---
+
+## 022 — Theming: Stylix, not matugen (2026-06-13)
+
+**Context:** Ticket 05's core decision. The old MyLinux pipeline ran
+`matugen image <wallpaper>` at runtime and wrote generated files straight into
+`~/.config/*` (waybar, wlogout, kitty, rofi, the full `dunstrc`, swaylock),
+which is incompatible with home-manager's read-only store symlinks. Two
+candidate architectures: keep matugen (live re-theme, no rebuild, lots of glue
++ writable-path discipline) or Stylix (declarative, palette derived from a
+wallpaper at build time, wallpaper change == rebuild, far less glue). Note: the
+old `apply_matugen.sh` inline `generate_*` bash functions and the
+`hyprland_colors`/`gtk*` templates were **dead code** — `config.toml`'s
+templates were the only thing matugen actually ran.
+
+**Decision:** Use **Stylix** (`modules/nixos/desktop/theming.nix`). Stylix
+derives one base16 palette from `stylix.image` and themes the desktop
+declaratively; because home-manager runs as a NixOS module, its
+home-manager-integration copies `stylix.*` into the maudi home automatically, so
+one module themes system + home. Accepting wallpaper-change-equals-rebuild was
+explicit. Sub-decisions:
+
+- **Notifications:** dunst → **swaync** (SwayNotificationCenter), themed by
+  stylix's swaync target; it registers its own user service.
+- **Qt:** `stylix.targets.qt.platform = "qtct"` (the default), which themes Qt
+  via a stylix-generated Kvantum theme under qt5ct/qt6ct — no manual Kvantum
+  SVG upkeep.
+- **Custom-layout apps keep their layouts, palette comes from stylix:** waybar,
+  wlogout, rofi and hyprland have hand-tuned configs from Ticket 04. Their
+  stylix targets are disabled (waybar/rofi/hyprland; wlogout has no target) and
+  their colours are injected from `config.lib.stylix.colors` — waybar/wlogout
+  via a prepended `@define-color` block, rofi via a prepended `* { … }` palette
+  (passed as a `builtins.toFile` theme path, since a derivation is misread as an
+  inline rasi attrset), hyprland keeps its 4-stop gradient borders mapped onto
+  base0D/0C/0E. Everything else (GTK, kitty, swaync, swaylock, cursor, fonts,
+  icons) is themed directly by stylix.
+- **Wallpaper picker** (`pkgs/scripts/theme-wallpaper-select.sh`, SUPER+W):
+  rofi-picks an image, repaints it live with swaybg, copies it over
+  `modules/nixos/desktop/wallpaper.png` in the local flake checkout
+  (`FLAKE_DIR`, default `~/desktop-nix`) and runs `nixos-rebuild switch` so
+  stylix re-derives the palette. swaybg still paints `stylix.image`; stylix's
+  hyprland target (which would pull in hyprpaper and flatten the gradient) is
+  disabled.
+
+**"Ask when starting" resolutions:** Papirus stays as the icon theme
+(`stylix.icons`, Papirus-Dark). swaylock references the wallpaper via
+`stylix.image` (stylix's swaylock target sets `image=` to a store path — the old
+hard-coded `/var/home/maudi/.dotfiles/...` path is gone). The matugen
+templates/`apply_matugen.sh` are dropped entirely (not ported).
+
+**Consequences:** Changing the wallpaper is a rebuild, not instant (the picker
+gives an instant swaybg preview to soften this). A picked wallpaper persists
+only until the next `system.autoUpgrade`, which rebuilds from git `main` and so
+restores the committed default `wallpaper.png` unless the change is committed.
+The default wallpaper is committed with a deliberately wide luminance range so
+the auto-generated dark scheme keeps readable bg/fg contrast. One more flake
+input (`stylix`) to track; it follows nixpkgs.

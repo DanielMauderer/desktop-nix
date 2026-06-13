@@ -1,9 +1,6 @@
 /* Ported from the old wlogout/style.css. The mocha.css / matugen.css @imports
- * and the per-button PNG icon backgrounds are dropped; @base/@mauve are
- * inlined as static defaults. Ticket 05 can reintroduce matugen colours. */
-@define-color base #111318;
-@define-color mauve #abc7ff;
-
+ * and the per-button PNG icon backgrounds are dropped. @base/@mauve are
+ * prepended by wlogout.nix from the stylix palette (DECISIONS 022). */
 * {
   background-image: none;
   font-family: "JetBrainsMono Nerd Font", sans-serif;
