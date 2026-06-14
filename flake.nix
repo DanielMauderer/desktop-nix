@@ -114,6 +114,16 @@
           name = "starship prompt enabled (Ticket 06)";
           assertion = cfg.home-manager.users.maudi.programs.starship.enable;
         }
+        {
+          name = "podman enabled with docker compat (Ticket 08)";
+          assertion = cfg.virtualisation.podman.enable && cfg.virtualisation.podman.dockerCompat;
+        }
+        {
+          name = "direnv + nix-direnv enabled in home (Ticket 08)";
+          assertion =
+            cfg.home-manager.users.maudi.programs.direnv.enable
+            && cfg.home-manager.users.maudi.programs.direnv.nix-direnv.enable;
+        }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -137,13 +147,52 @@
     {
       formatter.${system} = pkgs.nixfmt-rfc-style;
 
-      devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [
-          nil
-          statix
-          deadnix
-          nixfmt-rfc-style
-        ];
+      devShells.${system} = {
+        default = pkgs.mkShell {
+          packages = with pkgs; [
+            nil
+            statix
+            deadnix
+            nixfmt-rfc-style
+          ];
+        };
+
+        # Per-language project shells (Ticket 08 / DECISIONS 027). Enter with
+        # `nix develop ~/desktop-nix#rust`, or scaffold a project with
+        # `nix flake init -t ~/desktop-nix#rust` (drops a flake.nix + .envrc).
+        rust = pkgs.mkShell {
+          packages = with pkgs; [
+            cargo
+            rustc
+            rustfmt
+            clippy
+            cargo-nextest
+            bacon
+            rust-analyzer
+          ];
+        };
+        go = pkgs.mkShell {
+          packages = with pkgs; [
+            go
+            gopls
+            gotools
+            gofumpt
+          ];
+        };
+        node = pkgs.mkShell {
+          packages = with pkgs; [
+            nodejs
+            nodePackages.typescript-language-server
+          ];
+        };
+        python = pkgs.mkShell {
+          packages = with pkgs; [
+            python3
+            uv
+            ruff
+            python3Packages.python-lsp-server
+          ];
+        };
       };
 
       checks.${system} = {
@@ -176,6 +225,49 @@
             }
             ''
               find ${./.} -name '*.nix' -print0 | xargs -0 nixfmt --check
+              touch $out
+            '';
+
+        # Dev devShell smoke checks (Ticket 08): each toolchain compiles/runs a
+        # trivial hello-world offline, so a broken per-language shell fails the
+        # flake check. Cheap (node/python/go) plus a minimal rust+nextest build.
+        dev-node-check = pkgs.runCommand "dev-node-check" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+          node -e 'process.exit(0)'
+          touch $out
+        '';
+
+        dev-python-check = pkgs.runCommand "dev-python-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+          python3 -c 'assert 1 + 1 == 2'
+          touch $out
+        '';
+
+        dev-go-check = pkgs.runCommand "dev-go-check" { nativeBuildInputs = [ pkgs.go ]; } ''
+          export HOME="$TMPDIR" GOCACHE="$TMPDIR/go-cache" GOPROXY=off GOFLAGS=-mod=mod
+          cat > hello.go <<'EOF'
+          package main
+          import "fmt"
+          func main() { fmt.Println("hello") }
+          EOF
+          go run hello.go
+          touch $out
+        '';
+
+        dev-rust-check =
+          pkgs.runCommand "dev-rust-check"
+            {
+              nativeBuildInputs = [
+                pkgs.cargo
+                pkgs.rustc
+                pkgs.cargo-nextest
+                pkgs.gcc # cc — rustc needs a linker to build the test binary
+              ];
+            }
+            ''
+              export HOME="$TMPDIR" CARGO_HOME="$TMPDIR/cargo"
+              # `cargo new --lib` ships a passing `it_works` test; just build+run it.
+              cargo new --lib --vcs none hello
+              cd hello
+              cargo nextest run --offline
               touch $out
             '';
 
@@ -403,8 +495,66 @@
             )
           '';
         };
+
+        # Dev containers (Ticket 08): the dev system module is imported by base,
+        # so booting any host gives podman. Run a container from a store-loaded
+        # image (the VM has no network) and verify the docker→podman compat shim
+        # and podman-compose are present.
+        test-podman =
+          let
+            image = pkgs.dockerTools.buildImage {
+              name = "hello";
+              tag = "test";
+              copyToRoot = pkgs.buildEnv {
+                name = "hello-root";
+                paths = [ pkgs.coreutils ];
+                pathsToLink = [ "/bin" ];
+              };
+              config.Cmd = [ "/bin/true" ];
+            };
+          in
+          testLib.makeTest {
+            name = "podman";
+            nodes.machine = testNode;
+            testScript = ''
+              machine.wait_for_unit("multi-user.target")
+
+              # podman + podman-compose on PATH; docker is the podman compat
+              # shim — verify it resolves to the podman binary (the dockerCompat
+              # `docker --version` string is not guaranteed to mention podman).
+              machine.succeed("podman --version")
+              machine.succeed("podman-compose --version")
+              machine.succeed("realpath $(command -v docker) | grep -qi podman")
+
+              # Load the locally-built image and run it (rootful, no network).
+              machine.succeed("podman load -i ${image}")
+              machine.succeed("podman run --rm --network=none hello:test")
+            '';
+          };
       };
 
       nixosConfigurations = hosts;
+
+      # devShell templates for `nix flake init -t ~/desktop-nix#<lang>`
+      # (Ticket 08 / DECISIONS 027). Each drops a flake.nix + .envrc (`use flake`)
+      # so direnv loads the toolchain on `cd`.
+      templates = {
+        rust = {
+          path = ./templates/rust;
+          description = "Rust devShell (cargo, clippy, nextest, bacon, rust-analyzer)";
+        };
+        go = {
+          path = ./templates/go;
+          description = "Go devShell (go, gopls, gotools, gofumpt)";
+        };
+        node = {
+          path = ./templates/node;
+          description = "Node devShell (nodejs LTS + typescript-language-server)";
+        };
+        python = {
+          path = ./templates/python;
+          description = "Python devShell (python3, uv, ruff, python-lsp-server)";
+        };
+      };
     };
 }
