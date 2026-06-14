@@ -630,9 +630,11 @@
             # Running the CachyOS kernel (uname -r is e.g. "7.0.12-cachyos").
             machine.succeed("uname -r | grep -q cachyos")
 
-            # sched-ext: the scx service is active and running scx_lavd.
+            # sched-ext: the scx service is active and configured for scx_lavd.
+            # The scheduler is selected via the SCX_SCHEDULER env var (ExecStart
+            # just execs "$SCX_SCHEDULER"), so assert on Environment, not ExecStart.
             machine.wait_for_unit("scx.service")
-            machine.succeed("systemctl show -p ExecStart scx.service | grep -q scx_lavd")
+            machine.succeed("systemctl show -p Environment scx.service | grep -q SCX_SCHEDULER=scx_lavd")
 
             # Steam + companions are installed (steam pulls 32-bit libs).
             machine.succeed("test -x /run/current-system/sw/bin/steam")
