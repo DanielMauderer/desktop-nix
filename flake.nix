@@ -149,7 +149,9 @@
         }
         {
           name = "spotify in maudi home.packages (Ticket 10)";
-          assertion = builtins.any (p: (p.pname or "") == "spotify") cfg.home-manager.users.maudi.home.packages;
+          assertion = builtins.any (
+            p: (p.pname or "") == "spotify"
+          ) cfg.home-manager.users.maudi.home.packages;
         }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {

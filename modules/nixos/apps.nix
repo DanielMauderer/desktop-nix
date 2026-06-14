@@ -3,13 +3,20 @@
 # 0xc000022070/zen-browser-flake twilight channel (DECISIONS 030), no flatpak
 # on NixOS (DECISIONS 031/032). mpv and imv cover video and image viewing.
 # See docs/tickets/10-flatpak-strategy.md for the full rationale.
-{ inputs, pkgs, lib, ... }:
+{
+  inputs,
+  pkgs,
+  lib,
+  ...
+}:
 {
   # Exact unfree allow-list: any undeclared unfree package fails the build.
   # Steam entries (steam, steam-unwrapped, steam-run) are added in Ticket 11.
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-    "spotify"
-  ];
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
+    builtins.elem (lib.getName pkg) [
+      "spotify"
+    ];
 
   home-manager.users.maudi.home.packages = [
     pkgs.spotify
