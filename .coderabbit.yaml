@@ -17,7 +17,8 @@ reviews:
     - path: "**/*.nix"
       instructions: |
         Review for correctness, idiomatic style, and security:
-        - Options must use correct types and defaults
+        - When a module declares options, they must use correct types and
+          defaults (most modules here have no options block — that is fine)
         - Formatting follows nixfmt-rfc-style conventions
         - No deprecated option paths
         - Use mkDefault/mkForce only where precedence must be explicit
@@ -28,9 +29,17 @@ reviews:
         Generic logic belongs in modules/ — flag anything that looks reusable.
     - path: "modules/**"
       instructions: |
-        Modules must declare options with types and defaults.
-        No hard-coded hostnames or usernames — use config.networking.hostName
-        or specialArgs instead.
+        These are plain NixOS/home-manager modules composed by import, NOT a
+        generic library (DECISIONS 001: minimal abstraction, no flake-parts).
+        Do NOT request a typed `enable`/options interface or parameterised
+        usernames for a module just because it sets config directly — most
+        modules here intentionally have no options block.
+        This is a single-user, three-host personal config: the user is `maudi`
+        on every machine (DECISIONS 007) and per-feature groups (libvirtd,
+        gamemode, etc.) are added by their own modules by design. Referencing
+        `maudi` directly is the established convention, not a defect — do not
+        flag it. Still flag genuinely reusable logic stuck in a host file and
+        real correctness/security issues.
     - path: "lib/**"
       instructions: |
         Helper functions should be pure and minimal.

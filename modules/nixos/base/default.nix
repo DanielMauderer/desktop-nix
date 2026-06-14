@@ -5,9 +5,12 @@
 #
 # ../dev (Ticket 08) is pulled in here so the system-level dev pieces (podman)
 # land on every host, matching how home.nix wires the dev home module.
+# ../virtualisation (Ticket 09, DECISIONS 028) lands libvirt/KVM on every host
+# too — maudiblue enabled libvirtd globally and all three machines keep it.
 _: {
   imports = [
     ../dev
+    ../virtualisation
     ./audio.nix
     ./boot.nix
     ./fonts.nix
