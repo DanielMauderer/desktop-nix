@@ -31,10 +31,10 @@ Status legend: `open` → `migrated` / `dropped`.
 
 | App | Target | Ticket | Status |
 |---|---|---|---|
-| Zen Browser (`app.zen_browser.zen`) | nixpkgs / community flake / nix-flatpak (decide) | 10 | open |
-| Spotify (`com.spotify.Client`) | nixpkgs unfree / nix-flatpak (decide) | 10 | open |
-| Flatseal (`com.github.tchx84.Flatseal`) | only if flatpak stays | 10 | open |
-| Warehouse (`io.github.flattool.Warehouse`) | only if flatpak stays | 10 | open |
+| Zen Browser (`app.zen_browser.zen`) | `0xc000022070/zen-browser-flake` twilight (DECISIONS 030) | 10 | migrated |
+| Spotify (`com.spotify.Client`) | `pkgs.spotify` unfree (DECISIONS 029) | 10 | migrated |
+| Flatseal (`com.github.tchx84.Flatseal`) | dropped — no flatpak on NixOS (DECISIONS 031/032) | 10 | dropped |
+| Warehouse (`io.github.flattool.Warehouse`) | dropped — no flatpak on NixOS (DECISIONS 031/032) | 10 | dropped |
 
 ## 3. maudiblue — fonts
 
