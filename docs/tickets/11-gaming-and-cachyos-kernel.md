@@ -34,7 +34,7 @@ scratch against current NixOS gaming best practice.
       `gaming/gpu.nix`.
 - [x] MangoHud as HM package + config, set desktop-only via
       `home-manager.users.maudi.programs.mangohud` in `gaming/gpu.nix`.
-- [x] Kernel-update cadence documented in DECISIONS 029 (chaotic moves fast;
+- [x] Kernel-update cadence documented in DECISIONS 034 (chaotic moves fast;
       `nixos-rebuild --rollback` / pin the chaotic input if a kernel breaks).
 
 ## Testing
@@ -52,7 +52,7 @@ scratch against current NixOS gaming best practice.
       launches via Proton-GE, gamemode activates (`gamemoded -s` during play),
       MangoHud overlay renders, no scheduler/stutter regressions vs Silverblue.
 
-## Open questions (resolved — DECISIONS 029)
+## Open questions (resolved — DECISIONS 034)
 
 - [x] scx scheduler → **`scx_lavd`** (latency-oriented, gaming).
 - [x] gamemode + scx → keep `programs.gamemode` (cheap; complements scx). The

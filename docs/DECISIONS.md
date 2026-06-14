@@ -601,7 +601,78 @@ nested KVM and is left to manual on-hardware testing.
 
 ---
 
-## 029 — Gaming & CachyOS kernel (desktop only) (2026-06-14)
+## 029 — Spotify: nixpkgs unfree (Ticket 10, 2026-06-14)
+
+**Context:** Silverblue installed Spotify as `com.spotify.Client` (Flatpak, system
+scope). On NixOS `pkgs.spotify` (unfree) is in nixpkgs and integrates with the
+PipeWire stack that Ticket 03 set up.
+
+**Decision:** Use `pkgs.spotify` with an explicit `allowUnfreePredicate` allowlist.
+
+**Consequences:** Fully declarative, no Flatpak runtime needed. The allowlist is the
+single authoritative gate for unfree packages — the build fails on any unlisted
+unfree package. Steam entries are added when Ticket 11 lands.
+
+---
+
+## 030 — Zen Browser: `0xc000022070/zen-browser-flake`, twilight channel (Ticket 10, 2026-06-14)
+
+**Context:** Options were the `app.zen_browser.zen` Flatpak, the community flake
+(`0xc000022070/zen-browser-flake`), or a switch to nixpkgs Firefox (regression). The
+Zen team deletes official release artifacts; the community flake's `twilight` channel
+mirrors them and is the only reproducible option.
+
+**Decision:** Add `zen-browser` as a flake input (nixpkgs/home-manager follows the
+root), use the `twilight` package.
+
+**Consequences:** Release cadence tracked by the community flake maintainer. One extra
+flake input. Profile migration from the old machine is a manual step in the Ticket 13
+runbook.
+
+---
+
+## 031 — No Flatpak on NixOS (Ticket 10, 2026-06-14)
+
+**Context:** Silverblue used Flatpak as its primary app mechanism (both user and
+system Flathub remotes). On NixOS nixpkgs and a community flake cover all four former
+Flatpak apps (Spotify → nixpkgs, Zen → zen-browser-flake) or make them unnecessary
+(Flatseal, Warehouse).
+
+**Decision:** `services.flatpak` stays disabled (NixOS default). The scope question
+from the ticket ("Ask when starting: user vs system scope") is therefore moot.
+
+**Consequences:** Smaller system closure. Sandboxed Flatpak browser is no longer
+available; Zen Browser runs unwrapped (acceptable — same as most NixOS installs).
+
+---
+
+## 032 — Flatseal and Warehouse: drop (Ticket 10, 2026-06-14)
+
+**Context:** Both tools exist solely to manage Flatpak apps. With no Flatpak on
+NixOS (DECISIONS 031) they serve no purpose.
+
+**Decision:** Drop both. No replacement needed.
+
+**Consequences:** None — their function is subsumed by the declarative Nix config.
+
+---
+
+## 033 — Other GUI apps: thunar, mpv, imv (Ticket 10, 2026-06-14)
+
+**Context:** The Silverblue image provided file management, image viewing, and video
+playback outside the Flatpak list (via the base Fedora/Hyprland packages). The NixOS
+config must replicate this.
+
+**Decision:** `thunar` (file manager, already added in Ticket 04 desktop packages),
+`mpv` (video player, Wayland-native), `imv` (image viewer, Wayland-native). All in
+nixpkgs. Added via `modules/nixos/apps.nix` alongside Spotify and Zen Browser.
+
+**Consequences:** Replaces whatever the Silverblue base provided. Config migration for
+mpv/imv user preferences (if any) is a manual step in the Ticket 13 runbook.
+
+---
+
+## 034 — Gaming & CachyOS kernel (desktop only) (2026-06-14)
 
 **Context:** Ticket 11 adds gaming support. It is **net-new** — the old
 Silverblue image had no gaming or GPU config, so nothing is ported (the only

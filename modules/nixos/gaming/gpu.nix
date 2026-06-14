@@ -1,4 +1,4 @@
-# AMD GPU acceleration + tuning (Ticket 11, desktop only). See DECISIONS 029.
+# AMD GPU acceleration + tuning (Ticket 11, desktop only). See DECISIONS 034.
 #
 # The desktop runs an AMD card; mesa/RADV is the NixOS default Vulkan driver and
 # needs no extra packages (VAAPI is covered by mesa too). 32-bit support is

@@ -1,21 +1,11 @@
-# Steam + gaming runtime (Ticket 11, desktop only). See DECISIONS 029.
-{ pkgs, lib, ... }:
+# Steam + gaming runtime (Ticket 11, desktop only). See DECISIONS 034.
+#
+# The unfree allowance for steam/steam-unwrapped lives in the single central
+# allow-list (modules/nixos/apps.nix, DECISIONS 029) — only one module may
+# define nixpkgs.config.allowUnfreePredicate per host, so it is not repeated
+# here. (proton-ge-bin and steam-run are already free.)
+{ pkgs, ... }:
 {
-  # Steam (and its steam-unwrapped payload) are unfree. Scope the allowance to
-  # exactly the gaming packages instead of a blanket allowUnfree — this module
-  # is desktop-only, so the laptops keep a fully-free package set. (proton-ge-bin
-  # and steam-run are already free; listed here only so the predicate is robust
-  # if upstream relicenses.)
-  nixpkgs.config.allowUnfreePredicate =
-    pkg:
-    builtins.elem (lib.getName pkg) [
-      "steam"
-      "steam-unwrapped"
-      "steam-original"
-      "steam-run"
-      "proton-ge-bin"
-    ];
-
   programs = {
     steam = {
       enable = true;
@@ -34,7 +24,7 @@
     # feralinteractive gamemode: launch a game with `gamemoderun %command%` (or
     # via Steam's launch options) to apply CPU governor / niceness / GPU perf
     # tweaks for its lifetime. The old cosmetic hypr-gamemode toggle was dropped
-    # as unused (DECISIONS 029).
+    # as unused (DECISIONS 034).
     gamemode.enable = true;
   };
 }
