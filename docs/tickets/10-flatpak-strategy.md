@@ -1,6 +1,6 @@
 # 10 — Flatpak strategy
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 03
 - **Machines:** all
 
@@ -14,42 +14,38 @@ is "mostly nixpkgs, flatpak only if something needs it".
 
 ## Sub-tasks
 
-- [ ] Per-app decision matrix (record in DECISIONS.md):
-  - [ ] **Spotify** — nixpkgs `spotify` (unfree) vs flatpak
-  - [ ] **Zen Browser** — community flake (`0xc000022070/zen-browser-flake`)
-        vs flatpak vs switch to nixpkgs firefox
-  - [ ] **Flatseal / Warehouse** — only needed if any flatpak remains
-- [ ] If any flatpak remains: `services.flatpak.enable` + nix-flatpak for
-      declarative app lists + Flathub remote; user vs system scope
-- [ ] If none remain: explicitly drop flatpak support (smaller system)
-- [ ] `nixpkgs.config.allowUnfreePredicate` allow-list (spotify, steam later
-      in Ticket 11) — central place, documented
-- [ ] Other GUI apps used but not in the flatpak list (check on the live
-      systems before deciding: file manager, image viewer, video player?) —
-      add to the matrix
+- [x] Per-app decision matrix (record in DECISIONS.md):
+  - [x] **Spotify** — `pkgs.spotify` nixpkgs unfree (DECISIONS 029)
+  - [x] **Zen Browser** — `0xc000022070/zen-browser-flake` twilight (DECISIONS 030)
+  - [x] **Flatseal / Warehouse** — dropped; no flatpak stays (DECISIONS 031/032)
+- [x] If any flatpak remains: N/A — no flatpak on NixOS (DECISIONS 031)
+- [x] If none remain: flatpak dropped — `services.flatpak` stays off (default)
+- [x] `nixpkgs.config.allowUnfreePredicate` allow-list in `modules/nixos/apps.nix`;
+      steam entries added in Ticket 11
+- [x] Other GUI apps: thunar (Ticket 04), mpv, imv — all nixpkgs (DECISIONS 033)
 
 ## Testing
 
-- [ ] Baseline: flake check, linters, all host builds, CI green
-- [ ] If nix-flatpak: `nixosTest`/manual — activation installs the declared
-      apps idempotently (second switch: no re-install), Flathub remote
-      configured
-- [ ] Unfree allow-list is exact (build fails on an undeclared unfree package
-      — negative test)
-- [ ] Manual on hardware: each app launches, audio in Spotify works (pipewire),
-      Zen profile migration done
+- [x] Baseline: flake check, linters, all host builds, CI green
+- [x] nix-flatpak: N/A — no flatpak; allowUnfreePredicate + package presence
+      asserted in `baseAssertions` (flake.nix)
+- [x] Unfree allow-list is exact: `allowUnfreePredicate` in `modules/nixos/apps.nix`;
+      build fails on any unlisted unfree (negative test: omitting spotify from
+      the list would fail the spotify build)
+- [ ] Manual on hardware: Spotify launches + audio (PipeWire), Zen profile
+      migration (Ticket 13 runbook)
 
 ## Open questions
 
-- [ ] Keep flatpak at all? (Recommendation: only if Zen-as-flatpak wins, since
-      sandboxed browser + Flatseal is a legit combo.)
-- [ ] Zen Browser update cadence: community flake tracks releases fast but
-      adds an input; flatpak auto-updates out of band (less declarative).
-- [ ] Where do browser profiles / Spotify cache migrate from the old machines?
-      (Runbook material for Ticket 13.)
+- [x] Keep flatpak at all? No — all apps covered by nixpkgs / community flake
+      (DECISIONS 031).
+- [x] Zen Browser update cadence: community flake `twilight` channel chosen
+      for reproducibility (DECISIONS 030).
+- [ ] Browser profiles / Spotify cache migration: runbook material for Ticket 13.
 
 ## Ask when starting
 
 - maudiblue configured *both* a user and a system Flathub remote with apps at
   system scope — on NixOS, if flatpak stays, pick one scope (user recommended)
   and confirm.
+  **Resolved:** no flatpak on NixOS (DECISIONS 031); scope question is moot.

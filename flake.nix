@@ -23,6 +23,16 @@
       url = "git+https://github.com/nix-community/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Zen Browser (Ticket 10 / DECISIONS 030): community flake, twilight channel
+    # for reproducibility (official release artifacts may be deleted by the Zen team).
+    zen-browser = {
+      url = "github:0xc000022070/zen-browser-flake";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        home-manager.follows = "home-manager";
+      };
+    };
   };
 
   outputs =
@@ -132,6 +142,16 @@
           name = "virt-manager enabled and maudi in libvirtd group (Ticket 09)";
           assertion =
             cfg.programs.virt-manager.enable && builtins.elem "libvirtd" cfg.users.users.maudi.extraGroups;
+        }
+        {
+          name = "allowUnfreePredicate whitelists spotify (Ticket 10)";
+          assertion = cfg.nixpkgs.config.allowUnfreePredicate pkgs.spotify;
+        }
+        {
+          name = "spotify in maudi home.packages (Ticket 10)";
+          assertion = builtins.any (
+            p: (p.pname or "") == "spotify"
+          ) cfg.home-manager.users.maudi.home.packages;
         }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
