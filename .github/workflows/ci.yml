@@ -26,8 +26,12 @@ jobs:
           df -h /
       - uses: DeterminateSystems/nix-installer-action@v14
         with:
+          # The chaotic cache lets the test-gaming nixosTest pull the CachyOS
+          # kernel as a substitute instead of compiling it (Ticket 11 / 02).
           extra-conf: |
             extra-system-features = nixos-test
+            extra-substituters = https://nyx-cache.chaotic.cx/
+            extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       # Formatting is covered by the nixfmt-check flake check, so this single
       # command is the whole gate (local `nix flake check` == CI).
@@ -54,6 +58,12 @@ jobs:
           sudo docker image prune --all --force >/dev/null 2>&1 || true
           df -h /
       - uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          # The desktop closure includes the CachyOS kernel; pull it (and the
+          # rest of chaotic) from the chaotic cache instead of building it.
+          extra-conf: |
+            extra-substituters = https://nyx-cache.chaotic.cx/
+            extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       - name: Build toplevel
         run: nix build .#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel -L

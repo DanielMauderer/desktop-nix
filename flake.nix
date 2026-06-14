@@ -152,6 +152,22 @@
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;
       };
+
+      # Gaming test node (Ticket 11): the desktop host, which mkHost composes
+      # with the chaotic module (CachyOS kernel + scx) on top of the same
+      # home-manager/stylix/inputs wiring as testNode. The shared testNode can't
+      # be reused — it boots private-laptop, which deliberately has no chaotic.
+      gamingTestNode = {
+        imports = [
+          home-manager.nixosModules.home-manager
+          inputs.stylix.nixosModules.stylix
+          chaotic.nixosModules.default
+          ./hosts/desktop/default.nix
+        ];
+        _module.args.inputs = inputs;
+        home-manager.useGlobalPkgs = true;
+        home-manager.useUserPackages = true;
+      };
     in
     {
       formatter.${system} = pkgs.nixfmt-rfc-style;
@@ -300,6 +316,13 @@
                   name = "kanshi has only the laptop-internal fallback";
                   assertion = kanshiProfileNames cfg == [ "laptop-internal" ];
                 }
+                # Gaming stack (Ticket 11) is desktop-only — the Intel laptop
+                # must not pull in scx, Steam or 32-bit graphics.
+                {
+                  name = "no gaming stack (scx + steam disabled)";
+                  assertion =
+                    !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
+                }
               ]
             )
             ''
@@ -317,6 +340,12 @@
                 {
                   name = "chaotic module NOT loaded";
                   assertion = !(hosts.work-laptop.options ? chaotic);
+                }
+                # Gaming stack (Ticket 11) is desktop-only.
+                {
+                  name = "no gaming stack (scx + steam disabled)";
+                  assertion =
+                    !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
                 }
                 {
                   name = "kanshi: docked profiles before fallback";
@@ -349,6 +378,24 @@
                 {
                   name = "chaotic module loaded (chaotic.nyx options present)";
                   assertion = (hosts.desktop.options ? chaotic) && (hosts.desktop.options.chaotic ? nyx);
+                }
+                # Gaming stack (Ticket 11), desktop-only.
+                {
+                  name = "CachyOS kernel selected";
+                  assertion = cfg.boot.kernelPackages.kernel == hosts.desktop.pkgs.linuxPackages_cachyos.kernel;
+                }
+                {
+                  name = "sched-ext scx_lavd enabled";
+                  assertion = cfg.services.scx.enable && cfg.services.scx.scheduler == "scx_lavd";
+                }
+                {
+                  name = "Steam enabled with 32-bit graphics + gamemode";
+                  assertion =
+                    cfg.programs.steam.enable && cfg.hardware.graphics.enable32Bit && cfg.programs.gamemode.enable;
+                }
+                {
+                  name = "MangoHud enabled in maudi's home";
+                  assertion = cfg.home-manager.users.maudi.programs.mangohud.enable;
                 }
                 {
                   name = "kanshi: dual-head profile before fallback";
@@ -566,6 +613,42 @@
             # virt-manager GUI + virt-viewer console client are installed.
             machine.succeed("test -x /run/current-system/sw/bin/virt-manager")
             machine.succeed("test -x /run/current-system/sw/bin/virt-viewer")
+          '';
+        };
+
+        # Gaming stack (Ticket 11, desktop only): boot the desktop host on the
+        # CachyOS kernel and assert the sched-ext scheduler is live and the
+        # Steam/GPU/overlay pieces are installed. The kernel + steam closure are
+        # pulled from the chaotic cache (CI extra-conf), not built. Launching a
+        # real game / GPU control needs hardware and is left to manual testing.
+        test-gaming = testLib.makeTest {
+          name = "gaming";
+          nodes.machine = gamingTestNode;
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+
+            # Running the CachyOS kernel (uname -r is e.g. "7.0.12-cachyos").
+            machine.succeed("uname -r | grep -q cachyos")
+
+            # sched-ext: the scx service is active and running scx_lavd.
+            machine.wait_for_unit("scx.service")
+            machine.succeed("systemctl show -p ExecStart scx.service | grep -q scx_lavd")
+
+            # Steam + companions are installed (steam pulls 32-bit libs).
+            machine.succeed("test -x /run/current-system/sw/bin/steam")
+            machine.succeed("test -x /run/current-system/sw/bin/gamescope")
+            machine.succeed("test -x /run/current-system/sw/bin/gamemoderun")
+
+            # 32-bit graphics support is wired (Steam/Proton need it): NixOS
+            # exposes the 32-bit driver tree at /run/opengl-driver-32.
+            machine.succeed("test -e /run/opengl-driver-32")
+
+            # LACT GPU control tool is installed (lactd needs a real GPU to
+            # stay up, so assert the binary, not the unit, in a headless VM).
+            machine.succeed("test -x /run/current-system/sw/bin/lact")
+
+            # MangoHud overlay landed in maudi's home profile.
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/mangohud")
           '';
         };
       };

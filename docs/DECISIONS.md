@@ -598,3 +598,61 @@ enabled, virt-manager on, maudi in libvirtd group) and a `test-virtualisation`
 nixosTest (daemon up, `su maudi` reaches `qemu:///system`, default network
 defined+autostart, GUI/console clients installed). Booting a real guest requires
 nested KVM and is left to manual on-hardware testing.
+
+---
+
+## 029 — Gaming & CachyOS kernel (desktop only) (2026-06-14)
+
+**Context:** Ticket 11 adds gaming support. It is **net-new** — the old
+Silverblue image had no gaming or GPU config, so nothing is ported (the only
+gaming-adjacent artefact, MyLinux's cosmetic `gamemode.sh` Hyprland toggle, the
+user confirmed they never use). The `chaotic-cx/nyx` input and
+`chaotic.nixosModules.default` were already wired on the desktop host from
+Ticket 01 (`lib/mkHost.nix` `withChaotic = true`).
+
+**Decision:**
+
+- **`modules/nixos/gaming/`** (`kernel.nix` / `steam.nix` / `gpu.nix`), imported
+  **only** from `hosts/desktop/default.nix` — never from `modules/nixos/base`.
+  The two laptops are battery-first and one runs integrated **Intel** graphics,
+  so they get none of this (eval-asserted: scx/steam/32-bit all off on laptops).
+- **CachyOS kernel:** `boot.kernelPackages = pkgs.linuxPackages_cachyos` (from
+  the chaotic overlay). The chaotic module already adds its binary cache
+  (`https://nyx-cache.chaotic.cx/` + trusted key) to the system's `nix.settings`,
+  so the kernel is substituted, never built. The same substituter/key is added
+  to **CI** (`.github/workflows/ci.yml`, both jobs) so CI substitutes it too.
+- **sched-ext:** `services.scx` with `scheduler = "scx_lavd"` (latency-oriented,
+  gaming-tuned). gamemode is kept alongside it — cheap, and with no cosmetic
+  toggle there is no overlap.
+- **Steam:** `programs.steam.enable` + `remotePlay.openFirewall` +
+  `gamescopeSession.enable` (Big-Picture session at the greeter) + declarative
+  **Proton-GE** via `extraCompatPackages = [ proton-ge-bin ]` (pinned by the
+  flake; no imperative protonup-qt). `programs.gamescope.enable` and
+  `programs.gamemode.enable` (feralinteractive; `gamemoderun %command%`).
+- **Unfree, scoped:** an `nixpkgs.config.allowUnfreePredicate` whitelisting the
+  steam package names (`steam`, `steam-unwrapped`, …) instead of a blanket
+  `allowUnfree`. Because the module is desktop-only, the laptops keep a fully
+  free package set. (`proton-ge-bin`/`steam-run` are already free.)
+- **AMD GPU:** mesa/RADV is the NixOS default Vulkan driver (VAAPI included);
+  `hardware.graphics.enable32Bit` for 32-bit Steam/Proton titles. **LACT**
+  (`services.lact.enable`) for fan/clock/power control (chosen over CoreCtrl).
+  Generation-agnostic — no RDNA-specific wiring.
+- **MangoHud** overlay configured per-user via
+  `home-manager.users.maudi.programs.mangohud` **inside the desktop-only gaming
+  module**, so it does not land on the laptops (the shared `modules/home/desktop`
+  set is imported by every host).
+- **Dropped:** `pkgs/scripts/hypr-gamemode.sh` + its `pkgs/default.nix` entry
+  (unused cosmetic toggle).
+- **Kernel-update cadence:** chaotic tracks upstream closely and the cachyos
+  kernel can move every rebuild. If a kernel regresses, `nixos-rebuild
+  switch --rollback` reverts the generation, or pin/hold the `chaotic` flake
+  input (don't `nix flake update chaotic`) until a fixed kernel lands.
+
+**Consequences:** The desktop closure carries the cachyos kernel + steam + 32-bit
+graphics + LACT (heavier, accepted). The chaotic input now materially affects the
+desktop kernel, so `flake.lock` bumps to it should be reviewed. Tests: desktop
+eval assertions (cachyos kernel, scx_lavd, steam+32-bit+gamemode, MangoHud),
+laptop boundary guards, and a `test-gaming` nixosTest (boots cachyos, scx active
+on scx_lavd, steam/gamescope/gamemode/LACT/MangoHud installed, 32-bit driver
+tree present). Launching a real game and GPU control need hardware and are left
+to manual testing (Ticket 15).

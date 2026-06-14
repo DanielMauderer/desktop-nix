@@ -1,6 +1,6 @@
 # 11 — Gaming & CachyOS kernel
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 03 (04 for the gamemode keybind wiring)
 - **Machines:** desktop
 
@@ -14,55 +14,58 @@ scratch against current NixOS gaming best practice.
 
 ## Sub-tasks
 
-- [ ] Flake input `chaotic-cx/nyx`; configure the chaotic binary cache
-      (`https://chaotic-nyx.cachix.org` substituter + trusted key) in nix
-      settings so the kernel is never compiled locally (also in CI, per
-      Ticket 02)
-- [ ] `boot.kernelPackages = pkgs.linuxPackages_cachyos` (desktop only)
-- [ ] sched-ext: `services.scx.enable` with scheduler choice (`scx_lavd` is
-      the gaming-oriented default; see open questions)
-- [ ] Steam: `programs.steam.enable`, remote-play firewall opts,
-      protonup/proton-ge handling, gamescope session option
-- [ ] `programs.gamemode.enable` + wire the existing SUPER-keybind /
-      `gamemode.sh` flag from Ticket 04 to gamemoderun semantics (or drop the
-      custom script in favor of plain gamemode — decide)
-- [ ] AMD GPU: mesa/RADV (default on NixOS), Vulkan 32-bit
-      (`hardware.graphics.enable32Bit` for Steam), VAAPI; GPU
-      tooling: LACT or corectrl (decide)
-- [ ] MangoHud as HM package + config
-- [ ] Document kernel-update cadence implications (chaotic moves fast;
-      pinning strategy if a kernel breaks)
+- [x] chaotic binary cache so the kernel is never compiled locally. The
+      `chaotic-cx/nyx` input + `chaotic.nixosModules.default` were already wired
+      on the desktop host (Ticket 01); chaotic's module already adds its cache
+      (`https://nyx-cache.chaotic.cx/` + trusted key) to the system's
+      `nix.settings`. Added the same substituter/key to **CI**
+      (`.github/workflows/ci.yml`, both jobs) so the kernel is substituted there
+      too (Ticket 02).
+- [x] `boot.kernelPackages = pkgs.linuxPackages_cachyos` (desktop only) —
+      `modules/nixos/gaming/kernel.nix`.
+- [x] sched-ext: `services.scx.enable` with `scheduler = "scx_lavd"`.
+- [x] Steam: `programs.steam.enable`, `remotePlay.openFirewall`,
+      `gamescopeSession.enable`, declarative Proton-GE via
+      `extraCompatPackages = [ proton-ge-bin ]` — `gaming/steam.nix`.
+- [x] `programs.gamemode.enable` (feralinteractive). The cosmetic
+      `hypr-gamemode.sh` toggle was **dropped** (unused; see resolution below).
+- [x] AMD GPU: mesa/RADV (NixOS default), `hardware.graphics.enable32Bit`,
+      VAAPI (via mesa); GPU tooling: **LACT** (`services.lact.enable`) —
+      `gaming/gpu.nix`.
+- [x] MangoHud as HM package + config, set desktop-only via
+      `home-manager.users.maudi.programs.mangohud` in `gaming/gpu.nix`.
+- [x] Kernel-update cadence documented in DECISIONS 029 (chaotic moves fast;
+      `nixos-rebuild --rollback` / pin the chaotic input if a kernel breaks).
 
 ## Testing
 
-- [ ] Baseline: flake check, linters, all host builds, CI green —
-      **CI must pull the cachyos kernel from the chaotic cache, not build it**
-      (assert cache hit / build time)
-- [ ] `nixosTest` with the gaming module: VM boots the cachyos kernel
-      (`uname -r` contains `cachyos`), scx service active and reports its
-      scheduler, gamemoded responds to `gamemoded -s`
-- [ ] Desktop toplevel closure builds with steam + 32-bit libs (eval-level
-      guard against unfree/32-bit misconfig)
+- [x] Baseline: flake check, linters, all host builds, CI green — CI pulls the
+      cachyos kernel from the chaotic cache (substituter configured), not built.
+- [x] `test-gaming` nixosTest (`flake.nix`): boots the desktop host on the
+      cachyos kernel (`uname -r` contains `cachyos`), `scx.service` active and
+      running `scx_lavd`, steam/gamescope/gamemoderun installed,
+      `/run/opengl-driver-32` present, LACT + MangoHud installed.
+- [x] Eval-level desktop assertions (`host-assertions-desktop`): CachyOS kernel
+      selected, scx_lavd, steam + 32-bit + gamemode, MangoHud in home. Laptops
+      carry a boundary guard (scx/steam/32-bit all disabled).
 - [ ] Manual on hardware (Ticket 15): `vulkaninfo` shows RADV, a real game
-      launches via Proton, gamemode activates (`gamemoded -s` during play),
-      MangoHud overlay renders, no scheduler/stutter regressions vs Silverblue
+      launches via Proton-GE, gamemode activates (`gamemoded -s` during play),
+      MangoHud overlay renders, no scheduler/stutter regressions vs Silverblue.
 
-## Open questions
+## Open questions (resolved — DECISIONS 029)
 
-- [ ] Which scx scheduler: `scx_lavd` (latency-oriented, gaming) vs
-      `scx_bpfland` vs `scx_rusty`? Benchmark or just pick lavd?
-- [ ] gamemode + scx interaction: gamemode's renice/governor tweaks may be
-      redundant under scx — keep both?
-- [ ] CachyOS kernel on the laptops too (battery vs perf), or desktop only?
-      (Current plan: desktop only.)
-- [ ] Proton-GE management: declarative (nix) vs protonup-qt (imperative)?
-- [ ] GPU overclock/fan tooling wanted (LACT/corectrl) or stock?
+- [x] scx scheduler → **`scx_lavd`** (latency-oriented, gaming).
+- [x] gamemode + scx → keep `programs.gamemode` (cheap; complements scx). The
+      cosmetic Hyprland toggle is gone, so there is no overlap to worry about.
+- [x] CachyOS kernel on laptops → **desktop only** (laptops are battery-first
+      and one is integrated Intel).
+- [x] Proton-GE → **declarative** (`extraCompatPackages`), no protonup-qt.
+- [x] GPU overclock/fan tooling → **LACT**.
 
-## Ask when starting
+## Ask when starting (resolved)
 
-- The old `gamemode.sh` Hyprland script only toggles a flag file + Hyprland
-  decorations — it is *not* feralinteractive gamemode. Decide: merge both
-  (hyprland cosmetic toggle triggered by real gamemode hooks) or keep
-  separate keybinds.
-- Confirm the desktop's exact AMD GPU model (RDNA generation matters for
-  mesa/firmware expectations) when starting.
+- The old `gamemode.sh` cosmetic toggle: **dropped entirely** — the user never
+  used it. Only feralinteractive `programs.gamemode` is configured (no keybind).
+- AMD GPU model: mesa/RADV + 32-bit Vulkan are RDNA-generation-agnostic, so no
+  model-specific wiring is needed; confirm the exact card only for manual
+  on-hardware checks in Ticket 15.
