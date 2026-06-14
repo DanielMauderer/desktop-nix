@@ -15,6 +15,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # The dev environment (Ticket 08) enlarges every host/VM closure, which
+      # can exhaust the runner's root disk. Reclaim space from preinstalled SDKs
+      # before building.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
       - uses: DeterminateSystems/nix-installer-action@v14
         with:
           extra-conf: |
@@ -28,12 +37,22 @@ jobs:
     name: Build ${{ matrix.host }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         host: [private-laptop, work-laptop, desktop]
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # The dev environment (Ticket 08) enlarges every host closure, which can
+      # exhaust the runner's root disk. Reclaim space from preinstalled SDKs
+      # before building.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
       - uses: DeterminateSystems/nix-installer-action@v14
       - uses: DeterminateSystems/magic-nix-cache-action@v8
       - name: Build toplevel
