@@ -519,10 +519,12 @@
             testScript = ''
               machine.wait_for_unit("multi-user.target")
 
-              # podman + podman-compose on PATH; docker is the podman compat shim.
+              # podman + podman-compose on PATH; docker is the podman compat
+              # shim — verify it resolves to the podman binary (the dockerCompat
+              # `docker --version` string is not guaranteed to mention podman).
               machine.succeed("podman --version")
               machine.succeed("podman-compose --version")
-              machine.succeed("docker --version | grep -qi podman")
+              machine.succeed("realpath $(command -v docker) | grep -qi podman")
 
               # Load the locally-built image and run it (rootful, no network).
               machine.succeed("podman load -i ${image}")
