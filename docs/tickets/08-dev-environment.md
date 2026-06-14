@@ -1,6 +1,6 @@
 # 08 — Dev environment (replaces toolbox)
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 03, 06
 - **Machines:** desktop, work-laptop (light profile: private-laptop)
 
@@ -13,36 +13,39 @@ devshells/direnv).
 
 ## Sub-tasks
 
-- [ ] **Strategy decision:** thin set of global `home.packages` for daily
+- [x] **Strategy decision:** thin set of global `home.packages` for daily
       drivers (rust, node?) + per-project `devShells` with direnv/nix-direnv
       for everything else (recommended) — record in DECISIONS.md
-- [ ] Rust: toolchain source (nixpkgs rustc/cargo vs fenix/rust-overlay for
-      channel control) + `cargo-nextest`, `bacon` (replaces toolbox cargo
-      installs; `cw` alias and `<leader>rb` integration keep working)
-- [ ] Other toolchains used by the nvim setup: go, node (replaces nvm), python
-      (+ venv-selector workflow), C toolchain
-- [ ] direnv + nix-direnv via HM; devshell templates (`templates/` or
-      `devShells.<lang>`) for rust/go/node/python
-- [ ] Containers: `virtualisation.podman` (+ dockerCompat for the
-      `docker`→podman alias), `podman-compose`
-- [ ] Claude Code config from MyLinux `claude/`: settings.json, statusline.sh,
+      (`modules/home/dev/`, DECISIONS 027)
+- [x] Rust: toolchain source (nixpkgs rustc/cargo vs fenix/rust-overlay for
+      channel control) + `cargo-nextest`, `bacon` — **nixpkgs** chosen; `cw`
+      (bacon) and `ct` (cargo-nextest) aliases now resolve
+- [x] Other toolchains used by the nvim setup: go, node (replaces nvm), python
+      (+ uv for venvs), C toolchain — owned by `modules/home/dev`, removed from
+      the neovim module (no duplication)
+- [x] direnv + nix-direnv via HM; devshell templates (`templates/{rust,go,node,
+      python}` + `devShells.<lang>`) for rust/go/node/python
+- [x] Containers: `virtualisation.podman` (+ dockerCompat for the
+      `docker`→podman alias), `podman-compose` (`modules/nixos/dev/`)
+- [x] Claude Code config from MyLinux `claude/`: settings.json, statusline.sh,
       commands/, hooks/ — linked as **individual files** into `~/.claude`
-      (never the whole dir — it holds live state); rustfmt PostToolUse hook
-      must find rustfmt on PATH outside toolbox now
-- [ ] Update fish aliases from Ticket 06: `tb`/`tbr` removed/replaced,
-      `docker`→podman verified
-- [ ] Document the new workflow in `docs/` (how to start a project devshell)
+      (`modules/home/dev/claude.nix`); rustfmt/clippy hooks find their tools on
+      PATH from the dev module
+- [x] Update fish aliases from Ticket 06: `tb`/`tbr` already removed (Ticket 06);
+      `docker`→podman now backed by a real podman
+- [x] Document the new workflow in `docs/dev-environment.md` (how to start a
+      project devshell)
 
 ## Testing
 
-- [ ] Baseline: flake check, linters, all host builds, CI green
-- [ ] Each devshell template enters and compiles a hello-world
-      (`cargo nextest run`, `go test`, `node -e`, `python -c`) — wire as
-      flake `checks` where cheap
-- [ ] `nixosTest`: podman runs a container (`podman run --rm alpine true`),
-      `docker` alias/compat works, podman-compose up on a fixture compose file
-- [ ] bacon launches; `cargo nextest` runs in a sample project
-- [ ] Claude Code: `~/.claude/settings.json` symlink correct, hook script
+- [x] Baseline: flake check, linters, all host builds, CI green
+- [x] Each devshell template enters and compiles a hello-world
+      (`dev-rust-check`/`dev-go-check`/`dev-node-check`/`dev-python-check` flake
+      checks — offline)
+- [x] `nixosTest` (`test-podman`): podman runs a container (store-loaded image,
+      no network), `docker` compat works, podman-compose present
+- [x] bacon launches; `cargo nextest` runs in a sample project (dev-rust-check)
+- [x] Claude Code: `~/.claude/settings.json` symlink correct, hook script
       executes (rustfmt found), `settings.local.json` stays untouched/writable
 
 ## Open questions

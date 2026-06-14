@@ -498,3 +498,61 @@ The lockfile lives at `nvim/lazy-lock.json`; lazy.nvim writes it to
 `~/.config/nvim/lazy-lock.json` which, via the mkOutOfStoreSymlink, resolves
 back into the repo checkout at `~/desktop-nix/nvim/lazy-lock.json`. Updates
 are committed normally.
+
+---
+
+## 027 — Dev environment: nixpkgs toolchains + devShells/direnv, podman, no toolbox (2026-06-14)
+
+**Context:** Ticket 08 replaces the Silverblue `dev-tools` **toolbox** container
+(provisioned imperatively by MyLinux `setup.sh`: `cargo`/`fish` via dnf, then
+`cargo install` of `eza`, `matugen`, `cargo-nextest`, `bacon`). `eza` already
+moved to Ticket 06 and `matugen` was dropped for Stylix (DECISIONS 022), so the
+genuinely-missing dev tools were `cargo-nextest` + `bacon`, plus a container
+runtime and the Claude Code config. The language toolchains the ticket lists
+(rust/go/node/python/C) were already installed globally — but by the Ticket 07
+neovim module, where they were only ever editor build-deps. Several "Open
+questions" needed user calls (Rust source, what goes global, node strategy,
+distrobox escape hatch).
+
+**Decision:**
+
+- **Rust from nixpkgs**, not fenix/rust-overlay or rustup (rustup is an
+  anti-pattern on NixOS; no nightly/pinned-channel need today).
+- **Thin global toolchains + per-project devShells.** A new `modules/home/dev/`
+  owns the daily-driver toolchains (`cargo rustc rustfmt clippy`, `go`, `nodejs`
+  LTS, `python3`+`uv`, `gcc gnumake`) plus the cargo extras (`cargo-nextest`,
+  `bacon`) and git tooling (`git-spice`, `gh`). Everything pinned per-project
+  goes through `devShells` + direnv/nix-direnv (`programs.direnv`). Template
+  flakes (`templates/{rust,go,node,python}`, exposed as flake `templates` and
+  `devShells.<lang>`) scaffold a project shell: `nix flake init -t
+  ~/desktop-nix#<lang>` then `direnv allow`.
+- **Toolchain ownership moves to the dev module.** The Ticket 07 neovim module
+  drops the duplicated `cargo/rustc/rustfmt/gcc/gnumake/nodejs` and keeps only
+  editor-specific tooling (LSP servers, formatters, DAP). The two always load
+  together via `modules/nixos/base/home.nix`, so the home package set is
+  unchanged — ownership is just no longer split.
+- **Node:** a single global LTS (`nodejs`) replaces nvm/`load_nvm`; per-project
+  pinning is a devShell concern.
+- **Containers: podman** (`modules/nixos/dev/`, imported by base → all hosts).
+  `dockerCompat = true` gives scripts a `docker` shim; the interactive fish
+  `docker`→podman alias (Ticket 06) shadows it. `podman-compose` covers the old
+  compose workflows. The toolbox/mutable-container pattern is **dropped
+  entirely** — no distrobox escape hatch (nothing depended on ad-hoc `dnf`).
+- **Dev env on all hosts**, wired in `base` like the cli/neovim modules — the
+  ticket's "light profile" split is collapsed since podman is cheap and
+  private-laptop is the migration pilot.
+- **Claude Code config** ported from MyLinux `claude/` into
+  `modules/home/dev/claude/` and linked as **individual files** into `~/.claude`
+  (`settings.json`, `statusline.sh`, `CLAUDE.md`, `hooks/{rustfmt-edited,
+  clippy-stop}.sh`, `commands/{clippy,nextest}.md`) — never the whole dir, which
+  holds live state (`settings.local.json`, `projects/`, …). The rustfmt
+  PostToolUse and clippy Stop hooks find their tools on PATH from the dev module
+  (no toolbox indirection). `CLAUDE.md` was **updated**, not ported verbatim:
+  the old one described Silverblue/rpm-ostree/brew/toolbox, all retired here.
+
+**Consequences:** No mutable dev container; ad-hoc experiments use a throwaway
+devShell or `nix shell`. Project toolchains are reproducible and pinned per repo.
+Aliases/commands Tickets 06/07 left dormant now resolve (`docker`, `ct`, `cw`,
+`ck`, `gs`, npm/nx, lazygit `gh`, `/clippy`, `/nextest`). Tests: eval-level
+assertions for podman+direnv, a `test-podman` nixosTest (store-loaded image, no
+network), and offline `dev-{node,python,go,rust}-check` devShell smoke compiles.

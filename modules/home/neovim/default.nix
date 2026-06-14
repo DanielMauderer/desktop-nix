@@ -6,6 +6,11 @@
 # the Nix sandbox. Mason is kept as a UI layer only — all LSP servers, formatters,
 # and debuggers come from Nix packages below (dynamic-linking on NixOS breaks
 # Mason-downloaded binaries). rust_analyzer is managed by rustaceanvim.
+#
+# The language toolchains/runtimes themselves (cargo/rustc/rustfmt, gcc/gnumake,
+# nodejs) live in modules/home/dev (Ticket 08, DECISIONS 027) — that module owns
+# them and the two always load together via modules/nixos/base/home.nix. This
+# module keeps only editor-specific tooling.
 {
   config,
   pkgs,
@@ -18,6 +23,10 @@
     enable = true;
     vimAlias = true;
     viAlias = true;
+    # pynvim host (:checkhealth python3) lives inside neovim's own python3
+    # wrapper, NOT in home.packages — otherwise a `python3.withPackages` env
+    # collides with the bare python3 the dev module (Ticket 08) puts on PATH.
+    extraPython3Packages = ps: [ ps.pynvim ];
   };
 
   # Symlink the repo's nvim/ dir into ~/.config/nvim at activation time.
@@ -55,19 +64,11 @@
     gdb # C / C++ / Rust via gdb DAP
     vscode-js-debug # js-debug-adapter for TypeScript / JavaScript
 
-    # ── Treesitter build deps ─────────────────────────────────────────────────
-    # nvim-treesitter compiles native parsers; fff.nvim does `cargo build --release`.
-    gcc
-    gnumake
-    nodejs # treesitter JS/TS parsers + js-debug runtime
-
-    # ── Rust toolchain ────────────────────────────────────────────────────────
-    cargo # fff.nvim build step + general Rust dev
-    rustc
-    rustfmt # conform.nvim rust formatter
-
-    # ── Python neovim host ────────────────────────────────────────────────────
-    (python3.withPackages (ps: [ ps.pynvim ])) # :checkhealth python3
+    # Treesitter parser compilation (gcc/gnumake/nodejs), fff.nvim's
+    # `cargo build --release`, conform's rustfmt and the PATH python3 all rely on
+    # the toolchains from modules/home/dev (Ticket 08) — present in the same home
+    # profile. The pynvim host is wired via programs.neovim.extraPython3Packages
+    # above (inside the nvim wrapper) to avoid a python3 env PATH collision.
 
     # ── Clipboard ─────────────────────────────────────────────────────────────
     wl-clipboard # vim.o.clipboard = "unnamedplus" on Wayland
