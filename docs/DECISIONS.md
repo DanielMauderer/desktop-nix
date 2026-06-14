@@ -556,3 +556,45 @@ Aliases/commands Tickets 06/07 left dormant now resolve (`docker`, `ct`, `cw`,
 `ck`, `gs`, npm/nx, lazygit `gh`, `/clippy`, `/nextest`). Tests: eval-level
 assertions for podman+direnv, a `test-podman` nixosTest (store-loaded image, no
 network), and offline `dev-{node,python,go,rust}-check` devShell smoke compiles.
+
+---
+
+## 028 — Virtualisation: libvirt/KVM on all hosts, wired in base (2026-06-14)
+
+**Context:** Ticket 09 ports maudiblue's virtualisation layer. maudiblue's
+`recipe.yml` installs `virt-manager`, `libvirt`, `qemu-kvm`, `virt-viewer` and
+enables `libvirtd.service` on **every** machine (it has no per-host split). The
+ticket framed NixOS's equivalent as an opt-in per-host module (desktop +
+work-laptop, "private-laptop unless wanted") and flagged the host list as a
+decision to confirm when starting.
+
+**Decision:**
+
+- **All three hosts get libvirt/KVM** (user call, matching maudiblue's global
+  `libvirtd`). Because every host is enabled, the module is imported from
+  `modules/nixos/base` (like dev/podman) instead of per host — no enablement
+  flag or custom options namespace (the repo has none; wiring is by import).
+- **`modules/nixos/virtualisation/`** owns it: `virtualisation.libvirtd.enable`
+  with `qemu.package = qemu_kvm`, `programs.virt-manager.enable`, the
+  `virt-viewer` package, and `maudi` in the `libvirtd` group (group-rw socket →
+  `qemu:///system` needs no password; the Ticket 04 `hyprpolkitagent` covers any
+  remaining polkit prompts).
+- **Win11-class guests:** beyond maudiblue's parity set, enable `swtpm` (emulated
+  TPM 2.0) — an install-time requirement for Windows 11. UEFI/OVMF firmware needs
+  no wiring: current nixpkgs removed `virtualisation.libvirtd.qemu.ovmf` and ships
+  all of QEMU's OVMF images by default, so virt-manager's firmware dropdown
+  already offers the Secure-Boot variant.
+- **Default NAT network:** NixOS's libvirtd module does not define libvirt's
+  built-in `default` network, so a `libvirt-default-network.service` oneshot
+  `net-define`s + `net-autostart`s it (`virbr0`, `192.168.122.0/24`). Guests get
+  networking out of the box without a manual `virsh net-start`.
+- **VM migration runbook** documented in `modules/nixos/virtualisation/README.md`
+  (copy qcow2 + `dumpxml`, fix the firmware/emulator store paths, `virsh
+  define`) — feeds the Ticket 14/15 host runbooks.
+
+**Consequences:** Every host carries the qemu/OVMF/swtpm closure (heavier laptop
+images, accepted for parity). Tests: eval-level assertions (libvirtd + swtpm
+enabled, virt-manager on, maudi in libvirtd group) and a `test-virtualisation`
+nixosTest (daemon up, `su maudi` reaches `qemu:///system`, default network
+defined+autostart, GUI/console clients installed). Booting a real guest needs
+nested KVM and is left to manual on-hardware testing.

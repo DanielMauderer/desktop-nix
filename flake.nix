@@ -124,6 +124,15 @@
             cfg.home-manager.users.maudi.programs.direnv.enable
             && cfg.home-manager.users.maudi.programs.direnv.nix-direnv.enable;
         }
+        {
+          name = "libvirtd enabled with swtpm TPM emulation (Ticket 09)";
+          assertion = cfg.virtualisation.libvirtd.enable && cfg.virtualisation.libvirtd.qemu.swtpm.enable;
+        }
+        {
+          name = "virt-manager enabled and maudi in libvirtd group (Ticket 09)";
+          assertion =
+            cfg.programs.virt-manager.enable && builtins.elem "libvirtd" cfg.users.users.maudi.extraGroups;
+        }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -531,6 +540,34 @@
               machine.succeed("podman run --rm --network=none hello:test")
             '';
           };
+
+        # Virtualisation (Ticket 09): the libvirt module is imported by base, so
+        # booting any host gives libvirtd. Assert the daemon is up, maudi reaches
+        # qemu:///system via libvirtd-group socket access, the default NAT network
+        # is defined+autostarting, and the GUI/console clients are installed.
+        # Starting an actual guest needs nested KVM and is left to manual testing.
+        test-virtualisation = testLib.makeTest {
+          name = "virtualisation";
+          nodes.machine = testNode;
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+            machine.wait_for_unit("libvirtd.service")
+
+            # maudi is in the libvirtd group, so qemu:///system is reachable
+            # without root (the system socket is group-rw to libvirtd).
+            machine.succeed("id maudi | grep -q libvirtd")
+            machine.succeed("su maudi -c 'virsh -c qemu:///system list'")
+
+            # The default NAT network is defined and set to autostart.
+            machine.wait_for_unit("libvirt-default-network.service")
+            machine.succeed("virsh net-list --all | grep -q default")
+            machine.succeed("virsh net-info default | grep -qi 'Autostart:.*yes'")
+
+            # virt-manager GUI + virt-viewer console client are installed.
+            machine.succeed("test -x /run/current-system/sw/bin/virt-manager")
+            machine.succeed("test -x /run/current-system/sw/bin/virt-viewer")
+          '';
+        };
       };
 
       nixosConfigurations = hosts;
