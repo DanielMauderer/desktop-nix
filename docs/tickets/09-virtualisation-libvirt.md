@@ -7,7 +7,9 @@
 ## Goal
 
 Parity with maudiblue's virtualisation layer: libvirt + qemu-kvm with the
-virt-manager GUI and virt-viewer, as an opt-in NixOS module enabled per host.
+virt-manager GUI and virt-viewer. maudiblue enabled libvirtd on every machine;
+this is kept (DECISIONS 028), so the module is wired from `modules/nixos/base`
+and lands on all three hosts rather than being a per-host opt-in.
 
 ## Sub-tasks
 

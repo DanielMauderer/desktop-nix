@@ -596,5 +596,5 @@ decision to confirm when starting.
 images, accepted for parity). Tests: eval-level assertions (libvirtd + swtpm
 enabled, virt-manager on, maudi in libvirtd group) and a `test-virtualisation`
 nixosTest (daemon up, `su maudi` reaches `qemu:///system`, default network
-defined+autostart, GUI/console clients installed). Booting a real guest needs
+defined+autostart, GUI/console clients installed). Booting a real guest requires
 nested KVM and is left to manual on-hardware testing.
