@@ -766,7 +766,9 @@
         "home-manager": "home-manager_2",
         "hyprland": "hyprland",
         "nixpkgs": "nixpkgs_2",
-        "stylix": "stylix"
+        "sops-nix": "sops-nix",
+        "stylix": "stylix",
+        "zen-browser": "zen-browser"
       }
     },
     "rust-overlay": {
@@ -788,6 +790,26 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "type": "github"
+      }
+    },
+    "sops-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780547341,
+        "narHash": "sha256-Gq8KNx5A7hBB3uGJaj6eQfLDIz5YdLu92gqBcvHvoUo=",
+        "ref": "refs/heads/master",
+        "rev": "9ed65852b6257fbeae4355bc24ecfea307ca759a",
+        "revCount": 1216,
+        "type": "git",
+        "url": "https://github.com/Mic92/sops-nix"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://github.com/Mic92/sops-nix"
       }
     },
     "stylix": {
@@ -977,6 +999,29 @@
       "original": {
         "owner": "hyprwm",
         "repo": "xdg-desktop-portal-hyprland",
+        "type": "github"
+      }
+    },
+    "zen-browser": {
+      "inputs": {
+        "home-manager": [
+          "home-manager"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1781426426,
+        "narHash": "sha256-yzxJMNgv/sLishhCT9G2lm7W9CjHSlXWkfbWC7vfjqc=",
+        "owner": "0xc000022070",
+        "repo": "zen-browser-flake",
+        "rev": "df336067c1a8af3bfce3f0b88b66dc1c57411b4e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "0xc000022070",
+        "repo": "zen-browser-flake",
         "type": "github"
       }
     }

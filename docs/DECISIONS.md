@@ -727,3 +727,43 @@ laptop boundary guards, and a `test-gaming` nixosTest (boots cachyos, scx active
 on scx_lavd, steam/gamescope/gamemode/LACT/MangoHud installed, 32-bit driver
 tree present). Launching a real game and GPU control need hardware and are left
 to manual testing (Ticket 15).
+
+---
+
+## 035 — Secrets management: sops-nix + age (2026-06-15)
+
+**Context:** Ticket 12 establishes a secrets pattern *before* the first real
+secret is committed (the work-laptop wireguard key lands in Ticket 14). Secrets
+must be encrypted in git and decrypted only on the target host at activation
+time, and keyless CI runners must still build every host.
+
+**Decision:**
+
+- **sops-nix over agenix:** YAML files holding multiple keys, multiple
+  recipients per file, native age support, and `sops updatekeys` re-keying.
+- **Key scheme:** each host decrypts with its SSH host ed25519 key converted to
+  age (`sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"]`) plus a
+  personal master age key whose private half lives in the **password manager**
+  and can decrypt everything. No imperative per-user age key to manage.
+- **Wiring:** `inputs.sops-nix.nixosModules.sops` is added in `lib/mkHost.nix`
+  (like stylix) and mirrored into the flake's nixosTest nodes, avoiding the
+  `_module.args.inputs` recursion. `modules/nixos/base/secrets.nix` only sets
+  `sops.age.sshKeyPaths` (and disables GnuPG) — no `defaultSopsFile` and no
+  production `sops.secrets` until Ticket 14, which sets `sopsFile` per secret.
+- **`.sops.yaml`** holds public keys + creation rules: shared secrets to master
+  + all hosts, host-scoped paths to master + that host, and a fixtures rule to a
+  known test key only. Per-host recipients are `age1PLACEHOLDER…` placeholders
+  filled in at install time (`ssh-to-age` + `sops updatekeys`).
+- **Test:** a `test-secrets` nixosTest injects the known test age key, decrypts
+  a committed fixture (`secrets/fixtures/test.yaml`) to `/run/secrets`, and
+  asserts owner/mode (root and a user secret, both `0400`), non-world-readable,
+  and absence of the plaintext from `/nix/store`. The fixture is encrypted only
+  to the test key (the VM cannot use a real host key). Keyless CI host builds are
+  the negative test that secrets are activation-time, not eval-time.
+
+**Consequences:** Adding a host is a documented `ssh-to-age` + `sops updatekeys`
+step (runbook: `docs/runbooks/secrets.md`). The master private key is the single
+recovery root and must be backed up. The wireguard key lands in Ticket 14, which
+adds the first production `sops.secrets` entry. The jira.nvim / gitlab.nvim API
+tokens stay machine-local for now and are revisited in the Ticket 13–14
+`~/.config` credential sweep.

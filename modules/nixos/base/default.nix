@@ -22,6 +22,7 @@ _: {
     ./networking.nix
     ./nix.nix
     ./packages.nix
+    ./secrets.nix
     ./updates.nix
     ./users.nix
   ];

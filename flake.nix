@@ -33,6 +33,15 @@
         home-manager.follows = "home-manager";
       };
     };
+
+    # Secrets (Ticket 12 / DECISIONS 035): sops-nix decrypts secrets at
+    # activation time using each host's SSH host ed25519 key (converted to age)
+    # plus a personal master age key. Nothing is decrypted at eval time, so
+    # keyless CI runners still build every host.
+    sops-nix = {
+      url = "git+https://github.com/Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -153,6 +162,10 @@
             p: (p.pname or "") == "spotify"
           ) cfg.home-manager.users.maudi.home.packages;
         }
+        {
+          name = "sops age key derived from host ssh ed25519 key (Ticket 12)";
+          assertion = builtins.elem "/etc/ssh/ssh_host_ed25519_key" cfg.sops.age.sshKeyPaths;
+        }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -166,6 +179,7 @@
         imports = [
           home-manager.nixosModules.home-manager
           inputs.stylix.nixosModules.stylix
+          inputs.sops-nix.nixosModules.sops
           ./hosts/private-laptop/default.nix
         ];
         _module.args.inputs = inputs;
@@ -181,6 +195,7 @@
         imports = [
           home-manager.nixosModules.home-manager
           inputs.stylix.nixosModules.stylix
+          inputs.sops-nix.nixosModules.sops
           chaotic.nixosModules.default
           ./hosts/desktop/default.nix
         ];
@@ -199,6 +214,11 @@
             statix
             deadnix
             nixfmt-rfc-style
+            # Secrets (Ticket 12): edit/re-key sops files and convert SSH host
+            # keys to age for the bootstrap runbook (docs/runbooks/secrets.md).
+            sops
+            ssh-to-age
+            age
           ];
         };
 
@@ -673,6 +693,87 @@
             machine.succeed("test -x /etc/profiles/per-user/maudi/bin/mangohud")
           '';
         };
+
+        # Secrets (Ticket 12): prove sops-nix decrypts at *activation* time. The
+        # production key source is each host's SSH host key, but the VM's host
+        # key is not a recipient of the fixture — so this node forces it off and
+        # injects a known test age identity instead (its private half guards
+        # nothing real: it only decrypts secrets/fixtures/test.yaml). Asserts the
+        # secret lands in /run/secrets with the right owner/mode, is not
+        # world-readable, and that the plaintext is absent from the nix store
+        # (encrypted-at-rest). Keyless CI host builds are the negative test that
+        # this is activation-time, not eval-time.
+        test-secrets =
+          let
+            testAgeKey = "AGE-SECRET-KEY-1ZTVVG7CHXYCL2JLJ6ADJ3JDMQ32AQPEWHHYNZ3E9MVM7KA6QZQFQC2JGGK";
+          in
+          testLib.makeTest {
+            name = "secrets";
+            nodes.machine = {
+              imports = [
+                home-manager.nixosModules.home-manager
+                inputs.stylix.nixosModules.stylix
+                inputs.sops-nix.nixosModules.sops
+                ./hosts/private-laptop/default.nix
+              ];
+              _module.args.inputs = inputs;
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+
+              environment.etc."test-age-key.txt" = {
+                text = testAgeKey + "\n";
+                mode = "0400";
+              };
+
+              sops = {
+                # Override the production key source: the VM's fresh host key is
+                # not a fixture recipient. Use the injected test identity.
+                age = {
+                  sshKeyPaths = lib.mkForce [ ];
+                  keyFile = "/etc/test-age-key.txt";
+                };
+                gnupg.sshKeyPaths = lib.mkForce [ ];
+
+                # Two secrets from the same fixture key: one root-owned (the
+                # wireguard case, Ticket 14) and one user-owned (the token case),
+                # both 0400 so neither is world-readable.
+                secrets = {
+                  fixture_secret = {
+                    sopsFile = ./secrets/fixtures/test.yaml;
+                    owner = "root";
+                    mode = "0400";
+                  };
+                  fixture_user_secret = {
+                    sopsFile = ./secrets/fixtures/test.yaml;
+                    key = "fixture_secret";
+                    owner = "maudi";
+                    mode = "0400";
+                  };
+                };
+              };
+            };
+            testScript = ''
+              machine.wait_for_unit("multi-user.target")
+
+              # Both secrets materialized at the canonical /run/secrets path and
+              # decrypt to the known sentinel.
+              machine.succeed("test -e /run/secrets/fixture_secret")
+              machine.succeed("grep -q 'sops-fixture-canary-7a3f' /run/secrets/fixture_secret")
+              machine.succeed("grep -q 'sops-fixture-canary-7a3f' /run/secrets/fixture_user_secret")
+
+              # Correct owner + mode (0400), so not world-readable.
+              machine.succeed("stat -c '%U %a' /run/secrets/fixture_secret | grep -qx 'root 400'")
+              machine.succeed("stat -c '%U %a' /run/secrets/fixture_user_secret | grep -qx 'maudi 400'")
+
+              # A non-owner, non-root user cannot read it (root bypasses mode, so
+              # assert via an unprivileged read attempt).
+              machine.fail("su nobody -s /bin/sh -c 'cat /run/secrets/fixture_secret'")
+
+              # The plaintext must never appear in the nix store (the encrypted
+              # fixture is the only thing committed / copied to the store).
+              machine.fail("grep -r 'sops-fixture-canary-7a3f' /nix/store")
+            '';
+          };
       };
 
       nixosConfigurations = hosts;
