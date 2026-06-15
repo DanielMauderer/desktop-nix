@@ -816,3 +816,55 @@ time (the import is left commented in `default.nix` until then). Executing the
 migration on the physical machine and the hardware validation/rollback drill are
 manual — they run on the laptop per `docs/runbooks/private-laptop.md`, not in
 CI. Pilot lessons feed back into the modules before Tickets 14/15.
+
+---
+
+## 037 — work-laptop: disko + LUKS, Intel iGPU, WireGuard, security hardening (2026-06-15)
+
+**Context:** Ticket 14 brings the work laptop onto NixOS after the private-laptop
+pilot (DECISIONS 036). Open questions: disk layout, iGPU, VPN, monitor layouts,
+and work compliance requirements (disk encryption, screen lock, SSH exposure,
+firewall).
+
+**Decision:**
+
+- **Disk + iGPU = same as pilot (DECISIONS 036).** disko LUKS2 + ext4 + zram,
+  Intel iGPU (`intel-media-driver`/iHD, Gen8+; swap to `i965` if pre-Broadwell
+  — confirmed during hardware-capture step). Full-disk wipe of Silverblue.
+  Disk layout in `hosts/work-laptop/disk.nix`; hardware in
+  `hosts/work-laptop/hardware.nix`. Old Silverblue SSD kept un-wiped on a shelf
+  until the "Ready for Monday" gate passes.
+- **Monitor layouts confirmed:** the two docked kanshi profiles already stubbed
+  (`work-laptop-docked-dual`: DP-5 + DP-6, internal off;
+  `work-laptop-docked-hdmi`: eDP-1 + HDMI-A-1) match the real desk setups from
+  the MyLinux `w_laptop_2Monitors.conf` / `w_laptop_1Monitor.conf` dotfiles.
+  Output names and pixel positions to be verified on hardware via `hyprctl
+  monitors` at migration start.
+- **WireGuard only** (no corporate VPN client). VPN key managed via sops-nix:
+  `secrets/work-laptop/wireguard.yaml` (encrypted to master + work_laptop age
+  key, created at migration time). NixOS wiring via
+  `networking.wg-quick.interfaces.wg0` with `privateKeyFile` pointing at the
+  sops-decrypted path; peer details (endpoint, server pubkey, allowed IPs,
+  assigned address, DNS) filled in at migration time and committed. Template is
+  commented in `hosts/work-laptop/default.nix` with step-by-step instructions.
+- **Security hardening on all hosts** (work compliance surfaced the requirement;
+  applied universally): new `modules/nixos/base/hardening.nix` sets
+  `services.openssh.enable = false` (personal laptops, not servers),
+  `users.users.root.hashedPassword = "!"` (root account locked; `nixos-install
+  --no-root-passwd` already did this at install, declaration makes it explicit
+  and auditable), `networking.firewall.enable = true` (stateful, drop
+  unsolicited inbound). Verified via `baseAssertions` in `flake.nix` (SSH
+  disabled, root locked, firewall on) and in `test-base-system` nixosTest (SSH
+  daemon not running, nft filter table present).
+- **swayidle auto-lock** (work compliance: screen lock after a few minutes):
+  already implemented at 300 s in `modules/home/desktop/lockscreen.nix` (Ticket
+  04) — no change needed.
+
+**Consequences:** `hosts/work-laptop/` gains `hardware.nix`, `disk.nix`, and a
+fully wired `default.nix` (hardware imports + commented wireguard stanza). The
+`flake.nix` work-laptop host gains `disk.nix` in its modules list (same
+scoping trick as private-laptop). `hardening.nix` lands on all three hosts;
+the `baseAssertions` and `test-base-system` nixosTest are extended to verify
+SSH-off, root-locked, and firewall-enabled. Actual migration (hardware-
+configuration.nix, wireguard key, monitor verification) runs on the physical
+machine per `docs/runbooks/work-laptop.md`, not in CI.

@@ -1,6 +1,6 @@
 # 14 — Host: work-laptop + migration runbook
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 08, 09, 12, 13
 - **Machines:** work-laptop
 
