@@ -42,6 +42,15 @@
       url = "git+https://github.com/Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Declarative disk partitioning (Ticket 13 / DECISIONS 036): the pilot
+    # (private-laptop) is partitioned from a checked-in disko spec so a
+    # reinstall reproduces the exact LUKS + ext4 + ESP layout. Imported only by
+    # the host that uses it (hosts/private-laptop/disk.nix), not globally.
+    disko = {
+      url = "git+https://github.com/nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -67,7 +76,14 @@
       hosts = {
         private-laptop = mkHost {
           hostname = "private-laptop";
-          modules = [ ./hosts/private-laptop/default.nix ];
+          # disk.nix carries the disko spec (LUKS + ext4 + ESP) and is added
+          # only to the real nixosConfiguration — the nixosTest nodes below
+          # import default.nix alone, so the QEMU VMs use their own scratch
+          # disk and never the host's LUKS layout.
+          modules = [
+            ./hosts/private-laptop/default.nix
+            ./hosts/private-laptop/disk.nix
+          ];
         };
         work-laptop = mkHost {
           hostname = "work-laptop";
