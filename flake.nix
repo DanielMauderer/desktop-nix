@@ -96,7 +96,13 @@
         };
         desktop = mkHost {
           hostname = "desktop";
-          modules = [ ./hosts/desktop/default.nix ];
+          # disk.nix carries the disko spec (GPT + ESP + plain ext4, no LUKS)
+          # and is added only here — not imported by default.nix — so nixosTest
+          # VMs use their own scratch disk.
+          modules = [
+            ./hosts/desktop/default.nix
+            ./hosts/desktop/disk.nix
+          ];
           withChaotic = true;
         };
       };

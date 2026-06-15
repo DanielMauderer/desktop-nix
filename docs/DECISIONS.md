@@ -868,3 +868,46 @@ the `baseAssertions` and `test-base-system` nixosTest are extended to verify
 SSH-off, root-locked, and firewall-enabled. Actual migration (hardware-
 configuration.nix, wireguard key, monitor verification) runs on the physical
 machine per `docs/runbooks/work-laptop.md`, not in CI.
+
+## 038 — desktop: plain ext4 (no LUKS), AMD GPU, fresh Steam library, single-boot (Ticket 15, 2026-06-15)
+
+**Context:** Ticket 15 brings the gaming + dev desktop onto NixOS — the last
+machine off Silverblue and the real-hardware validation for the gaming stack
+(Ticket 11 / DECISIONS 034). Open questions on starting: disk layout/encryption,
+the existing Steam library, and dual-boot.
+
+**Decision:**
+
+- **Disk: plain ext4, NO LUKS** (diverges from the laptops' DECISIONS 036/037).
+  The desktop stays at home — a different physical-security profile than a laptop
+  that leaves the building — and skipping LUKS avoids a passphrase prompt at every
+  boot on a box that is often powered on headless. Still **disko-managed** for a
+  reproducible layout: GPT + 1 GiB ESP (vfat → `/boot`) + ext4 root filling the
+  rest. Swap is zram (`hardware.nix`), so no swap partition. Spec in
+  `hosts/desktop/disk.nix`, wired via `flake.nix`'s mkHost module list (same
+  scoping trick as the laptops, so nixosTest VMs never see it).
+- **Steam library: fresh re-download.** No existing partition is preserved or
+  mounted. Steam Cloud saves return automatically; **non-cloud saves are backed
+  up** in the runbook's pre-migration step. Library lands on the ext4 root.
+- **Single-boot.** Wipe Silverblue, install only NixOS — no Windows/dual-boot,
+  so no os-prober and no partition to preserve. Anticheat titles handled via
+  Proton where they work.
+- **AMD hardware** (`hosts/desktop/hardware.nix`): `kvm-amd`, `amd-ucode`
+  microcode, `amdgpu` in the initrd for early KMS, `radeonsi` VAAPI. The
+  mesa/RADV graphics + 32-bit support and the CachyOS kernel are already owned by
+  `modules/nixos/gaming/{gpu,kernel}.nix`, so `hardware.nix` does not redeclare
+  them. Exact GPU/CPU model confirmed during the hardware-capture step.
+- **Monitor layout confirmed:** the `desktop` kanshi profile
+  (`DP-3 = 2560x1440@144 @ 0,0`, `DP-2 = 1920x1080@60 @ 2560,0`) matches the
+  MyLinux `hypr/conf/monitors/default.conf` dotfile verbatim. The dotfile has no
+  workspace pinning, so none is added (the ticket's mention of pinning does not
+  reflect the source). Output names verified via `hyprctl monitors` at migration.
+
+**Consequences:** `hosts/desktop/` gains `hardware.nix` and `disk.nix`;
+`default.nix` imports `hardware.nix` (+ commented `hardware-configuration.nix`)
+and drops its placeholder inline `fileSystems."/"` (disko owns it). The
+`flake.nix` desktop host gains `disk.nix` in its modules list. The existing
+`host-assertions-desktop` and `test-gaming` nixosTest already cover the gaming
+stack and are unchanged. Actual migration + the MangoHud before/after
+performance pass run on the physical machine per `docs/runbooks/desktop.md`,
+not in CI.

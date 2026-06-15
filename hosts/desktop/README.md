@@ -10,7 +10,11 @@ Migrates last ([Ticket 15](../../docs/tickets/15-host-desktop.md)).
   gaming (steam, gamemode, gamescope), libvirt/KVM
 - Monitor layout: DP-3@2560x1440@144 + DP-2@1920x1080@60 (formerly
   `default.conf` in MyLinux)
+- Disk: plain **ext4, no LUKS** (desktop at home — DECISIONS 038), declaratively
+  partitioned via disko (`disk.nix`: GPT + ESP + ext4 root). Steam library is a
+  fresh re-download; single-boot (Silverblue wiped, no dual-boot).
 - Runbook: `docs/runbooks/desktop.md` (written as part of Ticket 15)
 
-`hardware/` will hold `hardware-configuration.nix` and the disk layout once the
-machine is installed.
+`hardware.nix` carries the AMD enablement (`kvm-amd`, `amd-ucode`, `amdgpu` KMS,
+`radeonsi` VAAPI, zram). `hardware/` holds the generated
+`hardware-configuration.nix` (added at install — see `docs/runbooks/desktop.md`).
