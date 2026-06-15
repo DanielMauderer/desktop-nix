@@ -87,7 +87,12 @@
         };
         work-laptop = mkHost {
           hostname = "work-laptop";
-          modules = [ ./hosts/work-laptop/default.nix ];
+          # disk.nix carries the disko LUKS spec and is added only here — not
+          # imported by default.nix — so nixosTest VMs use their own scratch disk.
+          modules = [
+            ./hosts/work-laptop/default.nix
+            ./hosts/work-laptop/disk.nix
+          ];
         };
         desktop = mkHost {
           hostname = "desktop";
@@ -181,6 +186,18 @@
         {
           name = "sops age key derived from host ssh ed25519 key (Ticket 12)";
           assertion = builtins.elem "/etc/ssh/ssh_host_ed25519_key" cfg.sops.age.sshKeyPaths;
+        }
+        {
+          name = "SSH daemon disabled (Ticket 14 / DECISIONS 037)";
+          assertion = !cfg.services.openssh.enable;
+        }
+        {
+          name = "root account locked (Ticket 14 / DECISIONS 037)";
+          assertion = cfg.users.users.root.hashedPassword == "!";
+        }
+        {
+          name = "firewall enabled (Ticket 14 / DECISIONS 037)";
+          assertion = cfg.networking.firewall.enable;
         }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
@@ -530,6 +547,11 @@
                 "for b in eza bat fd rg btop zoxide delta tree fzf lazygit fastfetch; do "
                 "test -x /etc/profiles/per-user/maudi/bin/$b; done"
             )
+
+            # Hardening (Ticket 14 / DECISIONS 037): SSH daemon must not be running
+            # and the firewall must be active.
+            machine.fail("systemctl is-active sshd")
+            machine.succeed("nft list ruleset | grep -q 'type filter hook input'")
           '';
         };
 

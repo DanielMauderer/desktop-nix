@@ -17,6 +17,7 @@ _: {
     ./audio.nix
     ./boot.nix
     ./fonts.nix
+    ./hardening.nix
     ./home.nix
     ./locale.nix
     ./networking.nix

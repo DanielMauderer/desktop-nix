@@ -40,7 +40,7 @@ Migration tickets, numbered in rough execution order. See
 | 11 | [Gaming & CachyOS kernel](11-gaming-and-cachyos-kernel.md) | 2 | 03 (04 for gamemode bind) | desktop | done |
 | 12 | [Secrets management](12-secrets-management.md) | 2 | 01 | all | done |
 | 13 | [Host: private-laptop (PILOT)](13-host-private-laptop-pilot.md) | 3 | 03–07, 10 | private-laptop | done |
-| 14 | [Host: work-laptop](14-host-work-laptop.md) | 3 | 08, 09, 12, 13 | work-laptop | open |
+| 14 | [Host: work-laptop](14-host-work-laptop.md) | 3 | 08, 09, 12, 13 | work-laptop | done |
 | 15 | [Host: desktop](15-host-desktop.md) | 3 | 08, 09, 11, 13 | desktop | open |
 | 16 | [Waydroid](16-waydroid.md) | 2 | 03 | TBD (maybe drop) | open |
 | 17 | [Archive old repos](17-archive-old-repos.md) | 4 | 13, 14, 15 | — | open |
