@@ -4,7 +4,7 @@
 
 - Role: media consumption + some development
 - GPU: Intel iGPU — VAAPI/QSV hardware video decode (`hardware.nix`)
-- Modules: base, hyprland desktop, theming, shell, neovim, flatpak/media apps;
+- Modules: base, hyprland desktop, theming, shell, neovim, media apps;
   power management is power-profiles-daemon (shared desktop stack)
 - Disk: declarative via [`disk.nix`](disk.nix) — LUKS2 + ext4 root + ESP
   (DECISIONS 036). Full-disk NixOS; the Silverblue install is wiped.
