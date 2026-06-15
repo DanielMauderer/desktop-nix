@@ -3,6 +3,9 @@
   imports = [
     ../../modules/nixos/base
     ../../modules/nixos/desktop
+    # Gaming/CachyOS stack is desktop-only (Ticket 11): CachyOS kernel, scx,
+    # Steam, AMD GPU + LACT, MangoHud. The laptops (Intel) never import it.
+    ../../modules/nixos/gaming
   ];
 
   networking.hostName = "desktop";

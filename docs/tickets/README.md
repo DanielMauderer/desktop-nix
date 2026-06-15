@@ -37,7 +37,7 @@ Migration tickets, numbered in rough execution order. See
 | 08 | [Dev environment (replaces toolbox)](08-dev-environment.md) | 2 | 03, 06 | desktop, work-laptop (light: private-laptop) | done |
 | 09 | [Virtualisation: libvirt/KVM](09-virtualisation-libvirt.md) | 2 | 03 | all | done |
 | 10 | [Flatpak strategy](10-flatpak-strategy.md) | 2 | 03 | all | done |
-| 11 | [Gaming & CachyOS kernel](11-gaming-and-cachyos-kernel.md) | 2 | 03 (04 for gamemode bind) | desktop | open |
+| 11 | [Gaming & CachyOS kernel](11-gaming-and-cachyos-kernel.md) | 2 | 03 (04 for gamemode bind) | desktop | done |
 | 12 | [Secrets management](12-secrets-management.md) | 2 | 01 | all | open |
 | 13 | [Host: private-laptop (PILOT)](13-host-private-laptop-pilot.md) | 3 | 03–07, 10 | private-laptop | open |
 | 14 | [Host: work-laptop](14-host-work-laptop.md) | 3 | 08, 09, 12, 13 | work-laptop | open |

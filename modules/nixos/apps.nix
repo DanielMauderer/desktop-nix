@@ -11,11 +11,18 @@
 }:
 {
   # Exact unfree allow-list: any undeclared unfree package fails the build.
-  # Steam entries (steam, steam-unwrapped, steam-run) are added in Ticket 11.
+  # This is the single authoritative gate (DECISIONS 029) — keep it here rather
+  # than scattering per-module predicates (only one may define this option per
+  # host). Steam is desktop-only (Ticket 11 / DECISIONS 034); listing its names
+  # here only *permits* them — nothing installs steam on the laptops.
   nixpkgs.config.allowUnfreePredicate =
     pkg:
     builtins.elem (lib.getName pkg) [
       "spotify"
+      "steam"
+      "steam-unwrapped"
+      "steam-original"
+      "steam-run"
     ];
 
   home-manager.users.maudi.home.packages = [

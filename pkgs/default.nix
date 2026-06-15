@@ -11,6 +11,9 @@
 #   hypridle.sh, restart-hypridle.sh        → lock standardised on swayidle
 #   power.sh, toggleallfloat.sh,            → unbound in the active config
 #   systeminfo.sh, keybindings.sh
+#   hypr-gamemode.sh                        → dropped in Ticket 11 (unused; the
+#                                             gaming stack uses feralinteractive
+#                                             gamemode, not the cosmetic toggle)
 #
 # hyprctl is resolved from the running Hyprland session at runtime, so it is
 # deliberately left out of runtimeInputs (keeps these scripts' closures small).
@@ -34,8 +37,6 @@ in
       procps
     ]
   );
-
-  hypr-gamemode = app "hypr-gamemode" (with pkgs; [ libnotify ]);
 
   hypr-move-to = app "hypr-move-to" (with pkgs; [ jq ]);
 
