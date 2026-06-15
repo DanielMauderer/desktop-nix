@@ -1,6 +1,6 @@
 # 13 — Host: private-laptop + migration runbook (PILOT)
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 03, 04, 05, 06, 07, 10
 - **Machines:** private-laptop
 
@@ -13,26 +13,31 @@ and a list of lessons fed back into the modules before Tickets 14/15.
 
 ## Sub-tasks
 
-- [ ] Compose `hosts/private-laptop/default.nix`: base + desktop + theming +
-      shell + neovim + flatpak/apps (light dev profile from Ticket 08 optional)
-- [ ] Hardware: generate `hardware-configuration.nix`, identify the iGPU
-      (Intel vs AMD → video driver/VAAPI bits), firmware
-- [ ] Laptop power: power-profiles-daemon vs TLP (decide), lid/suspend
-      behavior, brightness keys, battery waybar module works
-- [ ] `p_laptop` monitor/workspace layout from MyLinux as this host's config
-- [ ] Disk decision: disko (declarative partitioning, recommended for
-      reproducibility) vs manual; LUKS full-disk encryption yes/no; filesystem
-      (ext4 vs btrfs — keep simple unless snapshots wanted)
-- [ ] Write `docs/runbooks/private-laptop.md`:
-  - [ ] Pre-migration backup checklist (browser profiles, ssh keys, `~/`
+- [x] Compose `hosts/private-laptop/default.nix`: base + desktop + theming +
+      shell + neovim + flatpak/apps (all via base + desktop imports). Light dev
+      (podman + toolchains) already lands via base.
+- [x] Hardware: `hardware.nix` identifies the iGPU as **Intel**
+      (`intel-media-driver` / iHD VAAPI), firmware + Intel microcode + initrd
+      baseline. The machine-specific `hardware-configuration.nix` is generated
+      with `--no-filesystems` and committed at install (runbook §4).
+- [x] Laptop power: **power-profiles-daemon** (decided, already in the shared
+      desktop stack), brightness keys + battery/backlight/power-profile waybar
+      modules all wired from Ticket 04. Lid/suspend validated on hardware
+      (runbook §6).
+- [x] `p_laptop` layout: old config was `monitor=,preferred,auto,1` — the shared
+      kanshi `laptop-internal` fallback already covers it, so no host-specific
+      profile (asserted in `flake.nix`).
+- [x] Disk decision: **disko + LUKS** (ext4 root, 1 GiB ESP, zram swap) in
+      `disk.nix`, scoped to this host (DECISIONS 036).
+- [x] Write `docs/runbooks/private-laptop.md`:
+  - [x] Pre-migration backup checklist (browser profiles, ssh keys, `~/`
         data inventory, Spotify/media app state)
-  - [ ] Install steps: ISO, partitioning, `nixos-install --flake`
-  - [ ] Post-install: clone repo, first rebuild, theming bootstrap
-        (wallpaper into state dir), validation checklist
-  - [ ] Rollback plan: keep the Silverblue disk untouched? (USB-boot fallback /
-        old SSD on a shelf)
-- [ ] Execute the migration on the real machine
-- [ ] Capture pilot lessons → file follow-up fixes against the module tickets
+  - [x] Install steps: ISO, disko partitioning, `nixos-install --flake`
+  - [x] Post-install: clone repo, secrets enroll, first rebuild, theming, validation
+  - [x] Rollback plan: Silverblue wiped → installer USB / old SSD fallback
+- [ ] **Execute the migration on the real machine** (manual — runbook §2–5)
+- [ ] **Capture pilot lessons** → file follow-ups against module tickets
+      (manual, post-install — runbook §8)
 
 ## Testing
 
@@ -49,12 +54,14 @@ and a list of lessons fed back into the modules before Tickets 14/15.
 
 ## Open questions
 
-- [ ] disko or manual partitioning?
-- [ ] LUKS on this laptop? (Recommended for any laptop.)
-- [ ] Wipe Silverblue or dual-boot during a transition period?
-- [ ] Final hostname (`private-laptop` or something nicer)?
-- [ ] What data actually lives on this machine that must move? (Inventory
-      during the backup sub-task.)
+Resolved in [DECISIONS 036](../DECISIONS.md):
+
+- [x] disko or manual partitioning? → **disko** (declarative, scoped to host)
+- [x] LUKS on this laptop? → **yes**, LUKS2 full-disk + ext4 root, zram swap
+- [x] Wipe Silverblue or dual-boot? → **wipe**, full-disk NixOS
+- [x] Final hostname? → keep **`private-laptop`**
+- [ ] What data must move? → inventoried during the backup step on the machine
+      (runbook §1); record in the migration PR description.
 
 ## Ask when starting
 

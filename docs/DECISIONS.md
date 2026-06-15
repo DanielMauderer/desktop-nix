@@ -767,3 +767,52 @@ recovery root and must be backed up. The wireguard key lands in Ticket 14, which
 adds the first production `sops.secrets` entry. The jira.nvim / gitlab.nvim API
 tokens stay machine-local for now and are revisited in the Ticket 13–14
 `~/.config` credential sweep.
+
+---
+
+## 036 — private-laptop pilot: disko + LUKS, Intel iGPU, full-disk wipe (2026-06-15)
+
+**Context:** Ticket 13 brings the first real machine onto NixOS. The pilot
+(media + light dev, lowest risk) validates the whole module stack on hardware.
+Open questions: partitioning (disko vs manual), LUKS, wipe vs dual-boot,
+hostname, and the (undocumented) iGPU.
+
+**Decision:**
+
+- **disko + LUKS, full-disk wipe.** Declarative partitioning via the
+  `nix-community/disko` flake input so a reinstall reproduces the exact layout:
+  1 GiB ESP (vfat, `/boot`, systemd-boot) + a LUKS2 container filling the rest
+  holding the ext4 root. `allowDiscards = true` for SSD TRIM (accepted minor
+  metadata leak). Silverblue is **wiped** — the rollback is the installer USB /
+  old SSD on a shelf, not dual-boot.
+- **Swap = zram, not an encrypted swap partition** — keeps `disk.nix` simple and
+  suits a memory-light laptop; no hibernation (accepted).
+- **disko is scoped, not global.** The disko module is imported only by
+  `hosts/private-laptop/disk.nix`, which is added to the host via `lib/mkHost`'s
+  module list in `flake.nix` — **not** `imports`-ed by `default.nix`. The
+  nixosTest nodes import `default.nix` alone, so the QEMU VMs keep booting off
+  their own scratch disk and never see the LUKS/ESP layout. disko owns
+  `fileSystems`; `nixos-generate-config --no-filesystems` produces the rest.
+- **Intel iGPU.** `hardware.nix` adds `intel-media-driver` (iHD, Gen8+) +
+  `vpl-gpu-rt` and pins `LIBVA_DRIVER_NAME=iHD` for VAAPI/QSV media decode (the
+  pilot's main job). Pre-Broadwell hardware falls back to `intel-vaapi-driver`
+  / `i965` (documented in the runbook). Plus redistributable firmware and Intel
+  microcode.
+- **Hostname stays `private-laptop`** — renaming would ripple through the
+  `flake.nix` host assertions, kanshi profiles, `.sops.yaml` anchors and test
+  nodes for no real benefit.
+- **Power management = power-profiles-daemon** (already enabled in the shared
+  `modules/nixos/desktop`), not TLP — it is the simpler default and drives the
+  existing waybar power-profile module; brightnessctl + udev rules and the
+  battery/backlight waybar modules already exist from Ticket 04.
+- **Monitor layout:** the old MyLinux `p_laptop.conf` was just
+  `monitor=,preferred,auto,1`; the shared kanshi `laptop-internal` fallback
+  already covers a single internal panel, so no host-specific profile is added
+  (asserted: `kanshiProfileNames == ["laptop-internal"]`).
+
+**Consequences:** The flake gains a `disko` input (review `flake.lock` bumps).
+`hardware/hardware-configuration.nix` is generated and committed at install
+time (the import is left commented in `default.nix` until then). Executing the
+migration on the physical machine and the hardware validation/rollback drill are
+manual — they run on the laptop per `docs/runbooks/private-laptop.md`, not in
+CI. Pilot lessons feed back into the modules before Tickets 14/15.
