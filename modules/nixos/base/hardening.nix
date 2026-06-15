@@ -15,5 +15,8 @@ _: {
   # Stateful firewall: track established/related connections, drop unsolicited
   # inbound. NixOS's default is `enable = true`, but declaring it explicitly
   # makes the intent visible in host assertions and in the config diff.
+  # nftables.enable installs the nft binary and loads rules at boot — required
+  # for the VM test assertion `nft list ruleset` to find the command in PATH.
   networking.firewall.enable = true;
+  networking.nftables.enable = true;
 }
