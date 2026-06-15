@@ -769,9 +769,16 @@
               # assert via an unprivileged read attempt).
               machine.fail("su nobody -s /bin/sh -c 'cat /run/secrets/fixture_secret'")
 
-              # The plaintext must never appear in the nix store (the encrypted
-              # fixture is the only thing committed / copied to the store).
-              machine.fail("grep -r 'sops-fixture-canary-7a3f' /nix/store")
+              # Encrypted at rest: the only copy of the secret that lands in the
+              # store is the sops fixture, and it must be ciphertext — the
+              # plaintext sentinel must not appear in it. (We can't `grep -r` all
+              # of /nix/store: a nixosTest shares the host store with the guest,
+              # and the test-driver script itself contains this sentinel.)
+              machine.fail("grep -q 'sops-fixture-canary-7a3f' ${./secrets/fixtures/test.yaml}")
+
+              # Decrypted only onto tmpfs at activation: the secret resolves
+              # under /run (sops-nix's tmpfs), never to a persistent store path.
+              machine.succeed("readlink -f /run/secrets/fixture_secret | grep -q '^/run/'")
             '';
           };
       };
