@@ -1,0 +1,48 @@
+# sops creation rules (Ticket 12 / DECISIONS 035).
+#
+# Public keys only — safe to commit. Private keys never live here:
+#   - the master age key's private half is in the password manager;
+#   - per-host keys ARE the hosts' SSH host ed25519 keys, converted with
+#     `ssh-to-age` and filled in at install time (see docs/runbooks/secrets.md).
+#
+# The `age1PLACEHOLDER…` recipients below are replaced per host during the
+# bootstrap runbook, then `sops updatekeys` re-encrypts. They are inert until a
+# creation rule that references them is used, so the fixtures rule (test key
+# only) works today even while the production placeholders are unfilled.
+keys:
+  # Personal master key — decrypts everything. Generated once; private half in
+  # the password manager (runbook step 1).
+  - &master age1PLACEHOLDERmasterxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  # Per-host keys: ssh-to-age of each /etc/ssh/ssh_host_ed25519_key.pub.
+  - &private_laptop age1PLACEHOLDERprivatelaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &work_laptop age1PLACEHOLDERworklaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &desktop age1PLACEHOLDERdesktopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  # Fixture/test key: PUBLIC half of the known key the test-secrets nixosTest
+  # injects into the VM. Its private half is committed in the test (it guards
+  # nothing real). Encrypts only secrets/fixtures/*.
+  - &test_fixture age1zhqxhmt7t3vv9z8j24mxvytkx4wu4g6ks8nq9zxwven26nnukulqeck6w2
+
+creation_rules:
+  # Test fixtures: encrypted ONLY to the known test key — never to host keys,
+  # because the test VM uses the injected test identity, not a real host key.
+  - path_regex: secrets/fixtures/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *test_fixture
+
+  # Host-scoped production secrets (the wireguard key lands here in Ticket 14):
+  # master + only the owning host.
+  - path_regex: secrets/work-laptop/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *master
+          - *work_laptop
+
+  # Shared production secrets: master + every host.
+  - path_regex: secrets/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *master
+          - *private_laptop
+          - *work_laptop
+          - *desktop

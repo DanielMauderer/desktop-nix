@@ -20,6 +20,12 @@ nixpkgs.lib.nixosSystem {
     # nixosTest node provides `inputs` through `_module.args`). The theming
     # module only sets `stylix.*` config.
     inputs.stylix.nixosModules.stylix
+    # sops-nix's NixOS module is added here (like stylix) rather than via an
+    # `imports` inside modules/nixos/base/secrets.nix that reads `inputs` from
+    # `_module.args`, which would infinitely recurse when the nixosTest node
+    # provides `inputs` through `_module.args`. The secrets module only sets
+    # `sops.*` config (the age key source).
+    inputs.sops-nix.nixosModules.sops
     {
       home-manager.useGlobalPkgs = true;
       home-manager.useUserPackages = true;
