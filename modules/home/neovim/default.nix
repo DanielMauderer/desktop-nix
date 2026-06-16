@@ -23,6 +23,12 @@
     enable = true;
     vimAlias = true;
     viAlias = true;
+    # Only the python3 provider is used (pynvim, below). Drop the Ruby/Node/Perl
+    # providers that home-manager pulls in by default — nothing in the config
+    # uses them, so they only bloat the closure and add :checkhealth warnings.
+    withRuby = false;
+    withNodeJs = false;
+    withPerl = false;
     # pynvim host (:checkhealth python3) lives inside neovim's own python3
     # wrapper, NOT in home.packages — otherwise a `python3.withPackages` env
     # collides with the bare python3 the dev module (Ticket 08) puts on PATH.
@@ -64,11 +70,11 @@
     gdb # C / C++ / Rust via gdb DAP
     vscode-js-debug # js-debug-adapter for TypeScript / JavaScript
 
-    # Treesitter parser compilation (gcc/gnumake/nodejs), fff.nvim's
-    # `cargo build --release`, conform's rustfmt and the PATH python3 all rely on
-    # the toolchains from modules/home/dev (Ticket 08) — present in the same home
-    # profile. The pynvim host is wired via programs.neovim.extraPython3Packages
-    # above (inside the nvim wrapper) to avoid a python3 env PATH collision.
+    # Treesitter parser compilation (gcc/gnumake/nodejs), conform's rustfmt and
+    # the PATH python3 all rely on the toolchains from modules/home/dev
+    # (Ticket 08) — present in the same home profile. The pynvim host is wired via
+    # programs.neovim.extraPython3Packages above (inside the nvim wrapper) to
+    # avoid a python3 env PATH collision.
 
     # ── Clipboard ─────────────────────────────────────────────────────────────
     wl-clipboard # vim.o.clipboard = "unnamedplus" on Wayland

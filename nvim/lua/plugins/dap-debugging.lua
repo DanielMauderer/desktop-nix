@@ -4,29 +4,13 @@ return {
 		opts = {},
 	},
 	{
-		"jay-babu/mason-nvim-dap.nvim",
-		dependencies = {
-			"williamboman/mason.nvim",
-			"mfussenegger/nvim-dap",
-		},
-		-- gdb and js-debug-adapter come from Nix (home.packages); Mason installs nothing.
-		opts = {
-			ensure_installed = {},
-			automatic_installation = false,
-			handlers = {
-				function(config)
-					require("mason-nvim-dap").default_setup(config)
-				end,
-			},
-		},
-	},
-	{
 		"mfussenegger/nvim-dap",
 		event = "VeryLazy",
+		-- DAP adapters (gdb, js-debug-adapter) come from Nix (home.packages); the
+		-- Mason stack was removed (DECISIONS 028) as it installed nothing.
 		dependencies = {
 			"rcarriga/nvim-dap-ui",
 			"nvim-neotest/nvim-nio",
-			"jay-babu/mason-nvim-dap.nvim",
 			"theHamsta/nvim-dap-virtual-text",
 		},
 		config = function()
@@ -56,7 +40,9 @@ return {
 				local co = coroutine.running()
 				vim.schedule(function()
 					local cwd = vim.fn.getcwd()
-					local handle = io.popen("find " .. cwd .. " -type f -executable | grep -v .git 2>/dev/null")
+					local handle = io.popen(
+						"find " .. vim.fn.shellescape(cwd) .. " -type f -executable | grep -v .git 2>/dev/null"
+					)
 					local items = {}
 					if handle then
 						for line in handle:lines() do

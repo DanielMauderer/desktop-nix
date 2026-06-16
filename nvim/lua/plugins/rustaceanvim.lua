@@ -26,13 +26,22 @@ return {
 							-- from the project root if one exists. Lets no_std/embedded
 							-- repos restrict checking to `--bins` without affecting
 							-- the global defaults above.
+							--
+							-- SECURITY: rust-analyzer settings can carry keys that run
+							-- arbitrary commands on open/save (check.overrideCommand,
+							-- cargo.buildScripts.overrideCommand, procMacro, runnables).
+							-- A hostile cloned repo could ship a malicious file, so we
+							-- read it through vim.secure.read — which prompts once per
+							-- file and records the trust decision. Untrusted/declined
+							-- files return nil and are ignored.
 							local override = project_root .. "/rust-analyzer.json"
 							if vim.uv.fs_stat(override) then
-								local ok, data = pcall(function()
-									return vim.json.decode(table.concat(vim.fn.readfile(override), "\n"))
-								end)
-								if ok and type(data) == "table" then
-									settings = vim.tbl_deep_extend("force", settings, data)
+								local contents = vim.secure.read(override)
+								if contents then
+									local ok, data = pcall(vim.json.decode, contents)
+									if ok and type(data) == "table" then
+										settings = vim.tbl_deep_extend("force", settings, data)
+									end
 								end
 							end
 							return settings

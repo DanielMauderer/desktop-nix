@@ -11,7 +11,7 @@ return {
 			},
 			autoFold = {
 				enabled = false,
-			}
+			},
 		},
 
 		-- recommended: disable vim's auto-folding

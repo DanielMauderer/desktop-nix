@@ -17,6 +17,25 @@ was changed**).
 > recommendations actively favour a **leaner** config; nothing here removes a
 > plugin for you.
 
+> **Resolution (2026-06-16).** The findings were applied (see DECISIONS 041 + 042):
+> - **Cut** `hardtime` (NV-ST-1), `fff`, `fzf.vim`+bare `fzf`, `typr`, and the
+>   integrations `jira`/`gitlab`/`obsidian`/`kulala` (NV-Q-3/Q-4); deleted
+>   `fyler.lua.disabled`. `oil` kept but lazy-loaded.
+> - **NV-S-1** rust-analyzer.json now read via `vim.secure.read`; **NV-S-4**
+>   `cwd` shellescaped.
+> - **NV-Q-1** conform formatter list fixed (dropped `inject` + non-Nix tools,
+>   SQL on `sqruff`).
+> - **NV-Q-6** Mason stack removed; **NV-Q-7** DECISION 025 note corrected.
+> - **NV-ST-3** oil/fzf-lua lazy-loaded; **NV-ST-5** kitty autocmds guarded.
+> - **NV-Q-5** which-key reconciled; **NV-Q-8** stylua/luacheck cleaned;
+>   **NV-Q-9** Ruby/Node/Perl providers off; **NV-Q-10** modeline + `vim.o`;
+>   **NV-Q-2** dead code removed.
+>
+> Not changed (conscious): **NV-ST-2/NV-ST-4** (build-on-install + first-launch
+> network — inherent to lazy.nvim, covered by the Ticket-07 headless smoke test);
+> **NV-S-2** (residual hostile-repo surface, documented in the threat model);
+> **NV-S-3** (no in-repo secrets — the token-bearing integrations were cut).
+
 This audit closes the gap left by `docs/audit/pre-golive-review.md` (§2:
 "Excluded by request… Neovim (`nvim/**`, `modules/home/neovim`)"), whose only
 nvim item — `Q-4` (Ruby/Python3 providers) — was marked *No action, out of

@@ -15,14 +15,7 @@ return {
 				"<leader>fs",
 				function()
 					require("conform").format({
-						formatters = {
-							"sqruff",
-							-- "sqlfluff",
-							-- "pg_format",
-							-- "sql_formatter",
-							-- "sqlfmt",
-							stop_after_first = true,
-						},
+						formatters = { "sqruff", stop_after_first = true },
 						range = {
 							start = vim.api.nvim_buf_get_mark(0, "<"),
 							["end"] = vim.api.nvim_buf_get_mark(0, ">"),
@@ -47,15 +40,17 @@ return {
 					prepend_args = { "--dialect", "postgres" },
 				},
 			},
+			-- Only formatters provided by Nix (home.packages) or the dev module's
+			-- toolchain (rustfmt) are referenced here; an unknown name makes conform
+			-- error on <leader>fo. SQL is aligned on sqruff to match <leader>fs.
 			formatters_by_ft = {
 				lua = { "stylua" },
 				python = { "isort", "ruff_format", "ruff_organize_imports" },
-				rust = { "rustfmt", "inject", lsp_format = "fallback" },
-				javascript = { "inject", "prettierd", "prettier" },
-				typescript = { "inject", "prettierd", "prettier" },
+				rust = { "rustfmt", lsp_format = "fallback" },
+				javascript = { "prettierd" },
+				typescript = { "prettierd" },
 				json = { "jq" },
-				xml = { "xmlformatter" },
-				sql = { "sqlfluff", "pg_format", lsp_format = "fallback" },
+				sql = { "sqruff", lsp_format = "fallback" },
 			},
 		},
 	},

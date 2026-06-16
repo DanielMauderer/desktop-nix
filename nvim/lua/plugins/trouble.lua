@@ -22,7 +22,7 @@ return {
 				["P"] = "next",
 				["p"] = "prev",
 				["N"] = "prev",
-			}
+			},
 		},
 		keys = {
 			{

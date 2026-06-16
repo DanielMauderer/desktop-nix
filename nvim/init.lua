@@ -50,7 +50,7 @@ vim.o.relativenumber = true
 vim.o.hlsearch = true
 
 -- Make line numbers default
-vim.wo.number = true
+vim.o.number = true
 
 -- Enable mouse mode
 vim.o.mouse = "a"
@@ -73,7 +73,7 @@ vim.o.ignorecase = true
 vim.o.smartcase = true
 
 -- Keep signcolumn on by default
-vim.wo.signcolumn = "yes"
+vim.o.signcolumn = "yes"
 
 -- Decrease update time
 vim.o.updatetime = 250
@@ -99,10 +99,6 @@ vim.keymap.set("n", "]d", function()
 end, { desc = "Go to next diagnostic message" })
 vim.keymap.set("n", "<leader>e", vim.diagnostic.open_float, { desc = "Open floating diagnostic message" })
 vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Open diagnostics list" })
-
--- Tree Toggle
--- Overwritten by snacks explorer
--- vim.keymap.set("n", "<leader>tt", "<cmd>NvimTreeToggle<CR>", { desc = "Nvim [t]oggle [T]ree" })
 
 -- [[ Highlight on yank ]]
 -- See `:help vim.hl.on_yank()`
@@ -186,21 +182,30 @@ vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
 local kitty_group = vim.api.nvim_create_augroup("KittyPadding", { clear = true })
 
 local function set_kitty_padding(value)
-  -- Try direct kitten first (base system), fall back to host execution
-  local result = vim.fn.system("kitten @ set-spacing padding=" .. value)
-  if vim.v.shell_error ~= 0 then
-    vim.fn.system("flatpak-spawn --host kitten @ set-spacing padding=" .. value)
-  end
+	-- Only meaningful inside kitty; skip the shell-outs entirely on other
+	-- terminals (they would otherwise fail twice per enter/leave).
+	if not vim.env.KITTY_WINDOW_ID then
+		return
+	end
+	-- Try direct kitten first (base system), fall back to host execution
+	vim.fn.system("kitten @ set-spacing padding=" .. value)
+	if vim.v.shell_error ~= 0 then
+		vim.fn.system("flatpak-spawn --host kitten @ set-spacing padding=" .. value)
+	end
 end
 
 vim.api.nvim_create_autocmd("VimEnter", {
-  group = kitty_group,
-  callback = function() set_kitty_padding(0) end,
+	group = kitty_group,
+	callback = function()
+		set_kitty_padding(0)
+	end,
 })
 
 vim.api.nvim_create_autocmd("VimLeave", {
-  group = kitty_group,
-  callback = function() set_kitty_padding(10) end,
+	group = kitty_group,
+	callback = function()
+		set_kitty_padding(10)
+	end,
 })
 
 -- Load LSP Manager
@@ -212,4 +217,4 @@ vim.api.nvim_create_user_command("LspManager", function()
 end, { desc = "Open LSP Manager" })
 
 -- The line beneath this is called `modeline`. See `:help modeline`
--- vim: ts=2 sts=2 sw=2 et
+-- vim: ts=4 sts=4 sw=4 et

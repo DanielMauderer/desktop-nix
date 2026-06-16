@@ -348,6 +348,24 @@
               touch $out
             '';
 
+        # Neovim Lua config gate (nvim audit NV-Q-8): stylua formatting + luacheck
+        # lint. Kept here (not a separate CI step) so local `nix flake check` and
+        # CI stay identical. luacheck reads nvim/.luacheckrc for the Neovim globals.
+        nvim-lua-check =
+          pkgs.runCommand "nvim-lua-check"
+            {
+              nativeBuildInputs = [
+                pkgs.stylua
+                pkgs.lua54Packages.luacheck
+              ];
+            }
+            ''
+              stylua --check ${./nvim}
+              cd ${./nvim}
+              luacheck .
+              touch $out
+            '';
+
         # Dev devShell smoke checks (Ticket 08): each toolchain compiles/runs a
         # trivial hello-world offline, so a broken per-language shell fails the
         # flake check. Cheap (node/python/go) plus a minimal rust+nextest build.
