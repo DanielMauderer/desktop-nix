@@ -911,3 +911,48 @@ and drops its placeholder inline `fileSystems."/"` (disko owns it). The
 stack and are unchanged. Actual migration + the MangoHud before/after
 performance pass run on the physical machine per `docs/runbooks/desktop.md`,
 not in CI.
+
+## 039 — work-laptop compliance hardening: daily updates, audit logging, sudo logging (2026-06-16)
+
+**Context:** The corporate Linux workstation security policy
+("Sicherheitsanforderungen für Linux-Arbeitsplätze", §1–§4.8) was checked
+against `work-laptop`. The DECISIONS 037 baseline (LUKS2, SSH off, root locked,
+firewall) already covered most of it. Three controls were config-closeable gaps:
+the update cadence was `weekly` (policy §4.4/§4.5 requires security updates ≤ 72h),
+there was no logging of security-relevant events (§4.3/§4.5/§4.6), and sudo had no
+explicit logging (§4.3 "Entwickler dürfen sudo … mit Protokollierung"). Applied
+to **all hosts** (the policy is a fleet baseline, like DECISIONS 037), not just
+work-laptop. Full mapping: `docs/compliance/linux-workstation-policy.md`.
+
+**Decision:**
+
+- **Daily auto-upgrade** (§4.4): `modules/nixos/base/updates.nix` changes
+  `dates = "weekly"` → `"daily"` (keeping `randomizedDelaySec = "45min"`,
+  `allowReboot = false`). nixpkgs is `nixos-unstable`, so daily pulls keep the
+  worst-case security-update window well under the 72h bound.
+- **Security-event logging** (§4.3/4.5/4.6): new `modules/nixos/base/audit.nix`
+  enables `security.auditd` + `security.audit` with a small laptop-appropriate
+  rule set (privilege escalation via sudo/su, writes to `/etc/passwd` `/etc/shadow`
+  `/etc/group` `/etc/sudoers`, and time changes), and sets
+  `services.journald.storage = "persistent"` so auth/system events survive reboot.
+  A full CAPP/STIG profile was rejected as noise for a developer machine.
+- **Sudo logging** (§4.3/4.5): `modules/nixos/base/hardening.nix` adds
+  `security.sudo.extraConfig` with `Defaults use_pty` and
+  `Defaults logfile=/var/log/sudo.log`; `wheelNeedsPassword` stays at its secure
+  default (sudo prompts).
+- **Out of scope, deliberately:** on-device PAM password complexity
+  (`pam_pwquality`) — the company password policy is enforced at the IdP; and
+  **WireGuard/VPN activation** (§4.5/4.6 VPN+MFA) — stays templated in
+  `hosts/work-laptop/default.nix`, enrolled separately with real keys (the MFA
+  half is an IdP/VPN-server concern, off-device).
+- **Organisational items** NixOS cannot enforce are documented, not coded:
+  the §4.1 Linux asset register (`docs/INVENTORY.md`), and the §4.4 monthly
+  update confirmation + §4.8 offboarding process
+  (`docs/runbooks/compliance-tasks.md`).
+
+**Consequences:** `modules/nixos/base/default.nix` imports the new `audit.nix`.
+`flake.nix` `baseAssertions` gains two checks (auditd enabled; `autoUpgrade.dates
+== "daily"`) and `test-base-system` asserts the `auditd` unit is active with the
+`priv_esc` rule, `/var/log/sudo.log` configured, and journald persistent — so the
+controls cannot silently regress. Verified on real hardware post-migration per
+`docs/runbooks/work-laptop.md`.

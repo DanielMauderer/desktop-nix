@@ -9,6 +9,7 @@ their tickets:
 | `private-laptop.md` | [13](../tickets/13-host-private-laptop-pilot.md) | pilot migration |
 | `work-laptop.md` | [14](../tickets/14-host-work-laptop.md) | second migration |
 | `desktop.md` | [15](../tickets/15-host-desktop.md) | final migration |
+| `compliance-tasks.md` | — | recurring/offboarding compliance process (policy §4.4/§4.8) |
 
 Each per-machine runbook must cover: pre-migration backup checklist, installation steps
 (ISO, partitioning/disko, LUKS), data migration, first `nixos-rebuild switch`,

@@ -15,6 +15,7 @@ _: {
     ../dev
     ../virtualisation
     ./audio.nix
+    ./audit.nix
     ./boot.nix
     ./fonts.nix
     ./hardening.nix

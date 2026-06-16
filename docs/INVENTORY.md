@@ -1,5 +1,10 @@
 # Migration Inventory
 
+> **Note:** the bulk of this file is the *migration parity checklist* (old
+> maudiblue/MyLinux setup → NixOS). The separate **Linux asset register** at the
+> bottom is the compliance artifact required by the Linux workstation security
+> policy §4.1 — see [compliance/linux-workstation-policy.md](compliance/linux-workstation-policy.md).
+
 Everything the old setup (maudiblue image + MyLinux dotfiles) provides, with
 the ticket responsible for migrating it. This doubles as the **parity
 checklist for Ticket 17** — before archiving, every row must be either
@@ -107,3 +112,17 @@ Status legend: `open` → `migrated` / `dropped`.
 | Hard kill/restart reload pattern (`pkill dunst; dunst &`) | apply_matugen.sh | 05 |
 | firstboot.sh ignores failures (`|| true`), hardcoded repo URL | maudiblue | 03 |
 | Tide prompt state in universal variables (not declarative) — resolved: replaced by starship (DECISIONS 023) | fish | 06 |
+
+## Linux asset register (policy §4.1)
+
+Compliance register required by the Linux workstation security policy §4.1.
+Keep one row per company Linux device; update on hardware change, distro upgrade,
+and at offboarding (§4.8). The "Hardening status" baseline is enforced in code
+(DECISIONS 037/039) and verified by `nix flake check`; serial numbers and the
+last manual-update date are filled in operationally (a master copy may also live
+in the company Confluence table).
+
+| Device type | Serial | User | Distro & version | Encryption | Firewall / hardening | Last updates |
+|---|---|---|---|---|---|---|
+| Laptop (work) | _TBD_ | maudi | NixOS (nixos-unstable) | LUKS2 full-disk | nftables default-deny, SSH off, root locked, auditd, sudo logging | auto-daily (auto-upgrade) |
+
