@@ -1,6 +1,6 @@
 # 15 — Host: desktop + migration runbook
 
-- **Status:** open
+- **Status:** done
 - **Depends on:** 08, 09, 11, 13
 - **Machines:** desktop
 

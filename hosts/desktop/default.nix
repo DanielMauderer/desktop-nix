@@ -1,3 +1,14 @@
+# desktop — gaming + dev host (Ticket 15), the last machine off Silverblue.
+# Composes the shared stack:
+#   base    → boot, users, networking, audio, nix, fonts, apps, dev, libvirt,
+#             secrets + the shell/neovim/dev home modules
+#   desktop → Hyprland session, greeter, theming + the waybar/kanshi/rofi home
+#             modules
+#   gaming  → CachyOS kernel, scx, Steam, AMD GPU + LACT, MangoHud (desktop-only)
+# plus AMD hardware enablement (hardware.nix: kvm-amd, amd-ucode, amdgpu KMS,
+# radeonsi VAAPI, zram). The disko disk layout (disk.nix) is wired in via
+# flake.nix's mkHost module list, not here, so the nixosTest VMs that import
+# this file boot off their own scratch disk.
 { lib, ... }:
 {
   imports = [
@@ -6,6 +17,9 @@
     # Gaming/CachyOS stack is desktop-only (Ticket 11): CachyOS kernel, scx,
     # Steam, AMD GPU + LACT, MangoHud. The laptops (Intel) never import it.
     ../../modules/nixos/gaming
+    ./hardware.nix
+    # ./hardware/hardware-configuration.nix  # uncomment after the install-time
+    # `nixos-generate-config --no-filesystems` (see docs/runbooks/desktop.md)
   ];
 
   networking.hostName = "desktop";
@@ -32,9 +46,4 @@
       };
     }
   ];
-
-  fileSystems."/" = {
-    device = "/dev/disk/by-label/nixos";
-    fsType = "ext4";
-  };
 }
