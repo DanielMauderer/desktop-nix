@@ -205,6 +205,14 @@
           name = "firewall enabled (Ticket 14 / DECISIONS 037)";
           assertion = cfg.networking.firewall.enable;
         }
+        {
+          name = "auditd enabled for security-event logging (policy §4.3/4.5, DECISIONS 039)";
+          assertion = cfg.security.auditd.enable && cfg.security.audit.enable;
+        }
+        {
+          name = "security updates applied daily, ≤72h window (policy §4.4, DECISIONS 039)";
+          assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "daily";
+        }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -558,6 +566,15 @@
             # and the firewall must be active.
             machine.fail("systemctl is-active sshd")
             machine.succeed("nft list ruleset | grep -q 'type filter hook input'")
+
+            # Security-event logging (policy §4.3/4.5/4.6, DECISIONS 039): auditd is
+            # up with our rules loaded, sudo logs to its dedicated file, and the
+            # journal is persistent.
+            machine.wait_for_unit("auditd.service")
+            machine.wait_until_succeeds("auditctl -l | grep -q priv_esc")
+            machine.succeed("grep -q 'logfile=/var/log/sudo.log' /etc/sudoers")
+            # Storage=persistent makes journald keep logs under /var/log/journal.
+            machine.succeed("test -d /var/log/journal")
           '';
         };
 
