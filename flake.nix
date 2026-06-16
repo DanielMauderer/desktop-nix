@@ -213,6 +213,14 @@
           name = "security updates applied daily, ≤72h window (policy §4.4, DECISIONS 039)";
           assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "daily";
         }
+        {
+          name = "work-laptop tracks the CI-gated release branch; pilot/desktop track main (DECISIONS 042)";
+          assertion =
+            let
+              onRelease = lib.hasSuffix "/release" cfg.system.autoUpgrade.flake;
+            in
+            if host == "work-laptop" then onRelease else !onRelease;
+        }
       ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -252,7 +260,7 @@
       };
     in
     {
-      formatter.${system} = pkgs.nixfmt-rfc-style;
+      formatter.${system} = pkgs.nixfmt;
 
       devShells.${system} = {
         default = pkgs.mkShell {
@@ -260,7 +268,7 @@
             nil
             statix
             deadnix
-            nixfmt-rfc-style
+            nixfmt
             # Secrets (Ticket 12): edit/re-key sops files and convert SSH host
             # keys to age for the bootstrap runbook (docs/runbooks/secrets.md).
             sops
@@ -333,7 +341,7 @@
         nixfmt-check =
           pkgs.runCommand "nixfmt-check"
             {
-              nativeBuildInputs = [ pkgs.nixfmt-rfc-style ];
+              nativeBuildInputs = [ pkgs.nixfmt ];
             }
             ''
               find ${./.} -name '*.nix' -print0 | xargs -0 nixfmt --check

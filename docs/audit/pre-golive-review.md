@@ -278,3 +278,34 @@ nix build --keep-going \
 `test-secrets`) and full per-host `toplevel` builds were not run locally — no
 `/dev/kvm` / heavy closures — and are covered by `.github/workflows/ci.yml`
 (`flake-check` + `build-hosts`).*
+
+---
+
+## 8. Resolution status (2026-06-16)
+
+Applied on branch `claude/laughing-edison-siwb0r`. Legend: **Fixed** (code
+change), **Mitigated** (residual risk reduced + documented), **Kept** (conscious
+decision, recorded in DECISIONS 046), **Deferred** (needs on-machine enrollment;
+mechanism wired + runbook updated), **No action** (upstream / out of scope).
+
+| ID | Status | What changed |
+|---|---|---|
+| **ST‑1** | Fixed | Per-host update channel: work-laptop tracks a CI-gated `release` branch; pilot/desktop stay on `main`. `updates.nix`, `hosts/work-laptop/default.nix`, routing assertion in `flake.nix`. DECISIONS 042 |
+| **ST‑2** | Fixed | Scheduled daily `nix flake update` → PR → auto-merge on green (`.github/workflows/update-lock.yml`); promotion in `promote-release.yml`. The §4.4 window is now mechanical. DECISIONS 043 |
+| **ST‑3** | Fixed | `boot.loader.systemd-boot.configurationLimit = 20` (`boot.nix`). DECISIONS 045 |
+| **ST‑4** | Mitigated | configurationLimit keeps a known-good fallback for the CachyOS kernel; `allowReboot = false` means a bad kernel only bites on manual reboot. Pinning rejected (fights fast updates). DECISIONS 045 |
+| **ST‑5** | Fixed | work-laptop auto-suspend 10 → 30 min (lock stays 5 min) so unattended work/updates aren't interrupted. `hosts/work-laptop/default.nix` |
+| **ST‑6** | Kept | Zen `twilight` — user is comfortable with fast-moving software fleet-wide. DECISIONS 046 |
+| **S‑1** | Fixed | `initialHashedPassword` (yescrypt hash, no store plaintext) + explicit `mutableUsers` + one-time forced first-login change. `users.nix`. DECISIONS 044 |
+| **S‑2** | Kept | `trusted-users` keeps `maudi` — Docker/VM workflows depend on it. DECISIONS 046 |
+| **S‑3** | Kept | libvirtd + `virbr0` NAT kept — Docker/VM workflows. DECISIONS 046 |
+| **S‑4** | Deferred | Real age host keys + WireGuard key are enrolled on the machine (cannot be done in CI). Runbook updated (`runbooks/updates.md`, `secrets.md`); the S‑5 trap below is fixed |
+| **S‑5** | Fixed | WireGuard template now instructs adding `config` to the module signature when uncommenting, so it can't eval-fail verbatim. `hosts/work-laptop/default.nix` |
+| **S‑6** | Kept | `bluetooth.powerOnBoot = true` — the user's keyboard is Bluetooth; off-on-boot would lock them out. DECISIONS 046 |
+| **S‑7** | Kept | `qemu.runAsRoot` kept — VM workflow. Threat model noted. DECISIONS 046 |
+| **Q‑1** | Fixed | `pkgs.system` → `pkgs.stdenv.hostPlatform.system` (`apps.nix`) |
+| **Q‑2** | Fixed | `nixfmt-rfc-style` → `nixfmt` ×3 (`flake.nix`) |
+| **Q‑3** | No action | `options.json` context warning is upstream (Stylix), non-fatal |
+| **Q‑4** | No action | nvim Ruby/Python providers — explicitly out of audit scope |
+| **Q‑5** | Kept | `alsa.support32Bit` fleet-wide — harmless. DECISIONS 046 |
+| **Q‑6** | Fixed | Stale `users.nix` comment removed; ADR 011 cross-referenced to 039/042/043 |

@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, pkgs, ... }:
 {
   imports = [
     ../../modules/nixos/base
@@ -10,6 +10,28 @@
 
   networking.hostName = "work-laptop";
   system.stateVersion = "25.05";
+
+  # Update channel (DECISIONS 042): the work laptop is the one HA / policy-bound
+  # machine, so it tracks the CI-gated `release` branch instead of `main`. A
+  # commit only reaches `release` after its `build-hosts` job is green
+  # (.github/workflows/promote-release.yml), so an upgrade here is never the
+  # first build of that revision. Pilot (private-laptop) + desktop stay on `main`;
+  # the daily cadence is unchanged (modules/nixos/base/updates.nix).
+  system.autoUpgrade.flake = "github:DanielMauderer/desktop-nix/release";
+
+  # Idle policy (DECISIONS 042): keep the 5-min screen lock (modules/home/desktop/
+  # lockscreen.nix) but lengthen auto-suspend from 10 → 30 min on this host, so an
+  # unattended build/update or a long meeting on the dock isn't force-suspended.
+  home-manager.users.maudi.services.swayidle.timeouts = lib.mkForce [
+    {
+      timeout = 300;
+      command = "${pkgs.swaylock-effects}/bin/swaylock";
+    }
+    {
+      timeout = 1800;
+      command = "systemctl suspend";
+    }
+  ];
 
   # Host-specific kanshi profiles: docked at the desk (two external monitors,
   # internal panel off) or docked at home (internal + HDMI). Prepended
@@ -53,6 +75,10 @@
   ];
 
   # --- WireGuard VPN (uncomment after enrolling secrets/work-laptop/wireguard.yaml) ---
+  # NOTE: the block below reads `config.sops.secrets…`, so when you uncomment it,
+  # add `config` to this module's signature on line 1
+  # (`{ lib, pkgs, ... }:` → `{ lib, pkgs, config, ... }:`); otherwise eval fails
+  # with "config not in scope" (audit S-5).
   # 1. Replace age1PLACEHOLDERworklaptop… in .sops.yaml with the real host key:
   #      cat /etc/ssh/ssh_host_ed25519_key.pub | nix run nixpkgs#ssh-to-age
   # 2. sops edit secrets/work-laptop/wireguard.yaml  (paste the WireGuard private key)

@@ -7,7 +7,9 @@ evidence record for an ISMS review: each requirement is marked ✅ satisfied,
 (NixOS cannot enforce it — handled by process/docs).
 
 Config decisions behind the 🔧 items are recorded in [DECISIONS.md](../DECISIONS.md)
-entry **039**. The pre-existing ✅ hardening baseline is DECISIONS **037**.
+entries **039** and **042–044** (pre-go-live audit fixes: per-host update
+channel, mechanical lock-bump, managed bootstrap password). The pre-existing ✅
+hardening baseline is DECISIONS **037**.
 
 ## §4.1 Inventarisierung — 📄 organisational
 
@@ -29,6 +31,7 @@ its record in the asset register are operational (§4.1).
 |---|---|---|
 | Personal accounts | ✅ | single `maudi` normal user — `modules/nixos/base/users.nix` |
 | Company password policy | 📄 | enforced at the corporate IdP; PAM complexity intentionally **not** added on-device (see Out of scope) |
+| No weak/shared default credential | ✅ 🔧 | bootstrap password ships as a yescrypt **hash** (no plaintext in the Nix store) and is force-expired at first login so the user must set their own — `modules/nixos/base/users.nix` (DECISIONS 044) |
 | Developers may use sudo (password + logging) | ✅ 🔧 | `maudi` in `wheel`, `wheelNeedsPassword` default (prompts); sudo logging added — `modules/nixos/base/hardening.nix` (`use_pty`, `logfile=/var/log/sudo.log`) |
 | No direct root logins | ✅ | root account locked (`hashedPassword = "!"`) + SSH daemon off — `modules/nixos/base/hardening.nix` |
 | Logging of security-relevant actions | 🔧 | auditd + rules for privilege escalation and identity/sudoers changes — `modules/nixos/base/audit.nix` |
@@ -37,8 +40,8 @@ its record in the asset register are operational (§4.1).
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| All packages kept current | ✅ 🔧 | `system.autoUpgrade` from `main`, now **daily** — `modules/nixos/base/updates.nix` |
-| Security updates ≤ 72h | 🔧 | daily cadence keeps the worst-case window < 24h (was `weekly` ≈ 7d) |
+| All packages kept current | ✅ 🔧 | daily `system.autoUpgrade`; work-laptop tracks the CI-gated `release` branch, pilot/desktop track `main` — `modules/nixos/base/updates.nix` (DECISIONS 042) |
+| Security updates ≤ 72h | 🔧 | **mechanical, not process-dependent:** a scheduled CI job runs `nix flake update` daily and auto-merges on green (`.github/workflows/update-lock.yml`, DECISIONS 043); a green commit reaches `main` within a day and `release` as soon as `main` is green — worst-case window < 72h |
 | No EOL systems | ✅ | nixpkgs is `nixos-unstable` (DECISIONS log) |
 | Monthly update confirmation | 📄 | process note in [runbooks/compliance-tasks.md](../runbooks/compliance-tasks.md) |
 
@@ -49,10 +52,10 @@ Run without a classic AV scanner; the mandatory compensating controls:
 | Control | Status | Evidence |
 |---|---|---|
 | Firewall, default-deny inbound | ✅ | `networking.firewall.enable` + nftables — `modules/nixos/base/hardening.nix` |
-| Timely security updates (≤ 72h) | 🔧 | daily auto-upgrade (§4.4) |
+| Timely security updates (≤ 72h) | 🔧 | scheduled lock-bump + auto-merge + daily auto-upgrade (§4.4, DECISIONS 043) |
 | Signed package sources only | ✅ | Nix substituters are cryptographically signed (trusted public keys); no third-party unsigned repos |
 | Restricted user rights (sudo on demand) | ✅ | least-privilege single user, sudo prompts (§4.3) |
-| VPN + MFA for remote access | 🔶 | WireGuard is templated in `hosts/work-laptop/default.nix` (activated separately with real keys); MFA enforced at the corporate VPN/IdP |
+| VPN + MFA for remote access | 🔶 | WireGuard is templated in `hosts/work-laptop/default.nix` (activated separately with real keys; the template's `config` scope trap from audit S-5 is fixed); MFA enforced at the corporate VPN/IdP |
 | SSH hardening (no password logins); keys passphrase-protected | ✅ | SSH **daemon disabled** entirely — no inbound SSH surface. Outbound client keys' passphrases are an operational user obligation |
 | Logging of security-relevant events | 🔧 | auditd + persistent journald — `modules/nixos/base/audit.nix` |
 
@@ -82,8 +85,9 @@ are a process — checklist in [runbooks/compliance-tasks.md](../runbooks/compli
 The 🔧 items are guarded so they cannot silently regress:
 
 - **Eval assertions** (`flake.nix` `baseAssertions`, all hosts): auditd enabled,
-  `autoUpgrade.dates == "daily"`, plus the existing SSH-off / root-locked /
-  firewall-on checks.
+  `autoUpgrade.dates == "daily"`, the update-channel routing (work-laptop on
+  `…/release`, others on `main`; DECISIONS 042), plus the existing SSH-off /
+  root-locked / firewall-on checks.
 - **VM test** (`flake.nix` `test-base-system`): `auditd.service` active with the
   `priv_esc` rule loaded, `/var/log/sudo.log` configured, journald persistent,
   SSH not running, nftables input hook present.

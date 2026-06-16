@@ -10,6 +10,7 @@ their tickets:
 | `work-laptop.md` | [14](../tickets/14-host-work-laptop.md) | second migration |
 | `desktop.md` | [15](../tickets/15-host-desktop.md) | final migration |
 | `compliance-tasks.md` | — | recurring/offboarding compliance process (policy §4.4/§4.8) |
+| `updates.md` | — | update/release-promotion model, scheduled lock-bump setup, first-login password (audit ST-1/ST-2, DECISIONS 042–044) |
 
 Each per-machine runbook must cover: pre-migration backup checklist, installation steps
 (ISO, partitioning/disko, LUKS), data migration, first `nixos-rebuild switch`,
