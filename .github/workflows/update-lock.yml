@@ -1,0 +1,69 @@
+# Scheduled flake.lock bump (audit ST-2, DECISIONS 043).
+#
+# `system.autoUpgrade` rebuilds from the *committed* flake.lock — it never runs
+# `nix flake update` — so without this job nothing pulls new nixpkgs on its own
+# and the "security updates ≤ 72h" policy claim (§4.4) would be process-dependent.
+# This runs `nix flake update` daily, opens a PR, and lets it auto-merge once the
+# normal CI (flake-check + build-hosts) is green. Promotion to the work-laptop's
+# `release` branch then happens in promote-release.yml.
+#
+# SETUP (one-time, see docs/runbooks/updates.md):
+#   - Create a fine-grained PAT with `contents: write` + `pull-requests: write`
+#     and store it as the `LOCKBUMP_TOKEN` repo secret. A PAT (not the default
+#     GITHUB_TOKEN) is required so the bot's PR actually triggers CI — PRs opened
+#     by GITHUB_TOKEN do not start `on: pull_request` workflows.
+#   - Repo Settings → General → "Allow auto-merge".
+#   - Protect `main` requiring the `nix flake check` + `Build *` checks, so
+#     auto-merge waits for them.
+name: update-lock
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # daily, 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-lock
+  cancel-in-progress: true
+
+jobs:
+  update-lock:
+    name: Bump flake.lock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use the PAT so the resulting PR triggers CI (GITHUB_TOKEN would not).
+          token: ${{ secrets.LOCKBUMP_TOKEN }}
+          # Don't leave the PAT in .git/config for later steps; create-pull-request
+          # uses its own `token:` input to push (it recommends this).
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@v14
+      - name: Update flake.lock
+        run: nix flake update
+      - name: Open auto-merging PR
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.LOCKBUMP_TOKEN }}
+          base: main
+          branch: automation/flake-lock
+          delete-branch: true
+          # No PR is created if flake.lock is unchanged (peter-evans no-ops on a
+          # clean tree), so the auto-merge step below is simply skipped.
+          commit-message: "flake.lock: scheduled nixpkgs update"
+          title: "flake.lock: scheduled update"
+          body: |
+            Automated `nix flake update` (DECISIONS 043).
+
+            CI (`nix flake check` + per-host `Build *`) gates this PR; auto-merge
+            lands it on green. New nixpkgs then reaches the fleet via
+            `system.autoUpgrade` on the next daily run.
+      - name: Enable auto-merge
+        if: steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.LOCKBUMP_TOKEN }}
+        run: gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"

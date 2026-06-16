@@ -131,6 +131,12 @@ onward. Graphical assertions are left to the relevant ticket (04 for Hyprland,
 
 ## 011 — Update strategy: system.autoUpgrade from git main (2026-06-11)
 
+> **Superseded in part:** the `weekly` cadence below became `daily` in
+> [039](#039); the single shared `main` channel became a per-host split
+> (pilot/desktop on `main`, work-laptop on a CI-gated `release` branch) in
+> [042](#042); and the lock-bump that actually moves the fleet was automated in
+> [043](#043). The "track a flake ref, no auto-reboot" core still holds.
+
 **Context:** Ticket 03 had to replace maudiblue's `rpm-ostreed-automatic.timer`
 staged auto-updates. Options were manual `nixos-rebuild` only, or
 `system.autoUpgrade` pointed at a flake ref.
@@ -1048,3 +1054,140 @@ so a future rule-load regression fails in seconds instead of timing out. This
 turns CI green for the first time since DECISIONS 039. Amends — does not revoke —
 DECISIONS 039: the controls and their keys (`priv_esc`, `identity`, `privileges`,
 `time_change`) are preserved.
+
+## 042 — Per-host update channels: pilot/desktop on `main`, work-laptop on a CI-gated `release` branch (audit ST-1, 2026-06-16)
+
+**Context:** The pre-go-live audit (`docs/audit/pre-golive-review.md`, ST-1)
+flagged that every host — including the HA / policy-bound work-laptop — pulled
+`main` on the same daily timer (DECISIONS 011/039). CI proves a host *builds*,
+not that it *runs* on real hardware, and with one shared channel the work laptop
+could break the same day as the private-laptop pilot. Options considered:
+manual-only on the work laptop (one-line `enable = false`); stagger it a day
+behind with a time delay; or point it at a separate promoted ref.
+
+**Decision:** Split the update channel per host. private-laptop (pilot) and
+desktop keep tracking `main`. The work-laptop tracks a **`release` branch** that
+a CI workflow (`.github/workflows/promote-release.yml`) fast-forwards to a `main`
+commit **once that commit's `build-hosts` CI is green** — build-gated, no time
+delay (the user's call: a runtime soak window was considered and declined). A
+fixed git *tag* cannot serve here because `system.autoUpgrade.flake` needs a
+*moving* pointer; a branch is "the tag the pipeline advances". Wiring:
+`modules/nixos/base/updates.nix` sets `flake = lib.mkDefault "github:…/desktop-nix"`
+(= `main`) and `hosts/work-laptop/default.nix` overrides it to `…/desktop-nix/release`.
+All hosts stay on the same `daily` cadence (DECISIONS 039 unchanged). The
+threading uses `mkDefault` + a per-host override rather than a `mkHost`
+specialArg because the nixosTest nodes import the host `default.nix` files
+directly (not via `mkHost`), so a required specialArg would break eval.
+
+**Consequences:** `flake.nix` `baseAssertions` gains a hostname-aware check
+(work-laptop's `autoUpgrade.flake` ends in `/release`; the others do not), so the
+routing cannot silently regress. The `release` branch must exist before the work
+laptop's `autoUpgrade` works — it is created on the first `promote-release` run
+(pushing to a missing ref creates it) or seeded manually
+(`git push origin main:release`); see `docs/runbooks/updates.md`. Supersedes the
+single-channel half of DECISIONS 011. ST-4 (desktop's bleeding-edge kernel on the
+fast channel) is mitigated by DECISIONS 045 (bounded rollback) rather than by
+slowing the desktop down.
+
+## 043 — Scheduled flake.lock auto-update, auto-merge on green (audit ST-2, 2026-06-16)
+
+**Context:** Audit ST-2: `system.autoUpgrade` runs `nixos-rebuild --flake …`,
+which rebuilds from the **committed** `flake.lock`; it does **not** run
+`nix flake update`. So new nixpkgs (and security fixes) only reach hosts when a
+human bumps the lock and merges, and CI ran only `on: push`/`pull_request` with
+no `schedule:`. The §4.4/§4.5 "security updates ≤ 72h" claim was therefore
+process-dependent, not mechanical.
+
+**Decision:** Add `.github/workflows/update-lock.yml`: a daily (`schedule`)
+job that runs `nix flake update`, opens a PR via `peter-evans/create-pull-request`,
+and enables native auto-merge so the existing CI (`flake check` + `build-hosts`)
+gates it and it lands on green. The user chose auto-merge-on-green over a manual
+merge gate (fast security updates; "daily on Silverblue never broke"). Promotion
+to the work-laptop `release` branch then follows via DECISIONS 042. The bot uses
+a fine-grained PAT (`LOCKBUMP_TOKEN`) rather than the default `GITHUB_TOKEN`,
+because PRs/pushes made with `GITHUB_TOKEN` do not trigger `on: pull_request` /
+`on: push` workflows — without a PAT the bot PR's CI would never start and
+auto-merge would never fire.
+
+**Consequences:** New one-time repo setup, documented in
+`docs/runbooks/updates.md`: create the `LOCKBUMP_TOKEN` secret (`contents` +
+`pull-requests` write), enable "Allow auto-merge", and protect `main` requiring
+the `nix flake check` + `Build *` checks so auto-merge waits for them. With this
+in place the ≤72h window is mechanical: nixpkgs fix → daily lock-bump PR →
+auto-merge on green → `main` (pilot/desktop) within a day, `release` (work-laptop)
+as soon as `main` is green. The compliance mapping §4.4/§4.5 is updated to cite
+this job.
+
+## 044 — Bootstrap password: hashed + forced first-login change (audit S-1, 2026-06-16)
+
+**Context:** Audit S-1: `modules/nixos/base/users.nix` shipped
+`initialPassword = "changeme"` — weak, identical on every host, **and** landing
+as plaintext in the world-readable Nix store. A stale comment claimed Ticket 12
+(secrets) had replaced it; it had not. The proper sops path
+(`hashedPasswordFile`) needs real host age keys, which are still unenrolled
+(audit S-4), so it cannot be validated in CI yet.
+
+**Decision:** Ship the bootstrap credential as a **hash** via
+`initialHashedPassword` (yescrypt, generated with `mkpasswd -m yescrypt`) so no
+plaintext reaches the store, set `users.mutableUsers = true` explicitly, and
+**force a one-time password change at first login** with a
+`system.activationScripts` step that runs `chage -d 0 maudi` guarded by a stamp
+file (`/var/lib/nixos/.maudi-initial-pw-expired`) so a later rebuild never
+re-expires a password the user has since set. This matches the user's preference
+("plaintext is fine *only* if a first-login change is forced; otherwise hash it")
+— we do both. Migrating to a sops `hashedPasswordFile` remains the documented
+next step once host keys are enrolled.
+
+**Consequences:** `modules/nixos/base/users.nix` carries the hash, the explicit
+`mutableUsers`, and the activation step; the stale Ticket-12 comment is removed.
+No machine ships a store-readable plaintext password, and every machine forces
+the user off the shared bootstrap secret at first login. The hash is a throwaway
+bootstrap value — replace it (or wire sops) per `docs/runbooks/updates.md`.
+
+## 045 — Bounded rollback: systemd-boot configurationLimit (audit ST-3/ST-4, 2026-06-16)
+
+**Context:** Audit ST-3: `boot.nix` set no
+`boot.loader.systemd-boot.configurationLimit`, so the boot menu was unbounded,
+and GC (`nix.nix`, `--delete-older-than 30d`) bounded the rollback set by *time*,
+not by a count of known-good generations — exactly the safety net an HA machine
+(and the desktop's bleeding-edge CachyOS kernel, ST-4) leans on after a bad
+unattended upgrade.
+
+**Decision:** Set `boot.loader.systemd-boot.configurationLimit = 20` fleet-wide
+in `modules/nixos/base/boot.nix`. Combined with `allowReboot = false` (a bad
+kernel only bites on the next *manual* reboot, with the prior generation still in
+the menu), this is judged sufficient for ST-4 — pinning the desktop kernel was
+rejected as fighting the fast-security-update goal (DECISIONS 042/043).
+
+**Consequences:** Always at least 20 generations available to roll back to from
+the boot menu, independent of the 30-day GC window. The desktop's bleeding-edge
+kernel keeps a known-good fallback; the threat model for an unattended bad kernel
+bump is "reboot, pick the previous generation".
+
+## 046 — Go-live security posture: conscious-decision items kept deliberately (audit S-2/S-3/S-6/S-7/ST-6/Q-5, 2026-06-16)
+
+**Context:** Several audit findings are flagged as conscious-decision / ADR
+items, not defects — each a "keep or trim" call for go-live. The user reviewed
+them and chose to keep the current behaviour, with concrete reasons.
+
+**Decision (keep as-is, recorded here so they are deliberate, not drift):**
+
+- **S-6 `hardware.bluetooth.powerOnBoot = true`** (`audio.nix`): **kept** — the
+  user's keyboard is Bluetooth, so powering the radio on at boot is required to
+  log in. Turning it off would lock the user out of the machine.
+- **S-2 `trusted-users = [ "root" "maudi" ]`** (`nix.nix`) and **S-3/S-7 libvirt
+  + `qemu.runAsRoot`** (`virtualisation/libvirt.nix`, DECISIONS 028): **kept** —
+  the user's Docker/VM workflows depend on them; trimming risks breaking daily
+  development. `maudi` being daemon-root-equivalent and the always-on `virbr0`
+  NAT are accepted on this single-user developer machine.
+- **Q-5 `alsa.support32Bit = true`** fleet-wide (`audio.nix`): **kept** — harmless
+  on the laptops; not worth a per-host split.
+- **ST-6 Zen Browser `twilight`** (`apps.nix`, DECISIONS 030): **kept** — the
+  user is comfortable with fast-moving software (the whole fleet tracks
+  `nixos-unstable` daily), and `twilight` is the only reproducible Zen channel.
+
+**Consequences:** These are now documented go-live decisions rather than open
+audit findings. The residual exposure (daemon-root-equivalent `maudi`, BT attack
+surface, root QEMU, a nightly browser) is accepted for a single-user developer
+fleet and noted in the audit resolution log
+(`docs/audit/pre-golive-review.md`).

@@ -27,7 +27,7 @@
 
   home-manager.users.maudi.home.packages = [
     pkgs.spotify
-    inputs.zen-browser.packages.${pkgs.system}.twilight
+    inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
     pkgs.mpv
     pkgs.imv
   ];

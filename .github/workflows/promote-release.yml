@@ -1,0 +1,54 @@
+# Promote main → release (audit ST-1, DECISIONS 042).
+#
+# The work-laptop tracks the `release` branch instead of `main` so it never
+# auto-upgrades to a revision that failed to build. This workflow fast-forwards
+# `release` to a `main` commit only after that commit's CI (flake-check +
+# build-hosts) has gone green. The chosen model is build-gated with no time
+# delay: as soon as main is green, release follows.
+#
+# `workflow_run` only fires for workflow files that exist on the default branch,
+# so this takes effect once it is merged to `main`. Pushing to a non-existent
+# `release` ref creates it, so the model is self-bootstrapping; you can also run
+# it once manually (workflow_dispatch) to seed `release`.
+name: promote-release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote-release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Fast-forward release
+    # Only promote a green CI run (or a manual dispatch).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          # Don't persist the token in .git/config; the push below auths explicitly.
+          persist-credentials: false
+      - name: Fast-forward release to the tested commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "Promoting $sha to release"
+          # No --force: a non-fast-forward push is rejected, which is the desired
+          # safety property (release only ever advances along main's history).
+          # GH_TOKEN is auto-masked in the logs.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}" \
+            "$sha:refs/heads/release"
