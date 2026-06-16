@@ -7,7 +7,7 @@ return {
 	event = { "BufReadPre", "BufNewFile" },
 	dependencies = {
 		-- All LSP servers come from Nix (home.packages), so the Mason stack was
-		-- removed (DECISIONS 028) — it installed nothing and only added
+		-- removed (DECISIONS 047) — it installed nothing and only added
 		-- indirection. Servers are enabled directly via vim.lsp.enable() below.
 
 		-- Useful status updates for LSP.

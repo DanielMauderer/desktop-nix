@@ -487,7 +487,7 @@ Nix, Mason doesn't know about them). Core LSP/formatting/debugging functionality
 is unaffected — binaries are on PATH and found automatically by
 lspconfig/conform/dap.
 
-> **Superseded by DECISION 040 (2026-06-16):** the Mason stack was removed
+> **Superseded by DECISION 047 (2026-06-16):** the Mason stack was removed
 > entirely; Mason no longer runs. The LSP Manager picker (`<leader>lm`) was also
 > rewritten to a hardcoded server list (it no longer calls
 > `mason-lspconfig.get_installed_servers()`), so the picker is populated, not
@@ -1197,7 +1197,7 @@ surface, root QEMU, a nightly browser) is accepted for a single-user developer
 fleet and noted in the audit resolution log
 (`docs/audit/pre-golive-review.md`).
 
-## 041 — Neovim: remove the Mason stack entirely (NV-Q-6, 2026-06-16)
+## 047 — Neovim: remove the Mason stack entirely (NV-Q-6, 2026-06-16)
 
 **Context:** DECISION 025 kept `mason.nvim`, `mason-lspconfig.nvim`,
 `mason-tool-installer.nvim` and `mason-nvim-dap.nvim` as a "UI layer only" with
@@ -1220,10 +1220,10 @@ fewer Go/Rust-free plugin set to clone on a fresh install. `:Mason` is gone;
 `:checkhealth` no longer reports Mason. Finishes what DECISION 025 started (025's
 consequence note is updated to point here).
 
-## 042 — Neovim: lean-down + security/quality fixes from the nvim audit (2026-06-16)
+## 048 — Neovim: lean-down + security/quality fixes from the nvim audit (2026-06-16)
 
 **Context:** `docs/audit/nvim-review.md` raised stability/security/quality items
-beyond the Mason removal (041). The user chose, per finding, to lean the config
+beyond the Mason removal (047). The user chose, per finding, to lean the config
 down and apply the fixes.
 
 **Decision:**

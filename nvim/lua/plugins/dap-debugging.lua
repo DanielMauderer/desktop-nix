@@ -7,7 +7,7 @@ return {
 		"mfussenegger/nvim-dap",
 		event = "VeryLazy",
 		-- DAP adapters (gdb, js-debug-adapter) come from Nix (home.packages); the
-		-- Mason stack was removed (DECISIONS 028) as it installed nothing.
+		-- Mason stack was removed (DECISIONS 047) as it installed nothing.
 		dependencies = {
 			"rcarriga/nvim-dap-ui",
 			"nvim-neotest/nvim-nio",

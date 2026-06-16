@@ -17,7 +17,7 @@ was changed**).
 > recommendations actively favour a **leaner** config; nothing here removes a
 > plugin for you.
 
-> **Resolution (2026-06-16).** The findings were applied (see DECISIONS 041 + 042):
+> **Resolution (2026-06-16).** The findings were applied (see DECISIONS 047 + 048):
 > - **Cut** `hardtime` (NV-ST-1), `fff`, `fzf.vim`+bare `fzf`, `typr`, and the
 >   integrations `jira`/`gitlab`/`obsidian`/`kulala` (NV-Q-3/Q-4); deleted
 >   `fyler.lua.disabled`. `oil` kept but lazy-loaded.
