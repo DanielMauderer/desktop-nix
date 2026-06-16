@@ -410,6 +410,11 @@
                   assertion =
                     !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
                 }
+                # Waydroid (Ticket 16 / DECISIONS 040) is opt-in on private-laptop.
+                {
+                  name = "waydroid enabled (Ticket 16)";
+                  assertion = cfg.virtualisation.waydroid.enable;
+                }
               ]
             )
             ''
@@ -433,6 +438,12 @@
                   name = "no gaming stack (scx + steam disabled)";
                   assertion =
                     !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
+                }
+                # Waydroid (Ticket 16 / DECISIONS 040): the Android container is
+                # deliberately absent from the work laptop.
+                {
+                  name = "waydroid NOT enabled (Ticket 16)";
+                  assertion = !cfg.virtualisation.waydroid.enable;
                 }
                 {
                   name = "kanshi: docked profiles before fallback";
@@ -483,6 +494,11 @@
                 {
                   name = "MangoHud enabled in maudi's home";
                   assertion = cfg.home-manager.users.maudi.programs.mangohud.enable;
+                }
+                # Waydroid (Ticket 16 / DECISIONS 040) is opt-in on desktop.
+                {
+                  name = "waydroid enabled (Ticket 16)";
+                  assertion = cfg.virtualisation.waydroid.enable;
                 }
                 {
                   name = "kanshi: dual-head profile before fallback";
@@ -571,7 +587,13 @@
             # up with our rules loaded, sudo logs to its dedicated file, and the
             # journal is persistent.
             machine.wait_for_unit("auditd.service")
-            machine.wait_until_succeeds("auditctl -l | grep -q priv_esc")
+            # Rules are applied by the audit-rules-nixos.service oneshot at
+            # sysinit (before multi-user.target, already reached above). Assert
+            # it succeeded and the priv_esc rule is live — `succeed`, not a long
+            # `wait_until_succeeds`, so a future rule-load regression fails in
+            # seconds instead of timing out after 900s (DECISIONS 041).
+            machine.succeed("systemctl is-active audit-rules-nixos.service")
+            machine.succeed("auditctl -l | grep -q priv_esc")
             machine.succeed("grep -q 'logfile=/var/log/sudo.log' /etc/sudoers")
             # Storage=persistent makes journald keep logs under /var/log/journal.
             machine.succeed("test -d /var/log/journal")
@@ -714,6 +736,41 @@
             # virt-manager GUI + virt-viewer console client are installed.
             machine.succeed("test -x /run/current-system/sw/bin/virt-manager")
             machine.succeed("test -x /run/current-system/sw/bin/virt-viewer")
+          '';
+        };
+
+        # Waydroid (Ticket 16, private-laptop + desktop): the shared testNode
+        # boots private-laptop, which imports modules/nixos/waydroid. Assert the
+        # CLI and the waydroid-container service unit are installed and the
+        # Hyprland window rules landed. A full Android session needs binder +
+        # KVM and an imperative `waydroid init` image download, so starting the
+        # container is left to manual on-hardware testing (Ticket 16 checklist).
+        test-waydroid = testLib.makeTest {
+          name = "waydroid";
+          nodes.machine = testNode;
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+
+            # The waydroid CLI is on PATH and its container service unit is
+            # defined (not necessarily active without binder/KVM).
+            machine.succeed("test -x /run/current-system/sw/bin/waydroid")
+            machine.succeed("systemctl cat waydroid-container.service")
+
+            # Hyprland integration: the opt-in window rules for the Android
+            # toplevels were merged into maudi's rendered hyprland.conf.
+            machine.wait_for_unit("home-manager-maudi.service")
+            machine.succeed(
+                "grep -q 'windowrule=float, class:\\^(waydroid.*)\\$' "
+                "/home/maudi/.config/hypr/hyprland.conf"
+            )
+            machine.succeed(
+                "grep -q 'windowrule=float, title:\\^(Waydroid)\\$' "
+                "/home/maudi/.config/hypr/hyprland.conf"
+            )
+            machine.succeed(
+                "grep -q 'windowrule=idleinhibit focus, class:\\^(waydroid.*)\\$' "
+                "/home/maudi/.config/hypr/hyprland.conf"
+            )
           '';
         };
 

@@ -3,6 +3,7 @@
 #             secrets + the shell/neovim/dev home modules
 #   desktop → Hyprland session, greeter, theming, power-profiles-daemon,
 #             brightnessctl + the waybar/kanshi/rofi/etc. home modules
+#   waydroid → Android container (opt-in; private-laptop + desktop, DECISIONS 040)
 # plus laptop hardware enablement (hardware.nix: Intel iGPU/VAAPI, firmware,
 # microcode, zram). The disko disk layout (disk.nix) is wired in via flake.nix's
 # mkHost module list, not here, so the nixosTest VMs that import this file boot
@@ -16,6 +17,9 @@ _: {
   imports = [
     ../../modules/nixos/base
     ../../modules/nixos/desktop
+    # Waydroid (Ticket 16 / DECISIONS 040) is opt-in per host: the private
+    # laptop and desktop run the Android container, work-laptop does not.
+    ../../modules/nixos/waydroid
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after the install-time
     # `nixos-generate-config --no-filesystems` (see docs/runbooks/private-laptop.md)

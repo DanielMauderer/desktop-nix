@@ -42,5 +42,5 @@ Migration tickets, numbered in rough execution order. See
 | 13 | [Host: private-laptop (PILOT)](13-host-private-laptop-pilot.md) | 3 | 03–07, 10 | private-laptop | done |
 | 14 | [Host: work-laptop](14-host-work-laptop.md) | 3 | 08, 09, 12, 13 | work-laptop | done |
 | 15 | [Host: desktop](15-host-desktop.md) | 3 | 08, 09, 11, 13 | desktop | done |
-| 16 | [Waydroid](16-waydroid.md) | 2 | 03 | TBD (maybe drop) | open |
+| 16 | [Waydroid](16-waydroid.md) | 2 | 03 | private-laptop, desktop | done |
 | 17 | [Archive old repos](17-archive-old-repos.md) | 4 | 13, 14, 15 | — | open |

@@ -21,7 +21,7 @@ Status legend: `open` → `migrated` / `dropped`.
 | fastfetch | system info | home package + config port | 06 | migrated |
 | wlogout | logout menu | hyprland desktop module | 04 | migrated |
 | NetworkManager-tui | network TUI | NetworkManager (nmtui included) | 03 | migrated |
-| waydroid | Android container | `virtualisation.waydroid` (keep? ask) | 16 | open |
+| waydroid | Android container | `virtualisation.waydroid` opt-in module — private-laptop + desktop only, dropped on work-laptop (DECISIONS 040) | 16 | migrated |
 | virt-manager, libvirt, qemu-kvm, virt-viewer | VMs | `virtualisation.libvirtd` module | 09 | open |
 | lxqt-policykit | polkit agent | hyprpolkitagent instead (DECISIONS 018) | 04 | migrated |
 | swaylock | lock screen | desktop module (swaylock-effects) | 04 | migrated |

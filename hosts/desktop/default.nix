@@ -5,6 +5,7 @@
 #   desktop → Hyprland session, greeter, theming + the waybar/kanshi/rofi home
 #             modules
 #   gaming  → CachyOS kernel, scx, Steam, AMD GPU + LACT, MangoHud (desktop-only)
+#   waydroid → Android container (opt-in; private-laptop + desktop, DECISIONS 040)
 # plus AMD hardware enablement (hardware.nix: kvm-amd, amd-ucode, amdgpu KMS,
 # radeonsi VAAPI, zram). The disko disk layout (disk.nix) is wired in via
 # flake.nix's mkHost module list, not here, so the nixosTest VMs that import
@@ -17,6 +18,9 @@
     # Gaming/CachyOS stack is desktop-only (Ticket 11): CachyOS kernel, scx,
     # Steam, AMD GPU + LACT, MangoHud. The laptops (Intel) never import it.
     ../../modules/nixos/gaming
+    # Waydroid (Ticket 16 / DECISIONS 040) is opt-in per host: the desktop and
+    # private laptop run the Android container, work-laptop does not.
+    ../../modules/nixos/waydroid
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after the install-time
     # `nixos-generate-config --no-filesystems` (see docs/runbooks/desktop.md)

@@ -956,3 +956,95 @@ work-laptop. Full mapping: `docs/compliance/linux-workstation-policy.md`.
 `priv_esc` rule, `/var/log/sudo.log` configured, and journald persistent — so the
 controls cannot silently regress. Verified on real hardware post-migration per
 `docs/runbooks/work-laptop.md`.
+
+## 040 — Waydroid: keep on private-laptop + desktop, drop on work-laptop (Ticket 16, 2026-06-16)
+
+**Context:** Ticket 16's first sub-task was a decision, not an implementation:
+maudiblue layered the `waydroid` rpm into the image (`recipes/recipe.yml`), but
+nothing else in the old setup referenced it — no `waydroid init` automation, no
+GAPPS image, no Hyprland window rules in the MyLinux dotfiles. The ticket flagged
+it as the most likely "consciously dropped" row in `INVENTORY.md` and said to
+confirm usage before porting.
+
+**Decision:** Keep the Android container, but make it **opt-in per host** rather
+than global like libvirt (DECISIONS 028). It lands on the two personal machines —
+**private-laptop** and **desktop** — and is deliberately **absent from
+work-laptop**, whose security baseline (DECISIONS 037/039) has no place for an
+Android runtime nobody on that machine needs.
+
+- **Module:** new `modules/nixos/waydroid/default.nix` sets
+  `virtualisation.waydroid.enable = true` (parity with the layered rpm: pulls in
+  the waydroid CLI, lxc tooling and binder bits, registers
+  `waydroid-container.service`). Imported only from `hosts/private-laptop` and
+  `hosts/desktop`, **not** from `modules/nixos/base` — the same desktop-only
+  pattern the gaming stack uses (DECISIONS 034).
+- **Hyprland integration:** the module contributes three `windowrule`s to maudi's
+  home Hyprland config (float the `waydroid.*` app toplevels and the `Waydroid`
+  full-UI launcher in multi-window mode; idle-inhibit while an Android window is
+  focused). They merge with the shared `windowrule` list in
+  `modules/home/desktop/hyprland.nix` and only land on the waydroid hosts.
+- **Stays imperative** (documented in the module header): `sudo waydroid init`
+  (one-time system/vendor image download; `-s GAPPS` for the Play image),
+  `waydroid session start` / `show-full-ui`, and the Android data under
+  `~/.local/share/waydroid` + `/var/lib/waydroid` (user state, kept out of the
+  store).
+
+**Open question deferred:** the GAPPS / Google-Play image (device registration +
+licensing hassle) is *not* wired in. `waydroid init` defaults to the vanilla
+LineageOS image; GAPPS stays a manual `-s GAPPS` choice if a Play-only app ever
+forces it.
+
+**Consequences:** `flake.nix` `host-assertions-private-laptop` and
+`host-assertions-desktop` assert `virtualisation.waydroid.enable`, and
+`host-assertions-work-laptop` asserts it is **off** — so the per-host split
+cannot silently regress. A new `test-waydroid` nixosTest (on the shared
+private-laptop test node) checks the CLI and `waydroid-container.service` unit are
+installed and the window rules rendered; a full Android boot needs binder + KVM +
+the imperative image download, so it is left to on-hardware manual testing.
+
+## 041 — Audit rules: syscall-based priv-esc, drop nonexistent-path watches (fix DECISIONS 039, 2026-06-16)
+
+**Context:** The `test-base-system` nixosTest had been failing in CI ever since
+DECISIONS 039 added auditd — `main` itself was red. The assertion
+`machine.wait_until_succeeds("auditctl -l | grep -q priv_esc")` timed out after
+900s because **no audit rules were ever loaded**. NixOS applies
+`security.audit.rules` from `audit-rules-nixos.service`, a oneshot that runs at
+`sysinit.target` (`DefaultDependencies = false`, `before sysinit.target`) and
+calls `auditctl -R rules`. `auditctl -R` aborts the *entire* load on the first
+erroring line, and `auditctl` resolves `-w` watch paths to an inode at load time.
+Three watched paths do not exist when the rules load:
+
+- `/run/wrappers/bin/sudo` — the setuid wrappers tmpfs (`/run/wrappers`) is
+  populated by `suid-sgid-wrappers.service`, much later than sysinit. This was
+  line 5 (the first rule), so it aborted every load: `Error sending add rule
+  data request (No such file or directory) … There was an error in line 5 … No
+  rules`.
+- `/etc/gshadow` — NixOS's users-groups activation writes `/etc/{passwd,shadow,
+  group}` but never `/etc/gshadow`.
+- `/etc/sudoers.d` — the sudo module manages only `/etc/sudoers`, not a
+  `sudoers.d` directory.
+
+This failed identically on real hardware; it was only ever "verified" as
+`auditd.service` being active, not as rules being live, and the PR merged red.
+
+**Decision:** Keep the §4.3/4.5/4.6 intent (log privilege escalation, identity/
+authorisation-DB changes, and time changes) but make the rule set load-order- and
+path-independent:
+
+- **Privilege escalation** is now syscall-based instead of a wrapper-path watch:
+  `-a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=4294967295 -k priv_esc`
+  (plus the `b32` ABI). This flags any logged-in user (`auid >= 1000`) executing
+  a program that runs as root (`euid 0`) — i.e. sudo/su and kin — and resolves
+  no path at load time. It is also broader than the old two-wrapper watch.
+- **Identity/authorisation watches** keep only the files NixOS actually creates
+  (`/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/sudoers`); the `/etc/gshadow`
+  and `/etc/sudoers.d` watches are dropped (nothing exists there to watch).
+- **time_change** is unchanged (already syscall-based).
+
+**Consequences:** `modules/nixos/base/audit.nix` carries the new rule set.
+`test-base-system` now asserts `audit-rules-nixos.service` is active and the
+`priv_esc` rule is live with plain `succeed` (not a 900s `wait_until_succeeds`),
+so a future rule-load regression fails in seconds instead of timing out. This
+turns CI green for the first time since DECISIONS 039. Amends — does not revoke —
+DECISIONS 039: the controls and their keys (`priv_esc`, `identity`, `privileges`,
+`time_change`) are preserved.
