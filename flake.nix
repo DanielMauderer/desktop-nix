@@ -757,6 +757,14 @@
                 "grep -q 'windowrule=float, class:\\^(waydroid.*)\\$' "
                 "/home/maudi/.config/hypr/hyprland.conf"
             )
+            machine.succeed(
+                "grep -q 'windowrule=float, title:\\^(Waydroid)\\$' "
+                "/home/maudi/.config/hypr/hyprland.conf"
+            )
+            machine.succeed(
+                "grep -q 'windowrule=idleinhibit focus, class:\\^(waydroid.*)\\$' "
+                "/home/maudi/.config/hypr/hyprland.conf"
+            )
           '';
         };
 
