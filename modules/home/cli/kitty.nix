@@ -20,7 +20,7 @@ _: {
     cursor_stop_blinking_after = 1;
     cursor_trail_length = 1;
 
-    scrollback_lines = 2000;
+    scrollback_lines = 10000;
     wheel_scroll_min_lines = 1;
 
     enable_audio_bell = "no";
