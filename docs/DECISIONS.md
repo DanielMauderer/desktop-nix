@@ -1001,3 +1001,50 @@ cannot silently regress. A new `test-waydroid` nixosTest (on the shared
 private-laptop test node) checks the CLI and `waydroid-container.service` unit are
 installed and the window rules rendered; a full Android boot needs binder + KVM +
 the imperative image download, so it is left to on-hardware manual testing.
+
+## 041 — Audit rules: syscall-based priv-esc, drop nonexistent-path watches (fix DECISIONS 039, 2026-06-16)
+
+**Context:** The `test-base-system` nixosTest had been failing in CI ever since
+DECISIONS 039 added auditd — `main` itself was red. The assertion
+`machine.wait_until_succeeds("auditctl -l | grep -q priv_esc")` timed out after
+900s because **no audit rules were ever loaded**. NixOS applies
+`security.audit.rules` from `audit-rules-nixos.service`, a oneshot that runs at
+`sysinit.target` (`DefaultDependencies = false`, `before sysinit.target`) and
+calls `auditctl -R rules`. `auditctl -R` aborts the *entire* load on the first
+erroring line, and `auditctl` resolves `-w` watch paths to an inode at load time.
+Three watched paths do not exist when the rules load:
+
+- `/run/wrappers/bin/sudo` — the setuid wrappers tmpfs (`/run/wrappers`) is
+  populated by `suid-sgid-wrappers.service`, much later than sysinit. This was
+  line 5 (the first rule), so it aborted every load: `Error sending add rule
+  data request (No such file or directory) … There was an error in line 5 … No
+  rules`.
+- `/etc/gshadow` — NixOS's users-groups activation writes `/etc/{passwd,shadow,
+  group}` but never `/etc/gshadow`.
+- `/etc/sudoers.d` — the sudo module manages only `/etc/sudoers`, not a
+  `sudoers.d` directory.
+
+This failed identically on real hardware; it was only ever "verified" as
+`auditd.service` being active, not as rules being live, and the PR merged red.
+
+**Decision:** Keep the §4.3/4.5/4.6 intent (log privilege escalation, identity/
+authorisation-DB changes, and time changes) but make the rule set load-order- and
+path-independent:
+
+- **Privilege escalation** is now syscall-based instead of a wrapper-path watch:
+  `-a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=4294967295 -k priv_esc`
+  (plus the `b32` ABI). This flags any logged-in user (`auid >= 1000`) executing
+  a program that runs as root (`euid 0`) — i.e. sudo/su and kin — and resolves
+  no path at load time. It is also broader than the old two-wrapper watch.
+- **Identity/authorisation watches** keep only the files NixOS actually creates
+  (`/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/sudoers`); the `/etc/gshadow`
+  and `/etc/sudoers.d` watches are dropped (nothing exists there to watch).
+- **time_change** is unchanged (already syscall-based).
+
+**Consequences:** `modules/nixos/base/audit.nix` carries the new rule set.
+`test-base-system` now asserts `audit-rules-nixos.service` is active and the
+`priv_esc` rule is live with plain `succeed` (not a 900s `wait_until_succeeds`),
+so a future rule-load regression fails in seconds instead of timing out. This
+turns CI green for the first time since DECISIONS 039. Amends — does not revoke —
+DECISIONS 039: the controls and their keys (`priv_esc`, `identity`, `privileges`,
+`time_change`) are preserved.

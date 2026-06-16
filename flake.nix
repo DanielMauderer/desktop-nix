@@ -587,7 +587,13 @@
             # up with our rules loaded, sudo logs to its dedicated file, and the
             # journal is persistent.
             machine.wait_for_unit("auditd.service")
-            machine.wait_until_succeeds("auditctl -l | grep -q priv_esc")
+            # Rules are applied by the audit-rules-nixos.service oneshot at
+            # sysinit (before multi-user.target, already reached above). Assert
+            # it succeeded and the priv_esc rule is live — `succeed`, not a long
+            # `wait_until_succeeds`, so a future rule-load regression fails in
+            # seconds instead of timing out after 900s (DECISIONS 041).
+            machine.succeed("systemctl is-active audit-rules-nixos.service")
+            machine.succeed("auditctl -l | grep -q priv_esc")
             machine.succeed("grep -q 'logfile=/var/log/sudo.log' /etc/sudoers")
             # Storage=persistent makes journald keep logs under /var/log/journal.
             machine.succeed("test -d /var/log/journal")
