@@ -1,5 +1,5 @@
 /* Ported from the old wlogout/style.css. The mocha.css / matugen.css @imports
- * and the per-button PNG icon backgrounds are dropped. @base/@mauve are
+ * and the per-button PNG icon backgrounds are dropped. @base/@mauve/@text are
  * prepended by wlogout.nix from the stylix palette (DECISIONS 022). */
 * {
   background-image: none;
@@ -12,7 +12,7 @@ window {
 }
 
 button {
-  color: #e2e2e9;
+  color: @text;
   background-color: alpha(@base, 0.90);
   outline-style: none;
   border: none;

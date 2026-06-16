@@ -24,7 +24,7 @@
 
 }
 
-#window#waybar {
+window#waybar {
     color: @text;
     background-color: @base;
     transition-property:  background-color;
@@ -83,16 +83,8 @@ button:hover {
     font-size: 14px;
 }
 
-#custom-notification {
-    color: @text;
-}
-
 #group-10,
 #group-9,
-#group-8,
-#group-7,
-#group-6,
-#group-10,
 #group-5,
 #group-4,
 #group-3,
@@ -109,8 +101,7 @@ button:hover {
 }
 
 #network.disconnected,
-#pulseaudio.muted,
-#wireplumber.muted {
+#pulseaudio.muted {
     color: @red;
 }
 
@@ -137,9 +128,9 @@ label:focus {
 }
 
 #custom-vpn.connected {
-    color: #a6e3a1;
+    color: @green;
 }
 
 #custom-vpn.disconnected {
-    color: #f38ba8;
+    color: @red;
 }

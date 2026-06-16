@@ -78,14 +78,12 @@ in
         "GDK_SCALE,1"
         "GDK_BACKEND,wayland,x11,*"
         "CLUTTER_BACKEND,wayland"
-        "XCURSOR_SIZE,24"
         "OZONE_PLATFORM,wayland"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
         "SDL_VIDEODRIVER,wayland"
       ];
 
       exec-once = [
-        "hyprctl setcursor Bibata-Modern-Ice 24"
         "systemctl --user start hyprpolkitagent.service"
         # swaybg paints the stylix wallpaper (a store path; the picker swaps it
         # live and triggers a rebuild that re-derives the palette).
@@ -208,13 +206,9 @@ in
         initial_workspace_tracking = 1;
       };
 
-      # Unified windowrule syntax (string list). Ported from the old
-      # windowrules/default.conf and ml4w.conf; swaync/nwg rules dropped
-      # (dunst + kanshi replace them).
+      # Unified windowrule syntax (string list). Ported from the old window
+      # rules; swaync/nwg rules dropped (swaync + kanshi replace them).
       windowrule = [
-        "tile, title:^(Microsoft-edge)$"
-        "tile, title:^(Brave-browser)$"
-        "tile, title:^(Chromium)$"
         "float, title:^(nm-connection-editor)$"
         "float, title:^(qalculate-gtk)$"
         "idleinhibit fullscreen, class:.*"
@@ -247,11 +241,6 @@ in
         "size 700 600, class:^(org.gnome.Calculator)$"
         "center, class:^(org.gnome.Calculator)$"
 
-        # Emoji picker (smile)
-        "float, class:^(it.mijorus.smile)$"
-        "pin, class:^(it.mijorus.smile)$"
-        "move 100%-w-40 90, class:^(it.mijorus.smile)$"
-
         # Hyprland screen-share picker
         "float, class:^(hyprland-share-picker)$"
         "pin, class:^(hyprland-share-picker)$"
@@ -265,7 +254,6 @@ in
       ];
 
       layerrule = [
-        "noanim, hyprpicker"
         "noanim, selection"
       ];
 
@@ -287,7 +275,7 @@ in
 
         # Window management
         "$mainMod, Q, killactive"
-        "$mainMod SHIFT, Q, exec, hyprctl activewindow | grep pid | tr -d 'pid:' | xargs kill"
+        "$mainMod SHIFT, Q, exec, hyprctl activewindow -j | jq -r '.pid' | xargs -r kill"
         "$mainMod, F, fullscreen, 0"
         "$mainMod, M, fullscreen, 1"
         "$mainMod, T, togglefloating"
@@ -327,10 +315,10 @@ in
         # Media / brightness keys
         ", XF86MonBrightnessUp, exec, brightnessctl -q s +5%"
         ", XF86MonBrightnessDown, exec, brightnessctl -q s 5%-"
-        ", XF86AudioRaiseVolume, exec, pactl set-sink-mute @DEFAULT_SINK@ 0 && pactl set-sink-volume @DEFAULT_SINK@ +5%"
-        ", XF86AudioLowerVolume, exec, pactl set-sink-mute @DEFAULT_SINK@ 0 && pactl set-sink-volume @DEFAULT_SINK@ -5%"
-        ", XF86AudioMute, exec, pactl set-sink-mute @DEFAULT_SINK@ toggle"
-        ", XF86AudioMicMute, exec, pactl set-source-mute @DEFAULT_SOURCE@ toggle"
+        ", XF86AudioRaiseVolume, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"
+        ", XF86AudioLowerVolume, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-"
+        ", XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+        ", XF86AudioMicMute, exec, wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
         ", XF86AudioPlay, exec, playerctl play-pause"
         ", XF86AudioPause, exec, playerctl pause"
         ", XF86AudioNext, exec, playerctl next"

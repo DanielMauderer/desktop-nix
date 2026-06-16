@@ -8,6 +8,7 @@ let
   colorCss = ''
     @define-color base ${c.base00};
     @define-color mauve ${c.base0D};
+    @define-color text ${c.base05};
   '';
 in
 {
@@ -43,12 +44,6 @@ in
         action = "loginctl terminate-user $USER";
         text = "Logout";
         keybind = "e";
-      }
-      {
-        label = "hibernate";
-        action = "systemctl hibernate";
-        text = "Hibernate";
-        keybind = "h";
       }
     ];
     style = colorCss + builtins.readFile ./wlogout-style.css;

@@ -43,7 +43,6 @@ _: {
       shutdown = "systemctl poweroff";
       reboot = "systemctl reboot";
       suspend = "systemctl suspend";
-      hibernate = "systemctl hibernate";
 
       # Git. `gs`=git-spice and lazygit's gh PR commands are dormant until
       # Ticket 08; `lg` is plain lazygit now (was `toolbox run -c dev-tools`).
