@@ -39,10 +39,16 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # Don't persist the token in .git/config; the push below auths explicitly.
+          persist-credentials: false
       - name: Fast-forward release to the tested commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sha="${{ github.event.workflow_run.head_sha || github.sha }}"
           echo "Promoting $sha to release"
           # No --force: a non-fast-forward push is rejected, which is the desired
           # safety property (release only ever advances along main's history).
-          git push origin "$sha:refs/heads/release"
+          # GH_TOKEN is auto-masked in the logs.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}" \
+            "$sha:refs/heads/release"

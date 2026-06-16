@@ -38,6 +38,9 @@ jobs:
         with:
           # Use the PAT so the resulting PR triggers CI (GITHUB_TOKEN would not).
           token: ${{ secrets.LOCKBUMP_TOKEN }}
+          # Don't leave the PAT in .git/config for later steps; create-pull-request
+          # uses its own `token:` input to push (it recommends this).
+          persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@v14
       - name: Update flake.lock
         run: nix flake update
