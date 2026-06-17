@@ -10,18 +10,20 @@
 # `networking.hostId` (required by ZFS for pool-ownership safety) is set in the
 # host's hardware.nix, since it must be unique per machine.
 _: {
-  # Pull the ZFS kernel module + userland into the system.
-  boot.supportedFilesystems.zfs = true;
+  boot = {
+    # Pull the ZFS kernel module + userland into the system.
+    supportedFilesystems.zfs = true;
 
-  # Don't force-import a pool that wasn't cleanly exported (e.g. after a crash) —
-  # the safe value, and the default from 26.11 on. The data pool is imported
-  # normally via extraPools below; a forced import risks data loss.
-  boot.zfs.forceImportRoot = false;
+    # Don't force-import a pool that wasn't cleanly exported (e.g. after a crash)
+    # — the safe value, and the default from 26.11 on. The data pool is imported
+    # normally via extraPools below; a forced import risks data loss.
+    zfs.forceImportRoot = false;
 
-  # Import the pre-existing data pool at boot. Datasets mount at their own ZFS
-  # `mountpoint` property (e.g. /tank, /tank/share). Rename "tank" if the pool
-  # is called something else.
-  boot.zfs.extraPools = [ "tank" ];
+    # Import the pre-existing data pool at boot. Datasets mount at their own ZFS
+    # `mountpoint` property (e.g. /tank, /tank/share). Rename "tank" if the pool
+    # is called something else.
+    zfs.extraPools = [ "tank" ];
+  };
 
   # Monthly scrub to surface latent corruption (detect-only on this single-vdev
   # pool — see the header note).
