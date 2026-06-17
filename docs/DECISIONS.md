@@ -483,10 +483,15 @@ are enabled explicitly with `vim.lsp.enable()` rather than via mason-lspconfig's
 `automatic_enable`.
 
 **Consequences:** `:Mason` shows all tools as "not installed" (they come from
-Nix, Mason doesn't know about them). The LSP Manager custom picker (`<leader>lm`)
-will show an empty list since it calls `mason-lspconfig.get_installed_servers()`.
-Core LSP/formatting/debugging functionality is unaffected — binaries are on
-PATH and found automatically by lspconfig/conform/dap.
+Nix, Mason doesn't know about them). Core LSP/formatting/debugging functionality
+is unaffected — binaries are on PATH and found automatically by
+lspconfig/conform/dap.
+
+> **Superseded by DECISION 047 (2026-06-16):** the Mason stack was removed
+> entirely; Mason no longer runs. The LSP Manager picker (`<leader>lm`) was also
+> rewritten to a hardcoded server list (it no longer calls
+> `mason-lspconfig.get_installed_servers()`), so the picker is populated, not
+> empty.
 
 ---
 
@@ -1191,3 +1196,62 @@ audit findings. The residual exposure (daemon-root-equivalent `maudi`, BT attack
 surface, root QEMU, a nightly browser) is accepted for a single-user developer
 fleet and noted in the audit resolution log
 (`docs/audit/pre-golive-review.md`).
+
+## 047 — Neovim: remove the Mason stack entirely (NV-Q-6, 2026-06-16)
+
+**Context:** DECISION 025 kept `mason.nvim`, `mason-lspconfig.nvim`,
+`mason-tool-installer.nvim` and `mason-nvim-dap.nvim` as a "UI layer only" with
+`ensure_installed = {}` everywhere. All servers/formatters/DAP adapters already
+come from Nix (`home.packages`), servers are enabled with `vim.lsp.enable()`, and
+the `<leader>lm` picker was rewritten to a hardcoded list — so the four Mason
+plugins installed nothing and `:Mason` only ever showed everything as
+"not installed". The nvim audit (`docs/audit/nvim-review.md` NV-Q-6) flagged this
+as dead indirection.
+
+**Decision:** Remove all four Mason plugins. `plugins/nvim-lspconfig.lua` drops the
+mason dependencies and the `mason-tool-installer`/`mason-lspconfig` `setup()`
+calls; `plugins/dap-debugging.lua` and `plugins/nvim-dap-ui.lua` drop the
+`mason-nvim-dap` spec, dependency and handler; the four entries are removed from
+`nvim/lazy-lock.json`; the `:Mason` row is removed from `nvim/cheatsheet.html`.
+
+**Consequences:** No behaviour change — LSP attaches, formatters run and DAP
+adapters resolve exactly as before, all from Nix-provided binaries on PATH. One
+fewer Go/Rust-free plugin set to clone on a fresh install. `:Mason` is gone;
+`:checkhealth` no longer reports Mason. Finishes what DECISION 025 started (025's
+consequence note is updated to point here).
+
+## 048 — Neovim: lean-down + security/quality fixes from the nvim audit (2026-06-16)
+
+**Context:** `docs/audit/nvim-review.md` raised stability/security/quality items
+beyond the Mason removal (047). The user chose, per finding, to lean the config
+down and apply the fixes.
+
+**Decision:**
+
+- **Plugins cut** (NV-ST-1 / NV-Q-3 / NV-Q-4): `hardtime.nvim` (training,
+  unpinned — closed the one `lazy-lock.json` reproducibility hole), `fff.nvim`
+  (Rust-built extra picker — snacks covers it), `fzf.vim` + the bare `junegunn/fzf`
+  spec (legacy finder, fzf built twice — fzf-lua keeps its own `fzf` dep), `typr`
+  (typing game), and the personal/work integrations `jira.nvim`, `gitlab.nvim`,
+  `obsidian.nvim`, `kulala.nvim`. `oil.nvim` was **kept** but lazy-loaded.
+  `fyler.lua.disabled` (dead file) deleted.
+- **Security** (NV-S-1): the project-root `rust-analyzer.json` deep-merge in
+  `rustaceanvim.lua` now reads through `vim.secure.read` (trust prompt) instead of
+  unconditionally — a hostile cloned repo can no longer inject
+  `overrideCommand`/build-script/proc-macro settings on open. `binary_picker` in
+  `dap-debugging.lua` now `shellescape`s `cwd` (NV-S-4).
+- **Quality** (NV-Q-1): `conform.nvim` formatter list fixed — removed the
+  non-existent `"inject"` formatter and tools not provided by Nix
+  (`sqlfluff`/`pg_format`/`xmlformatter`/`prettier`); SQL aligned on `sqruff`.
+- **Lazy-loading** (NV-ST-3): `oil` (`cmd`/`keys`) and `fzf-lua` (`keys`) no longer
+  `lazy = false`.
+- **Housekeeping**: kitty-padding autocmds guarded on `$KITTY_WINDOW_ID`
+  (NV-ST-5); which-key groups reconciled with the real keymaps, `<leader>d`
+  relabelled Debugger (NV-Q-5); `stylua`/`luacheck` clean-up (NV-Q-8); Ruby/Node/
+  Perl neovim providers disabled, only python3 kept (NV-Q-9); `init.lua` modeline
+  `ts=2`→`ts=4` and `vim.wo`→`vim.o` (NV-Q-10); dead commented blocks removed
+  (NV-Q-2); cheatsheet updated.
+
+**Consequences:** A leaner, fully-pinned plugin set; format-on-save works on the
+primary languages again; opening external Rust repos no longer auto-executes
+project-supplied settings. `docs/audit/nvim-review.md` carries a resolution note.

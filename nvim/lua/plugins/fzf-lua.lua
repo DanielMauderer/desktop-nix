@@ -3,7 +3,8 @@ return {
 		"ibhagwan/fzf-lua",
 		-- optional for icon support
 		dependencies = { "nvim-tree/nvim-web-devicons", { "junegunn/fzf", build = "./install --bin" } },
-		lazy = false,
+		-- Lazy-load on its keymaps (NV-ST-3); the FzfLua global is set when the
+		-- plugin loads, before any of the key handlers below run.
 		opts = {
 			-- Override default key mappings to prevent Ctrl+D from exiting
 			keymap = {
@@ -23,14 +24,6 @@ return {
 				end,
 				desc = "[S]earch [R]egisters",
 			},
-			-- Use snacks
-			-- {
-			-- 	"<leader>gb",
-			-- 	function ()
-			-- 		FzfLua.git_branches()
-			-- 	end,
-			-- 	desc = "[G]it [b]ranches"
-			-- },
 			{
 				"<leader>z",
 				function()
@@ -47,7 +40,7 @@ return {
 						cmd = "find . -type d -maxdepth 5 2>/dev/null",
 						file_icons = false,
 						actions = {
-							["default"] = function(selected, opts)
+							["default"] = function(selected, _opts)
 								local dir = selected[1]
 								if dir then
 									local path = dir

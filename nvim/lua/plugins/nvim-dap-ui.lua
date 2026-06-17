@@ -4,7 +4,6 @@ return {
 		dependencies = {
 			"mfussenegger/nvim-dap",
 			"nvim-neotest/nvim-nio",
-			{ "jay-babu/mason-nvim-dap.nvim", opts = {} },
 		},
 		config = function()
 			local dap = require("dap")
@@ -61,28 +60,7 @@ return {
 				desc = "Debug: Step Out",
 			},
 
-			-- Breakpoint management
-			-- {
-			-- 	"<leader>db",
-			-- 	function()
-			-- 		require("dap").toggle_breakpoint()
-			-- 	end,
-			-- 	desc = "Debug: Toggle Breakpoint",
-			-- },
-			-- {
-			-- 	"<leader>dB",
-			-- 	function()
-			-- 		require("dap").set_breakpoint(vim.fn.input("Breakpoint condition: "))
-			-- 	end,
-			-- 	desc = "Debug: Set Conditional Breakpoint",
-			-- },
-			-- {
-			-- 	"<leader>dc",
-			-- 	function()
-			-- 		require("dap").clear_breakpoints()
-			-- 	end,
-			-- 	desc = "Debug: Clear All Breakpoints",
-			-- },
+			-- Breakpoint management lives in persistent-breakpoints.lua.
 
 			-- DAP UI controls
 			{

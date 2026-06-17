@@ -171,7 +171,6 @@ function M.open_lsp_picker()
 	-- Format items for snacks picker
 	local formatted_items = {}
 	for _, item in ipairs(items) do
-		local status_color = item.status == "running" and "green" or "red"
 		local display_name = string.format("%s %s", item.icon, item.name)
 		local display_description = string.format("[%s] %s", item.status:upper(), item.description)
 
@@ -184,10 +183,8 @@ function M.open_lsp_picker()
 		})
 	end
 
-	-- Use Snacks picker.select for vim.ui.select
-	local Snacks = require("snacks")
-
-	-- Format items for vim.ui.select
+	-- Format items for vim.ui.select (Snacks provides the picker UI via its
+	-- vim.ui.select override, so no direct require is needed here).
 	local select_items = {}
 	for _, item in ipairs(formatted_items) do
 		table.insert(select_items, {
@@ -318,27 +315,9 @@ end
 
 -- Setup function
 function M.setup()
-	-- Add keybinding to snacks configuration
-	local Snacks = require("snacks")
-
-	-- Add LSP manager to snacks keybindings
+	-- LSP manager keymaps (the picker uses Snacks via vim.ui.select on demand).
 	vim.keymap.set("n", "<leader>lm", M.open_lsp_picker, { desc = "LSP Manager" })
 	vim.keymap.set("n", "<leader>lr", M.restart_all_servers, { desc = "Restart LSP Servers" })
-
-	-- Add to snacks picker if available
-	if Snacks and Snacks.picker then
-		-- This will be available after snacks is loaded
-		vim.api.nvim_create_autocmd("User", {
-			pattern = "VeryLazy",
-			callback = function()
-				-- Add LSP manager to snacks picker
-				if Snacks.picker then
-					-- You can add this to your snacks configuration if desired
-					-- vim.notify("LSP Manager loaded. Use <leader>lm to open the picker.", vim.log.levels.INFO)
-				end
-			end,
-		})
-	end
 end
 
 -- Auto-setup when required

@@ -186,7 +186,7 @@
 <div class="no-results hidden" id="noresults">No shortcuts match your filter.</div>
 
 <footer>
-  Generated from <code>~/desktop-nix/nvim/lua/plugins/</code>. Filetype-scoped maps (Rust, TOML, HTTP) only apply in those buffers. Many pickers also live behind <kbd>:Telescope</kbd>-style commands shown in the <code>:Snacks.picker</code> menu.
+  Generated from <code>~/desktop-nix/nvim/lua/plugins/</code>. Filetype-scoped maps (Rust, TOML) only apply in those buffers. Many pickers also live behind <kbd>:Telescope</kbd>-style commands shown in the <code>:Snacks.picker</code> menu.
 </footer>
 
 <script>
@@ -283,8 +283,6 @@ const DATA = [
     { k: [":","GrugFar"], d: "Find & replace UI" },
   ]},
   { title: "File Navigation", ico: "", badge: "", items: [
-    { k: ["<leader>","f","f"], d: "Find files (fff, cwd)" },
-    { k: ["<leader>","F","f"], d: "Find files (git root)" },
     { k: ["<leader>","f","F"], d: "Find files (smart)" },
     { k: ["<leader>","f","g"], d: "Git files" },
     { k: ["<leader>","f","b"], d: "Buffers" },
@@ -374,11 +372,6 @@ const DATA = [
     { k: ["<leader>","f","o"], d: "Format buffer" },
     { k: ["<leader>","f","s"], d: "Format SQL selection", m: "v" },
   ]},
-  { title: "HTTP (kulala)", ico: "", badge: "ft: http/rest", items: [
-    { k: ["<leader>","k","s"], d: "Send request" },
-    { k: ["<leader>","k","a"], d: "Send all requests" },
-    { k: ["<leader>","k","b"], d: "Open scratchpad" },
-  ]},
   { title: "Treesitter Text Objects", ico: "", badge: "op/visual", items: [
     { k: ["a","f"], d: "Around function", m: "ts" },
     { k: ["i","f"], d: "Inside function", m: "ts" },
@@ -397,11 +390,9 @@ const DATA = [
   ]},
   { title: "Misc & Commands", ico: "", badge: "", items: [
     { k: [",","v"], d: "Select Python venv", m: "ft: py" },
-    { k: [":","Mason"], d: "LSP / tool installer UI" },
     { k: [":","Neogit"], d: "Interactive Git UI" },
     { k: [":","GrugFar"], d: "Find & replace" },
-    { k: [":","Typr"], d: "Typing practice game" },
-    { k: [":","TyprStats"], d: "Typing stats" },
+    { k: [":","Oil"], d: "Buffer-style file explorer" },
   ]},
 ];
 

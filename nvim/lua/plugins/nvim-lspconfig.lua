@@ -6,12 +6,9 @@ return {
 	-- so LSP never attached for ts/lua/go/etc. in a fresh session.)
 	event = { "BufReadPre", "BufNewFile" },
 	dependencies = {
-		-- Automatically install LSPs and related tools to stdpath for Neovim
-		-- Mason must be loaded before its dependents so we need to set it up here.
-		-- NOTE: `opts = {}` is the same as calling `require('mason').setup({})`
-		{ "williamboman/mason.nvim", opts = {} },
-		"williamboman/mason-lspconfig.nvim",
-		"WhoIsSethDaniel/mason-tool-installer.nvim",
+		-- All LSP servers come from Nix (home.packages), so the Mason stack was
+		-- removed (DECISIONS 047) — it installed nothing and only added
+		-- indirection. Servers are enabled directly via vim.lsp.enable() below.
 
 		-- Useful status updates for LSP.
 		{ "j-hui/fidget.nvim", opts = {} },
@@ -213,14 +210,10 @@ return {
 		}
 
 		-- On NixOS all LSP servers and formatters come from Nix packages (home.packages
-		-- in modules/home/neovim/default.nix). Mason is kept as a UI layer only —
-		-- it installs nothing automatically so dynamic-linking issues don't occur.
-		-- Formatters (stylua, prettierd, isort, ruff, gofumpt, clang-format, jq) are
-		-- on PATH from Nix and found automatically by conform.nvim.
-		require("mason-tool-installer").setup({ ensure_installed = {} })
-
-		-- mason-lspconfig v2 removed the `handlers` API. Servers are now enabled via
-		-- vim.lsp.enable(), and per-server settings are registered with vim.lsp.config().
+		-- in modules/home/neovim/default.nix). Servers are registered/enabled with the
+		-- native vim.lsp API; formatters (stylua, prettierd, isort, ruff, gofumpt,
+		-- clang-format, jq, sqruff) are on PATH from Nix and found by conform.nvim.
+		--
 		-- Broadcast blink.cmp capabilities to every server.
 		vim.lsp.config("*", { capabilities = capabilities })
 
@@ -229,18 +222,9 @@ return {
 			vim.lsp.config(server_name, server_config)
 		end
 
-		-- Enable each server explicitly — Mason won't install them so automatic_enable
-		-- would find nothing. rust_analyzer is excluded: rustaceanvim owns it.
+		-- Enable each server explicitly. rust_analyzer is excluded: rustaceanvim owns it.
 		for server_name in pairs(servers) do
 			vim.lsp.enable(server_name)
 		end
-
-		require("mason-lspconfig").setup({
-			ensure_installed = {},
-			automatic_installation = false,
-			-- Servers are enabled above; disable automatic_enable to avoid
-			-- double-enabling anything Mason happens to find installed.
-			automatic_enable = false,
-		})
 	end,
 }
