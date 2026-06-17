@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: [private-laptop, work-laptop, desktop]
+        host: [private-laptop, work-laptop, desktop, home-server]
     steps:
       - uses: actions/checkout@v4
         with:

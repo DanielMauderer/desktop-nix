@@ -1,31 +1,25 @@
-# Base system module — imported by every host.
-# Everything machines share: boot, locale, user, networking, audio, nix
-# settings, a minimal CLI set, fonts and the auto-update strategy.
-# See docs/tickets/03-base-system-module.md.
+# Base system module — imported by every desktop/workstation host.
+# = the shared `../core` baseline (boot, locale, networking, nix, secrets,
+# updates, hardening, audit, packages, user) PLUS the desktop/workstation extras
+# that the headless home-server deliberately does NOT want.
+# See docs/tickets/03-base-system-module.md and DECISIONS 049 for the core split.
 #
 # ../apps.nix (Ticket 10, DECISIONS 029-033) lands GUI apps (Spotify, Zen Browser,
-# mpv, imv) plus the allowUnfreePredicate allowlist on every host.
-# ../dev (Ticket 08) is pulled in here so the system-level dev pieces (podman)
-# land on every host, matching how home.nix wires the dev home module.
-# ../virtualisation (Ticket 09, DECISIONS 028) lands libvirt/KVM on every host
-# too — maudiblue enabled libvirtd globally and all three machines keep it.
+# mpv, imv) plus the allowUnfreePredicate allowlist.
+# ../dev (Ticket 08) lands the system-level dev pieces (podman) on every
+# workstation, matching how home.nix wires the dev home module.
+# ../virtualisation (Ticket 09, DECISIONS 028) lands libvirt/KVM — maudiblue
+# enabled libvirtd globally and all three desktop machines keep it.
+# ./audio.nix (PipeWire), ./fonts.nix and ./home.nix (the cli/neovim/dev home
+# modules) round out the workstation baseline.
 _: {
   imports = [
+    ../core
     ../apps.nix
     ../dev
     ../virtualisation
     ./audio.nix
-    ./audit.nix
-    ./boot.nix
     ./fonts.nix
-    ./hardening.nix
     ./home.nix
-    ./locale.nix
-    ./networking.nix
-    ./nix.nix
-    ./packages.nix
-    ./secrets.nix
-    ./updates.nix
-    ./users.nix
   ];
 }

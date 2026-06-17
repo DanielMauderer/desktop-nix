@@ -1255,3 +1255,60 @@ down and apply the fixes.
 **Consequences:** A leaner, fully-pinned plugin set; format-on-save works on the
 primary languages again; opening external Rust repos no longer auto-executes
 project-supplied settings. `docs/audit/nvim-review.md` carries a resolution note.
+
+## 049 — Add a headless `home-server` host; split `core` out of `base` (2026-06-17)
+
+**Context:** The fleet gains a first non-desktop machine — a headless home
+server. It must share the **same shell** as the workstations but otherwise run a
+very different stack: a WAN firewall with port 80/443 open, a reverse proxy (the
+user already runs Nginx Proxy Manager in a container for auto Let's Encrypt), a
+WireGuard VPN *server*, SSH reachable **only** through the VPN, a mounted ZFS
+data pool (data-only, on a hardware-RAID LUN; OS on a separate SSD), an NFS
+share, and Podman for hosting the user's docker-compose / Ansible services.
+
+The open question — new repo vs. new host here — resolves to **new host**: the
+flake is already multi-host and `modules/home/cli` is a self-contained shell
+module, so reuse means zero shell duplication plus the shared CI matrix and daily
+auto-lock-update pipeline. A separate repo would copy the fish/starship config
+and lose that pipeline.
+
+The blocker was that `modules/nixos/base` is desktop-coupled (Spotify/Zen GUI,
+PipeWire, libvirt, fonts, the cli/neovim/dev home wiring) and the flake's
+`baseAssertions` — applied to every host — demand desktop traits **and assert
+`services.openssh.enable == false`**, which a VPN-reachable server contradicts.
+
+**Decision:**
+
+- **`modules/nixos/core/`** — extracted the genuinely machine-agnostic
+  sub-modules out of `base` (boot, locale, nix, networking, secrets, updates,
+  hardening, audit, packages, users) via `git mv`. `base` now = `core` + the
+  desktop/workstation extras (apps, dev, virtualisation, audio, fonts, home), so
+  the three desktop hosts evaluate **unchanged**; the server imports `core`
+  directly and skips the extras.
+- **`hosts/home-server/`** — `default.nix` (core + dev + server + the cli/neovim
+  home modules for the shared shell; `maudi`'s SSH authorized key), `hardware.nix`
+  (ZFS `networking.hostId`, LTS `boot.kernelPackages` for ZFS compat, HBA initrd
+  modules, zram) and `disk.nix` (disko for the OS SSD only — GPT ESP + ext4, no
+  LUKS; the ZFS pool is imported at runtime, never formatted by disko).
+- **`modules/nixos/server/`** — `ssh.nix` (`mkForce` enable, key-only/no-root,
+  `openFirewall = false`, :22 admitted only on the `wg0` interface),
+  `wireguard.nix` (wg0 server on UDP 51820, private key from an install-time path
+  to keep CI keyless), `reverse-proxy.nix` (open 80/443 for the NPM container,
+  admin :81 VPN-only), `containers.nix` (Podman docker-compatible socket +
+  oci-containers backend = podman + autoPrune), `zfs.nix` (import the `tank`
+  pool, autoScrub) and `nfs.nix` (NFSv4 export of the dataset to the LAN/VPN
+  source ranges only).
+- **Flake/CI/sops** — `baseAssertions` split into a shared `commonAssertions`
+  plus a desktop delta; a new `serverAssertions` set (SSH enabled but VPN-only,
+  wg0/firewall/ZFS/NFS/podman-socket checks) drives a `host-assertions-home-server`
+  check. `home-server` added to the CI `build-hosts` matrix; `.sops.yaml` gains a
+  `home_server` recipient + `secrets/home-server/` rule (scaffolding only).
+
+**Consequences:** A clean, minimal server host that inherits the shared shell and
+pipeline without any desktop cruft, and a reusable `core` for future headless
+machines. No nixosTest for the server: its VPN-only SSH, ZFS pool and NFS export
+can't be exercised in a disk/key-less QEMU node, so the eval assertions plus the
+`build-hosts` toplevel build are the gate. Install-time follow-ups (real
+`hardware-configuration.nix`, `wg0.key`, admin SSH key, the `tank` pool, the LAN
+CIDR in `nfs.nix`) are flagged inline; a `docs/runbooks/home-server.md` can
+capture them when the box is provisioned.
