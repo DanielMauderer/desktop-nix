@@ -35,7 +35,7 @@
   environment.systemPackages = [ pkgs.virt-viewer ];
 
   # The system socket is group-rw to `libvirtd`, so this is what lets maudi
-  # reach qemu:///system without root (see modules/nixos/base/users.nix).
+  # reach qemu:///system without root (see modules/nixos/core/users.nix).
   users.users.maudi.extraGroups = [ "libvirtd" ];
 
   # NixOS's libvirtd module does not define libvirt's built-in "default" NAT

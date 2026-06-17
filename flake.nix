@@ -105,6 +105,18 @@
           ];
           withChaotic = true;
         };
+        home-server = mkHost {
+          hostname = "home-server";
+          # disk.nix carries the disko spec for the OS SSD only (GPT + ESP +
+          # plain ext4); the ZFS data pool lives on a separate hardware-RAID LUN
+          # imported at runtime (modules/nixos/server/zfs.nix). Added only here —
+          # not imported by default.nix — so a nixosTest VM uses its own scratch
+          # disk and never the server's layout.
+          modules = [
+            ./hosts/home-server/default.nix
+            ./hosts/home-server/disk.nix
+          ];
+        };
       };
 
       # Eval-time host assertions (DECISIONS 021): facts about the evaluated
@@ -130,8 +142,10 @@
       kanshiProfileNames =
         cfg: map (p: p.profile.name) cfg.home-manager.users.maudi.services.kanshi.settings;
 
-      # Assertions shared by every host.
-      baseAssertions = host: cfg: [
+      # Assertions shared by EVERY host — desktops and the headless home-server
+      # alike. The host-type-specific lists below (baseAssertions /
+      # serverAssertions) extend this with their own deltas.
+      commonAssertions = host: cfg: [
         {
           name = "hostName is ${host}";
           assertion = cfg.networking.hostName == host;
@@ -149,10 +163,6 @@
           assertion = cfg.home-manager.users ? maudi;
         }
         {
-          name = "stylix enabled with a wallpaper (Ticket 05)";
-          assertion = cfg.stylix.enable && cfg.stylix.image != null;
-        }
-        {
           name = "fish managed in home (Ticket 06)";
           assertion = cfg.home-manager.users.maudi.programs.fish.enable;
         }
@@ -165,37 +175,8 @@
           assertion = cfg.virtualisation.podman.enable && cfg.virtualisation.podman.dockerCompat;
         }
         {
-          name = "direnv + nix-direnv enabled in home (Ticket 08)";
-          assertion =
-            cfg.home-manager.users.maudi.programs.direnv.enable
-            && cfg.home-manager.users.maudi.programs.direnv.nix-direnv.enable;
-        }
-        {
-          name = "libvirtd enabled with swtpm TPM emulation (Ticket 09)";
-          assertion = cfg.virtualisation.libvirtd.enable && cfg.virtualisation.libvirtd.qemu.swtpm.enable;
-        }
-        {
-          name = "virt-manager enabled and maudi in libvirtd group (Ticket 09)";
-          assertion =
-            cfg.programs.virt-manager.enable && builtins.elem "libvirtd" cfg.users.users.maudi.extraGroups;
-        }
-        {
-          name = "allowUnfreePredicate whitelists spotify (Ticket 10)";
-          assertion = cfg.nixpkgs.config.allowUnfreePredicate pkgs.spotify;
-        }
-        {
-          name = "spotify in maudi home.packages (Ticket 10)";
-          assertion = builtins.any (
-            p: (p.pname or "") == "spotify"
-          ) cfg.home-manager.users.maudi.home.packages;
-        }
-        {
           name = "sops age key derived from host ssh ed25519 key (Ticket 12)";
           assertion = builtins.elem "/etc/ssh/ssh_host_ed25519_key" cfg.sops.age.sshKeyPaths;
-        }
-        {
-          name = "SSH daemon disabled (Ticket 14 / DECISIONS 037)";
-          assertion = !cfg.services.openssh.enable;
         }
         {
           name = "root account locked (Ticket 14 / DECISIONS 037)";
@@ -213,15 +194,118 @@
           name = "security updates applied daily, ≤72h window (policy §4.4, DECISIONS 039)";
           assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "daily";
         }
-        {
-          name = "work-laptop tracks the CI-gated release branch; pilot/desktop track main (DECISIONS 042)";
-          assertion =
-            let
-              onRelease = lib.hasSuffix "/release" cfg.system.autoUpgrade.flake;
-            in
-            if host == "work-laptop" then onRelease else !onRelease;
-        }
       ];
+
+      # Assertions for the desktop/workstation hosts (those that import
+      # modules/nixos/base): the shared baseline plus the desktop-only deltas.
+      baseAssertions =
+        host: cfg:
+        commonAssertions host cfg
+        ++ [
+          {
+            name = "stylix enabled with a wallpaper (Ticket 05)";
+            assertion = cfg.stylix.enable && cfg.stylix.image != null;
+          }
+          {
+            name = "direnv + nix-direnv enabled in home (Ticket 08)";
+            assertion =
+              cfg.home-manager.users.maudi.programs.direnv.enable
+              && cfg.home-manager.users.maudi.programs.direnv.nix-direnv.enable;
+          }
+          {
+            name = "libvirtd enabled with swtpm TPM emulation (Ticket 09)";
+            assertion = cfg.virtualisation.libvirtd.enable && cfg.virtualisation.libvirtd.qemu.swtpm.enable;
+          }
+          {
+            name = "virt-manager enabled and maudi in libvirtd group (Ticket 09)";
+            assertion =
+              cfg.programs.virt-manager.enable && builtins.elem "libvirtd" cfg.users.users.maudi.extraGroups;
+          }
+          {
+            name = "allowUnfreePredicate whitelists spotify (Ticket 10)";
+            assertion = cfg.nixpkgs.config.allowUnfreePredicate pkgs.spotify;
+          }
+          {
+            name = "spotify in maudi home.packages (Ticket 10)";
+            assertion = builtins.any (
+              p: (p.pname or "") == "spotify"
+            ) cfg.home-manager.users.maudi.home.packages;
+          }
+          {
+            name = "SSH daemon disabled (Ticket 14 / DECISIONS 037)";
+            assertion = !cfg.services.openssh.enable;
+          }
+          {
+            name = "work-laptop tracks the CI-gated release branch; pilot/desktop track main (DECISIONS 042)";
+            assertion =
+              let
+                onRelease = lib.hasSuffix "/release" cfg.system.autoUpgrade.flake;
+              in
+              if host == "work-laptop" then onRelease else !onRelease;
+          }
+        ];
+
+      # Assertions for the headless home-server (imports modules/nixos/core +
+      # modules/nixos/server, NOT base): the shared baseline plus the
+      # server-only deltas (DECISIONS 049). Notably SSH is ENABLED here — the one
+      # host that allows remote login — but only across the VPN.
+      serverAssertions =
+        host: cfg:
+        commonAssertions host cfg
+        ++ [
+          {
+            name = "SSH daemon enabled (DECISIONS 049)";
+            assertion = cfg.services.openssh.enable;
+          }
+          {
+            name = "SSH is key-only, no root login (DECISIONS 049)";
+            assertion =
+              (cfg.services.openssh.settings.PasswordAuthentication == false)
+              && (cfg.services.openssh.settings.PermitRootLogin == "no");
+          }
+          {
+            name = "SSH (:22) admitted only on the wg0 VPN interface, never the WAN";
+            assertion =
+              builtins.elem 22 cfg.networking.firewall.interfaces.wg0.allowedTCPPorts
+              && !(builtins.elem 22 cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            name = "WireGuard server wg0 listens on UDP 51820";
+            assertion =
+              (cfg.networking.wireguard.interfaces ? wg0)
+              && cfg.networking.wireguard.interfaces.wg0.listenPort == 51820;
+          }
+          {
+            name = "WireGuard UDP port open on the WAN";
+            assertion = builtins.elem 51820 cfg.networking.firewall.allowedUDPPorts;
+          }
+          {
+            name = "reverse-proxy HTTP/HTTPS (80/443) open on the WAN";
+            assertion =
+              builtins.elem 80 cfg.networking.firewall.allowedTCPPorts
+              && builtins.elem 443 cfg.networking.firewall.allowedTCPPorts;
+          }
+          {
+            name = "ZFS filesystem support enabled";
+            assertion = cfg.boot.supportedFilesystems.zfs or false;
+          }
+          {
+            name = "unique hostId set (required by ZFS)";
+            assertion = cfg.networking.hostId != null && cfg.networking.hostId != "";
+          }
+          {
+            name = "NFS server enabled for the file share";
+            assertion = cfg.services.nfs.server.enable;
+          }
+          {
+            name = "podman docker-compatible socket enabled for service hosting";
+            assertion = cfg.virtualisation.podman.dockerSocket.enable;
+          }
+          {
+            name = "oci-containers backend is podman";
+            assertion = cfg.virtualisation.oci-containers.backend == "podman";
+          }
+        ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
       };
@@ -542,6 +626,35 @@
               grep -q 'output "DP-2" mode 1920x1080@60 position 2560,0' "$conf"
               test "$(grep '^profile' "$conf" | tail -1)" = 'profile laptop-internal {'
             '';
+
+        # Home-server eval assertions (DECISIONS 049): the server uses its own
+        # serverAssertions set (NOT baseAssertions — it has no desktop stack and
+        # deliberately enables SSH, which baseAssertions forbids). The CI
+        # build-hosts matrix builds its toplevel; a nixosTest is omitted because
+        # the VPN-only SSH, ZFS pool and NFS export can't be exercised in a
+        # disk/key-less QEMU node, so these eval checks are the gate.
+        host-assertions-home-server =
+          let
+            cfg = hosts.home-server.config;
+          in
+          mkHostCheck "home-server" (
+            serverAssertions "home-server" cfg
+            ++ [
+              # No desktop/workstation stack leaked in via a stray import.
+              {
+                name = "no Hyprland / desktop session on the server";
+                assertion = !cfg.programs.hyprland.enable;
+              }
+              {
+                name = "stylix disabled (headless, no theming)";
+                assertion = !cfg.stylix.enable;
+              }
+              {
+                name = "chaotic module NOT loaded";
+                assertion = !(hosts.home-server.options ? chaotic);
+              }
+            ]
+          ) "";
 
         # Template nixosTest: boot private-laptop config, assert multi-user.target.
         # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).

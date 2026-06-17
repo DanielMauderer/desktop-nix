@@ -17,6 +17,7 @@ keys:
   - &private_laptop age1PLACEHOLDERprivatelaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   - &work_laptop age1PLACEHOLDERworklaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   - &desktop age1PLACEHOLDERdesktopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &home_server age1PLACEHOLDERhomeserverxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   # Fixture/test key: PUBLIC half of the known key the test-secrets nixosTest
   # injects into the VM. Its private half is committed in the test (it guards
   # nothing real). Encrypts only secrets/fixtures/*.
@@ -38,6 +39,16 @@ creation_rules:
           - *master
           - *work_laptop
 
+  # Home-server-scoped secrets (scaffolding for a future migration of the
+  # WireGuard server key off the install-time /etc/wireguard/wg0.key path onto
+  # sops, once the host's age key is enrolled — DECISIONS 049): master + the
+  # server only. No secret is committed yet, so keyless CI stays green.
+  - path_regex: secrets/home-server/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *master
+          - *home_server
+
   # Shared production secrets: master + every host.
   - path_regex: secrets/[^/]+\.yaml$
     key_groups:
@@ -46,3 +57,4 @@ creation_rules:
           - *private_laptop
           - *work_laptop
           - *desktop
+          - *home_server
