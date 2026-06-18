@@ -129,7 +129,6 @@ in
           enabled = true;
           size = 8;
           passes = 3;
-          new_optimizations = true;
           ignore_opacity = true;
           xray = false;
           noise = 0.02;
@@ -189,16 +188,8 @@ in
         pass_mouse_when_bound = false;
       };
 
-      gestures = {
-        workspace_swipe = true;
-        workspace_swipe_fingers = 3;
-        workspace_swipe_distance = 500;
-        workspace_swipe_invert = false;
-        workspace_swipe_min_speed_to_force = 30;
-        workspace_swipe_cancel_ratio = 0.5;
-        workspace_swipe_create_new = true;
-        workspace_swipe_forever = true;
-      };
+      # gestures.workspace_swipe_* were removed in Hyprland 0.47; the new
+      # touch-gesture system has no equivalent knobs yet.
 
       misc = {
         disable_hyprland_logo = true;
@@ -208,7 +199,7 @@ in
 
       # Unified windowrule syntax (string list). Ported from the old window
       # rules; swaync/nwg rules dropped (swaync + kanshi replace them).
-      windowrule = [
+      windowrulev2 = [
         "float, title:^(nm-connection-editor)$"
         "float, title:^(qalculate-gtk)$"
         "idleinhibit fullscreen, class:.*"
@@ -254,7 +245,7 @@ in
       ];
 
       layerrule = [
-        "noanim, selection"
+        "noanim 1, selection"
       ];
 
       bindm = [
