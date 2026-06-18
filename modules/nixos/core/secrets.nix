@@ -18,6 +18,8 @@
   # closed; we only need the key file, not the daemon).
   system.activationScripts.sshHostKey = {
     text = ''
+      mkdir -p /etc/ssh
+      chmod 755 /etc/ssh
       if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
         ${pkgs.openssh}/bin/ssh-keygen \
           -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N "" -C "" >&2
