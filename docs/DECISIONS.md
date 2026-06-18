@@ -1312,3 +1312,36 @@ can't be exercised in a disk/key-less QEMU node, so the eval assertions plus the
 `hardware-configuration.nix`, `wg0.key`, admin SSH key, the `tank` pool, the LAN
 CIDR in `nfs.nix`) are flagged inline; a `docs/runbooks/home-server.md` can
 capture them when the box is provisioned.
+
+---
+
+## 050 — Scripted installer: `scripts/install.sh` (2026-06-18)
+
+**Context:** Installing a host means hand-typing the runbook §3–4 every time:
+clone the repo, `disko --mode disko`, `nixos-generate-config --no-filesystems`,
+copy the generated `hardware-configuration.nix` into the host dir, uncomment its
+import in `default.nix`, stage it so the flake sees it, `nixos-install`, then
+`passwd maudi`. That's long, error-prone, and easy to get stuck partway through
+(the pilot migration stalled mid-install).
+
+**Decision:** Add `scripts/install.sh <host>` — one parameterised script (works
+for any `hosts/<host>` with a `disk.nix`) that runs the whole §3–4 flow. It
+parses the target device out of `disk.nix` and shows it next to `lsblk`,
+requires an explicit `yes` before wiping (skippable with `--yes`), and supports
+`--skip-disko` / `--skip-hardware` to **resume** a half-finished install without
+re-wiping the disk or clobbering a hand-edited hardware file. It `git add`s the
+generated files (staging is enough for a dirty-tree flake eval — no commit/git
+identity needed on the installer). It is **not** packaged with
+`writeShellApplication` like `pkgs/scripts/*`, because it runs on the NixOS
+installer ISO *before* this system exists; it's plain bash kept shellcheck-clean.
+
+The runbooks (private-laptop/work-laptop/desktop §3) now lead with the scripted
+path and keep the manual commands as the fallback / reference for what it does.
+
+**Consequences:** A migration is `git clone … && sudo …/scripts/install.sh
+<host>` plus answering the wipe prompt and two passphrase/password prompts. A
+stuck install is resumable instead of restart-from-scratch. The script still
+defers the genuinely manual bits (hardware capture in §0, secrets enrolment in
+§5) to the runbook. disko is pinned to `github:nix-community/disko/latest` to
+match the runbooks rather than the flake's locked input, since the installer ISO
+has no checkout-local lock to honour at partition time.
