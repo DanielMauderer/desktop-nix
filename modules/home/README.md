@@ -1,13 +1,11 @@
 # modules/home/
 
-home-manager modules (used as a NixOS module, not standalone). These replace
-the symlinked config dirs from the MyLinux dotfiles repo. Planned modules and
-the tickets that create them:
+home-manager modules (used as NixOS modules, not standalone). Each group has its
+own README.
 
-| Module                                   | Replaces (MyLinux)                       | Ticket |
-|------------------------------------------|------------------------------------------|--------|
-| `hyprland` (+ waybar, dunst, rofi, wlogout, swaylock/-idle/-bg, hyprshot) | `hypr/`, `waybar/`, `dunst/`, `rofi/`, `wlogout/` | 04 |
-| `theming` (matugen or stylix, gtk/qt/Kvantum) | `matugen/`, `gtk-3.0/`, `gtk-4.0/`, `Kvantum/`, `qt5ct/`, `qt6ct/` | 05 |
-| `fish` (+ kitty, fastfetch, lazygit, CLI tools) | `fish/`, `kitty/`, `fastfetch/`, `lazygit/` | 06 |
-| `neovim`                                  | `nvim/`                                  | 07     |
-| `dev` (toolchains, direnv, claude config) | toolbox `dev-tools`, `claude/`           | 08     |
+| Group     | What it configures                                                  |
+|-----------|---------------------------------------------------------------------|
+| `cli`     | Shell environment: fish + starship, kitty, fastfetch, lazygit, CLI tools. All hosts. |
+| `desktop` | Per-user Hyprland/waybar/swaync/rofi/wlogout/lockscreen/kanshi + stylix. Workstations. |
+| `dev`     | Language toolchains (Rust/Go/Node/Python/C), direnv, the Claude config. |
+| `neovim`  | Neovim with the lazy.nvim config under `nvim/` + LSP/formatter/DAP packages. |

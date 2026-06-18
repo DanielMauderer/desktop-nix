@@ -1,81 +1,46 @@
 # desktop-nix
 
-Declarative NixOS configuration for all my machines — replacing the previous
-Fedora Silverblue setup ([maudiblue](https://github.com/DanielMauderer/maudiblue)
-BlueBuild image + [MyLinux](https://github.com/DanielMauderer/MyLinux) dotfiles),
-which will be archived once the migration is complete.
-
-Desktop environment: **Hyprland** (Wayland) with Material You dynamic theming.
+Declarative NixOS configuration for all my machines. Desktop environment:
+**Hyprland** (Wayland) with stylix-driven dynamic theming. home-manager runs as
+a NixOS module, so one `nixos-rebuild switch` updates system and home together.
 
 ## Machines
 
-| Host             | Role                              | GPU              | Kernel            | Special modules                     |
-|------------------|-----------------------------------|------------------|-------------------|-------------------------------------|
-| `private-laptop` | Media consumption, some dev       | Intel/AMD iGPU   | default           | — (**pilot: migrates first**)       |
-| `work-laptop`    | Heavy development                 | Intel/AMD iGPU   | default           | full dev stack, libvirt, wireguard  |
-| `desktop`        | Gaming + development              | AMD dGPU         | **CachyOS** (chaotic-nyx) | gaming (steam, scx, gamemode), libvirt |
+| Host             | Role                         | GPU            | Kernel             | Notes                                  |
+|------------------|------------------------------|----------------|--------------------|----------------------------------------|
+| `private-laptop` | Media + light dev            | Intel iGPU     | default            | pilot; LUKS; waydroid                  |
+| `work-laptop`    | Heavy dev                    | Intel iGPU     | default            | LUKS; wireguard; CI-gated `release` channel |
+| `desktop`        | Gaming + dev                 | AMD dGPU       | **CachyOS** (chaotic-nyx) | gaming stack; ext4 no-LUKS; waydroid |
+| `home-server`    | Headless services            | —              | LTS                | ZFS, NFS, WireGuard server, no GUI     |
+
+Each host has its own docs: `hosts/<name>/README.md` (what the machine is) and
+`hosts/<name>/INSTALL.md` (how to install it).
 
 ## Repository layout
 
 ```
-docs/        Documentation: ROADMAP, DECISIONS, INVENTORY, runbooks, tickets
-hosts/       Per-host configuration (one dir per machine + hardware config)
-modules/     Reusable modules — modules/nixos (system) and modules/home (home-manager)
-lib/         Helper functions (mkHost etc.)
-overlays/    Nixpkgs overlays (patches only — external package sets are flake inputs)
-pkgs/        Custom packages (e.g. scripts packaged with writeShellApplication)
+hosts/<name>/    Per-host config + README (description) + INSTALL (install guide)
+modules/nixos/   System modules, one README per group (base, core, desktop, …)
+modules/home/    home-manager modules, one README per group (cli, desktop, dev, neovim)
+lib/             mkHost.nix — the nixosConfiguration factory
+overlays/        Nixpkgs overlays (local patches only)
+pkgs/            Custom packages (shell scripts via writeShellApplication)
+scripts/         install.sh — scripted host installer
+docs/            DECISIONS.md — the key architecture choices
 ```
-
-## Architecture (summary — see [docs/DECISIONS.md](docs/DECISIONS.md))
-
-- **Flakes**, plain (no flake-parts) — `flake.nix` is created in
-  [Ticket 01](docs/tickets/01-repo-bootstrap-flake-skeleton.md)
-- **home-manager as a NixOS module** — one `nixos-rebuild switch` updates
-  system + home atomically
-- **CachyOS kernel** via the [chaotic-cx/nyx](https://github.com/chaotic-cx/nyx)
-  flake input on the desktop host only
-- **Testing is mandatory** — every ticket has a Testing checklist; CI builds all
-  host configurations on every push (see
-  [Ticket 02](docs/tickets/02-testing-and-ci-infrastructure.md))
-
-## Status
-
-| Ticket | Description | Status |
-|--------|-------------|--------|
-| [01](docs/tickets/01-repo-bootstrap-flake-skeleton.md) | Repo bootstrap: flake skeleton | ✅ done |
-| [02](docs/tickets/02-testing-and-ci-infrastructure.md) | Testing & CI infrastructure | ✅ done |
-| 03–17 | Modules, hosts, archive | open |
 
 ## Local development
 
-Enter the dev shell for lint/format tools:
-
 ```sh
-nix develop
+nix develop                 # dev shell with lint/format tools
+nix flake check -L          # everything CI runs (eval + per-host build + nixosTests)
+nix fmt                     # format all .nix files
+nix build .#nixosConfigurations.<host>.config.system.build.toplevel -L
 ```
 
-Run all checks locally before pushing (this is what CI runs):
+## Documentation map
 
-```sh
-nix flake check -L
-```
-
-Build a specific host toplevel:
-
-```sh
-nix build .#nixosConfigurations.private-laptop.config.system.build.toplevel -L
-```
-
-Format all `.nix` files:
-
-```sh
-nix fmt
-```
-
-**Next step:** run `nix flake update` locally after pulling to generate
-`flake.lock`, then verify with `nix flake check`.
-
-- Migration plan & phases: [docs/ROADMAP.md](docs/ROADMAP.md)
-- Ticket index: [docs/tickets/README.md](docs/tickets/README.md)
-- Architecture decisions: [docs/DECISIONS.md](docs/DECISIONS.md)
-- What's being migrated: [docs/INVENTORY.md](docs/INVENTORY.md)
+- **Per host** — `hosts/<name>/README.md` + `hosts/<name>/INSTALL.md`
+- **Per module group** — `README.md` in each `modules/nixos/*` and `modules/home/*` dir
+- **Architecture decisions** — [docs/DECISIONS.md](docs/DECISIONS.md)
+- **Secrets & update automation** — [modules/nixos/core/README.md](modules/nixos/core/README.md)

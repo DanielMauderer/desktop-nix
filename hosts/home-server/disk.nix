@@ -14,7 +14,7 @@
 # by default.nix), so any nixosTest that imports default.nix boots off its own
 # scratch disk.
 #
-# Install-time use (see a future docs/runbooks/home-server.md): format with
+# Install-time use (see hosts/home-server/INSTALL.md): format with
 #   sudo nix --experimental-features "nix-command flakes" run \
 #     github:nix-community/disko/latest -- --mode disko \
 #     /tmp/cfg/hosts/home-server/disk.nix

@@ -353,8 +353,8 @@
             statix
             deadnix
             nixfmt
-            # Secrets (Ticket 12): edit/re-key sops files and convert SSH host
-            # keys to age for the bootstrap runbook (docs/runbooks/secrets.md).
+            # Secrets: edit/re-key sops files and convert SSH host keys to age
+            # for enrollment (see modules/nixos/core/README.md).
             sops
             ssh-to-age
             age

@@ -2,7 +2,7 @@
 # = the shared `../core` baseline (boot, locale, networking, nix, secrets,
 # updates, hardening, audit, packages, user) PLUS the desktop/workstation extras
 # that the headless home-server deliberately does NOT want.
-# See docs/tickets/03-base-system-module.md and DECISIONS 049 for the core split.
+# See modules/nixos/core/ and DECISIONS 049 for the core/base split.
 #
 # ../apps.nix (Ticket 10, DECISIONS 029-033) lands GUI apps (Spotify, Zen Browser,
 # mpv, imv) plus the allowUnfreePredicate allowlist.

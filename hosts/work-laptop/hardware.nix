@@ -1,7 +1,7 @@
-# Hardware enablement for the work laptop (Ticket 14). Same pattern as the
-# pilot (hosts/private-laptop/hardware.nix): Intel iGPU assumption (iHD, Gen8+)
-# that must be verified during the hardware-capture step in
-# docs/runbooks/work-laptop.md. If the iGPU is pre-Broadwell swap to
+# Hardware enablement for the work laptop. Same pattern as the pilot
+# (hosts/private-laptop/hardware.nix): Intel iGPU assumption (iHD, Gen8+) that
+# must be verified during the hardware-capture step in
+# hosts/work-laptop/INSTALL.md. If the iGPU is pre-Broadwell swap to
 # `intel-vaapi-driver` / `i965`. The machine-specific kernel-module probe
 # produced by `nixos-generate-config --no-filesystems` is committed separately
 # as hardware/hardware-configuration.nix at install time.

@@ -13,7 +13,7 @@
 # (NOT imported by default.nix), so the nixosTest VMs — which import default.nix
 # directly — never see this layout and boot off their own scratch disk.
 #
-# Install-time use (see docs/runbooks/desktop.md): format the disk with
+# Install-time use (see hosts/desktop/INSTALL.md): format the disk with
 #   sudo nix --experimental-features "nix-command flakes" run \
 #     github:nix-community/disko/latest -- --mode disko \
 #     /tmp/cfg/hosts/desktop/disk.nix

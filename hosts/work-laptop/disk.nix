@@ -9,7 +9,7 @@
 # default.nix alone, so QEMU VMs never see the LUKS/ESP layout. Disko owns
 # `fileSystems`; `nixos-generate-config --no-filesystems` produces the rest.
 #
-# Install-time use (see docs/runbooks/work-laptop.md):
+# Install-time use (see hosts/work-laptop/INSTALL.md):
 #   sudo nix --experimental-features "nix-command flakes" run \
 #     github:nix-community/disko/latest -- --mode disko \
 #     /mnt-etc/nixos/hosts/work-laptop/disk.nix

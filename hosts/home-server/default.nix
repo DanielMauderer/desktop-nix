@@ -22,7 +22,7 @@ _: {
     ../../modules/nixos/server
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after the install-time
-    # `nixos-generate-config --no-filesystems` (see docs/runbooks/home-server.md)
+    # `nixos-generate-config --no-filesystems` (see hosts/home-server/INSTALL.md)
   ];
 
   networking.hostName = "home-server";

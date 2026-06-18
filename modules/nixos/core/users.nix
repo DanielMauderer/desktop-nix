@@ -7,7 +7,7 @@
 # is force-expired once at first activation so the user must set their own at
 # first login. Replace the hash with your own (`mkpasswd -m yescrypt`), or wire a
 # sops `hashedPasswordFile` once host keys are enrolled — see
-# docs/runbooks/updates.md.
+# modules/nixos/core/README.md.
 { pkgs, lib, ... }:
 {
   programs.fish.enable = true;
