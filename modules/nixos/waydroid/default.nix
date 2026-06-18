@@ -31,8 +31,16 @@ _: {
   # don't emit idle-inhibit themselves). These rules are contributed from here
   # so they only land on waydroid hosts; the home module's shared windowrule
   # list (modules/home/desktop/hyprland.nix) concatenates with them.
-  home-manager.users.maudi.wayland.windowManager.hyprland.settings.windowrule = [
-    "float true, class ^(waydroid.*)$"
-    "float true, title ^(Waydroid)$"
-  ];
+  home-manager.users.maudi.wayland.windowManager.hyprland.extraConfig = ''
+    windowrule {
+      name = wr-float-waydroid-class
+      match:class = ^(waydroid.*)$
+      float = true
+    }
+    windowrule {
+      name = wr-float-waydroid-title
+      match:title = ^(Waydroid)$
+      float = true
+    }
+  '';
 }
