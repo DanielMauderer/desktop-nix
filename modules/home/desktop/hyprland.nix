@@ -200,47 +200,47 @@ in
       # windowrule unified syntax (Hyprland 0.47+: v1/v2 keywords both removed;
       # use `windowrule`; booleans need explicit `true`; idleinhibit removed).
       windowrule = [
-        "float true, title:^(nm-connection-editor)$"
-        "float true, title:^(qalculate-gtk)$"
+        "float true, title ^(nm-connection-editor)$"
+        "float true, title ^(qalculate-gtk)$"
 
         # Picture-in-Picture: floating, pinned, parked top-right.
-        "float true, title:^(Picture-in-Picture)$"
-        "pin true, title:^(Picture-in-Picture)$"
-        "move 69.5% 4%, title:^(Picture-in-Picture)$"
-        "opacity 1.0 override, title:^(Picture-in-Picture)$"
+        "float true, title ^(Picture-in-Picture)$"
+        "pin true, title ^(Picture-in-Picture)$"
+        "move 69.5% 4%, title ^(Picture-in-Picture)$"
+        "opacity 1.0 override, title ^(Picture-in-Picture)$"
 
         # pavucontrol
-        "float true, class:^(.*org.pulseaudio.pavucontrol.*)$"
-        "size 700 600, class:^(.*org.pulseaudio.pavucontrol.*)$"
-        "center true, class:^(.*org.pulseaudio.pavucontrol.*)$"
-        "pin true, class:^(.*org.pulseaudio.pavucontrol.*)$"
+        "float true, class ^(.*org.pulseaudio.pavucontrol.*)$"
+        "size 700 600, class ^(.*org.pulseaudio.pavucontrol.*)$"
+        "center true, class ^(.*org.pulseaudio.pavucontrol.*)$"
+        "pin true, class ^(.*org.pulseaudio.pavucontrol.*)$"
 
         # blueman-manager
-        "float true, class:^(blueman-manager)$"
-        "size 800 600, class:^(blueman-manager)$"
-        "center true, class:^(blueman-manager)$"
+        "float true, class ^(blueman-manager)$"
+        "size 800 600, class ^(blueman-manager)$"
+        "center true, class ^(blueman-manager)$"
 
         # Mission Center
-        "float true, class:^(io.missioncenter.MissionCenter)$"
-        "pin true, class:^(io.missioncenter.MissionCenter)$"
-        "center true, class:^(io.missioncenter.MissionCenter)$"
-        "size 900 600, class:^(io.missioncenter.MissionCenter)$"
+        "float true, class ^(io.missioncenter.MissionCenter)$"
+        "pin true, class ^(io.missioncenter.MissionCenter)$"
+        "center true, class ^(io.missioncenter.MissionCenter)$"
+        "size 900 600, class ^(io.missioncenter.MissionCenter)$"
 
         # GNOME Calculator
-        "float true, class:^(org.gnome.Calculator)$"
-        "size 700 600, class:^(org.gnome.Calculator)$"
-        "center true, class:^(org.gnome.Calculator)$"
+        "float true, class ^(org.gnome.Calculator)$"
+        "size 700 600, class ^(org.gnome.Calculator)$"
+        "center true, class ^(org.gnome.Calculator)$"
 
         # Hyprland screen-share picker
-        "float true, class:^(hyprland-share-picker)$"
-        "pin true, class:^(hyprland-share-picker)$"
-        "center true, class:^(hyprland-share-picker)$"
-        "size 600 400, class:^(hyprland-share-picker)$"
+        "float true, class ^(hyprland-share-picker)$"
+        "pin true, class ^(hyprland-share-picker)$"
+        "center true, class ^(hyprland-share-picker)$"
+        "size 600 400, class ^(hyprland-share-picker)$"
 
         # Generic floating helper window
-        "float true, class:^(dotfiles-floating)$"
-        "size 1000 700, class:^(dotfiles-floating)$"
-        "center true, class:^(dotfiles-floating)$"
+        "float true, class ^(dotfiles-floating)$"
+        "size 1000 700, class ^(dotfiles-floating)$"
+        "center true, class ^(dotfiles-floating)$"
       ];
 
       # noanim was removed as a layerrule type in Hyprland 0.47.

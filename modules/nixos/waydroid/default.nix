@@ -32,8 +32,7 @@ _: {
   # so they only land on waydroid hosts; the home module's shared windowrule
   # list (modules/home/desktop/hyprland.nix) concatenates with them.
   home-manager.users.maudi.wayland.windowManager.hyprland.settings.windowrule = [
-    "float, class:^(waydroid.*)$"
-    "float, title:^(Waydroid)$"
-    "idleinhibit focus, class:^(waydroid.*)$"
+    "float true, class ^(waydroid.*)$"
+    "float true, title ^(Waydroid)$"
   ];
 }
