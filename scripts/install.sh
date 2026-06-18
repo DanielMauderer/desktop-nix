@@ -38,6 +38,22 @@ die() {
   exit 1
 }
 
+# Re-run a command that fails on transient network drops. nixos-install pulls
+# hundreds of paths from the binary cache and a single dropped connection aborts
+# the whole run; re-running resumes from the paths already copied into /mnt, so
+# retry a few times (exponential backoff) before giving up.
+retry() {
+  local -i attempt=1 max=4 delay=5
+  while true; do
+    "$@" && return 0
+    [ "$attempt" -lt "$max" ] || return 1
+    echo "install.sh: '$1' failed (attempt $attempt/$max); retrying in ${delay}s..." >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+    delay=$((delay * 2))
+  done
+}
+
 usage() {
   # Print the comment header (everything up to the first blank-after-shebang).
   sed -n '2,/^set -euo/{/^set -euo/!p;}' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -85,8 +101,21 @@ DEFAULT_NIX="$HOST_DIR/default.nix"
 # --- must be root: disko/nixos-install write to block devices and /mnt -------
 [ "$(id -u)" -eq 0 ] || die "must run as root (use sudo)."
 
-# --- enable flakes for this invocation regardless of installer config -------
-export NIX_CONFIG="experimental-features = nix-command flakes"
+# --- enable flakes + harden binary-cache downloads --------------------------
+# Flakes must be on regardless of the installer's own nix config. On top of
+# that, installer networks (ISO Wi-Fi, hotel/captive portals, flaky uplinks)
+# routinely drop HTTP/2 streams mid-transfer; nix surfaces that as
+#   error: ... HTTP error 200 (curl error: Failed sending data to the peer (55))
+# against cache.nixos.org, and one failed substitute cascades into a pile of
+# "1 dependency failed" build errors and an aborted nixos-install. Forcing
+# HTTP/1.1 and trimming the parallel-connection count makes these transfers
+# survive lossy links, and connect-timeout fails dead peers fast so a retry can
+# pick a healthy one. Both `nix run ... disko` and `nixos-install` read
+# NIX_CONFIG, so this covers every download the install performs.
+export NIX_CONFIG='experimental-features = nix-command flakes
+http2 = false
+http-connections = 5
+connect-timeout = 10'
 
 # --- show the target disk and confirm (this is the destructive bit) ---------
 # disko reads the device from disk.nix; surface it so a wrong device is caught
@@ -164,7 +193,11 @@ fi
 # --- 5. install -------------------------------------------------------------
 echo "==> Installing NixOS: nixos-install --flake $REPO#$HOST --no-root-passwd"
 echo "    (root login stays disabled; maudi uses sudo.)"
-nixos-install --flake "$REPO#$HOST" --no-root-passwd
+retry nixos-install --flake "$REPO#$HOST" --no-root-passwd ||
+  die "nixos-install failed after repeated attempts. This is usually a flaky
+network to cache.nixos.org (curl error 55 / 'Failed sending data to the peer').
+Check connectivity ('ping -c1 cache.nixos.org'), then resume without re-wiping
+the disk: sudo $SCRIPT_DIR/install.sh $HOST --skip-disko --skip-hardware"
 
 # --- 6. set maudi's password (the config ships no password) -----------------
 echo "==> Set a password for the 'maudi' user:"
