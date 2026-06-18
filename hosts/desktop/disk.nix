@@ -18,10 +18,7 @@
 #     github:nix-community/disko/latest -- --mode disko \
 #     /tmp/cfg/hosts/desktop/disk.nix
 # disko then generates fileSystems."/" and "/boot" for the running system.
-{ inputs, ... }:
-{
-  imports = [ inputs.disko.nixosModules.disko ];
-
+_: {
   disko.devices.disk.main = {
     type = "disk";
     # VERIFY with `lsblk` before formatting — an NVMe SSD is usually

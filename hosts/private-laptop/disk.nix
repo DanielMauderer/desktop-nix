@@ -15,10 +15,7 @@
 #     /mnt-etc/nixos/hosts/private-laptop/disk.nix
 # disko then generates fileSystems."/" and "/boot" plus
 # boot.initrd.luks.devices."cryptroot" for the running system.
-{ inputs, ... }:
-{
-  imports = [ inputs.disko.nixosModules.disko ];
-
+_: {
   disko.devices.disk.main = {
     type = "disk";
     # VERIFY with `lsblk` before formatting — NVMe laptops are usually
