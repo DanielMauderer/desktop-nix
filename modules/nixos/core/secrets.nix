@@ -12,7 +12,23 @@
 # The sops-nix NixOS module itself is wired in lib/mkHost.nix (and mirrored into
 # the flake's nixosTest nodes), like stylix, to avoid the `_module.args.inputs`
 # recursion.
-_: {
+{ pkgs, ... }: {
+  # Generate the SSH host ed25519 key at activation time so sops-nix can derive
+  # the age identity even when sshd is disabled (hardening.nix keeps port 22
+  # closed; we only need the key file, not the daemon).
+  system.activationScripts.sshHostKey = {
+    text = ''
+      mkdir -p /etc/ssh
+      chmod 755 /etc/ssh
+      if [ ! -f /etc/ssh/ssh_host_ed25519_key ]; then
+        ${pkgs.openssh}/bin/ssh-keygen \
+          -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N "" -C "" >&2
+        chmod 600 /etc/ssh/ssh_host_ed25519_key
+        chmod 644 /etc/ssh/ssh_host_ed25519_key.pub
+      fi
+    '';
+  };
+
   # Derive the host's age identity from its SSH host key at activation time.
   # The path is identical on every host, so this needs no per-host `hostname`.
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];

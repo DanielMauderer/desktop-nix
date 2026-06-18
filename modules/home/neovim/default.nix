@@ -26,6 +26,7 @@
     # Only the python3 provider is used (pynvim, below). Drop the Ruby/Node/Perl
     # providers that home-manager pulls in by default — nothing in the config
     # uses them, so they only bloat the closure and add :checkhealth warnings.
+    withPython3 = true;
     withRuby = false;
     withNodeJs = false;
     withPerl = false;
