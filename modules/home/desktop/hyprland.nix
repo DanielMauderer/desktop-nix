@@ -197,53 +197,8 @@ in
         initial_workspace_tracking = 1;
       };
 
-      # windowrule unified syntax (Hyprland 0.47+: v1/v2 keywords both removed;
-      # use `windowrule`; booleans need explicit `true`; idleinhibit removed).
-      windowrule = [
-        "float true, title ^(nm-connection-editor)$"
-        "float true, title ^(qalculate-gtk)$"
-
-        # Picture-in-Picture: floating, pinned, parked top-right.
-        "float true, title ^(Picture-in-Picture)$"
-        "pin true, title ^(Picture-in-Picture)$"
-        "move 69.5% 4%, title ^(Picture-in-Picture)$"
-        "opacity 1.0 override, title ^(Picture-in-Picture)$"
-
-        # pavucontrol
-        "float true, class ^(.*org.pulseaudio.pavucontrol.*)$"
-        "size 700 600, class ^(.*org.pulseaudio.pavucontrol.*)$"
-        "center true, class ^(.*org.pulseaudio.pavucontrol.*)$"
-        "pin true, class ^(.*org.pulseaudio.pavucontrol.*)$"
-
-        # blueman-manager
-        "float true, class ^(blueman-manager)$"
-        "size 800 600, class ^(blueman-manager)$"
-        "center true, class ^(blueman-manager)$"
-
-        # Mission Center
-        "float true, class ^(io.missioncenter.MissionCenter)$"
-        "pin true, class ^(io.missioncenter.MissionCenter)$"
-        "center true, class ^(io.missioncenter.MissionCenter)$"
-        "size 900 600, class ^(io.missioncenter.MissionCenter)$"
-
-        # GNOME Calculator
-        "float true, class ^(org.gnome.Calculator)$"
-        "size 700 600, class ^(org.gnome.Calculator)$"
-        "center true, class ^(org.gnome.Calculator)$"
-
-        # Hyprland screen-share picker
-        "float true, class ^(hyprland-share-picker)$"
-        "pin true, class ^(hyprland-share-picker)$"
-        "center true, class ^(hyprland-share-picker)$"
-        "size 600 400, class ^(hyprland-share-picker)$"
-
-        # Generic floating helper window
-        "float true, class ^(dotfiles-floating)$"
-        "size 1000 700, class ^(dotfiles-floating)$"
-        "center true, class ^(dotfiles-floating)$"
-      ];
-
-      # noanim was removed as a layerrule type in Hyprland 0.47.
+      # windowrule/layerrule blocks are generated via extraConfig below
+      # (Hyprland 0.47+ uses block syntax incompatible with settings key-value).
 
       bindm = [
         "$mainMod, mouse:272, movewindow"
@@ -319,5 +274,83 @@ in
       ++ moveToWorkspaceBinds
       ++ moveAllBinds;
     };
+
+    # Hyprland 0.47+ uses block syntax for windowrule/layerrule; the settings
+    # attrset only generates flat key=value lines so we write these raw.
+    extraConfig = ''
+      windowrule {
+        name = wr-float-nm-editor
+        match:title = ^(nm-connection-editor)$
+        float = true
+      }
+      windowrule {
+        name = wr-float-qalculate
+        match:title = ^(qalculate-gtk)$
+        float = true
+      }
+      windowrule {
+        name = wr-idleinhibit
+        match:class = [window]
+        idle_inhibit = fullscreen
+      }
+      windowrule {
+        name = wr-pip
+        match:title = ^(Picture-in-Picture)$
+        float = true
+        pin = true
+        move = 69.5% 4%
+        opacity = 1.0 override
+      }
+      windowrule {
+        name = wr-float-pavucontrol
+        match:class = ^(.*org.pulseaudio.pavucontrol.*)$
+        float = true
+        size = 700 600
+        center = true
+        pin = true
+      }
+      windowrule {
+        name = wr-float-blueman
+        match:class = ^(blueman-manager)$
+        float = true
+        size = 800 600
+        center = true
+      }
+      windowrule {
+        name = wr-float-missioncenter
+        match:class = ^(io.missioncenter.MissionCenter)$
+        float = true
+        pin = true
+        center = true
+        size = 900 600
+      }
+      windowrule {
+        name = wr-float-calculator
+        match:class = ^(org.gnome.Calculator)$
+        float = true
+        size = 700 600
+        center = true
+      }
+      windowrule {
+        name = wr-float-share-picker
+        match:class = ^(hyprland-share-picker)$
+        float = true
+        pin = true
+        center = true
+        size = 600 400
+      }
+      windowrule {
+        name = wr-float-dotfiles
+        match:class = ^(dotfiles-floating)$
+        float = true
+        size = 1000 700
+        center = true
+      }
+      layerrule {
+        name = lr-noanim-selection
+        match:namespace = selection
+        no_anim = true
+      }
+    '';
   };
 }
