@@ -197,56 +197,53 @@ in
         initial_workspace_tracking = 1;
       };
 
-      # Unified windowrule syntax (string list). Ported from the old window
-      # rules; swaync/nwg rules dropped (swaync + kanshi replace them).
-      windowrulev2 = [
-        "float, title:^(nm-connection-editor)$"
-        "float, title:^(qalculate-gtk)$"
-        "idleinhibit fullscreen, class:.*"
+      # windowrule unified syntax (Hyprland 0.47+: v1/v2 keywords both removed;
+      # use `windowrule`; booleans need explicit `true`; idleinhibit removed).
+      windowrule = [
+        "float true, title:^(nm-connection-editor)$"
+        "float true, title:^(qalculate-gtk)$"
 
         # Picture-in-Picture: floating, pinned, parked top-right.
-        "float, title:^(Picture-in-Picture)$"
-        "pin, title:^(Picture-in-Picture)$"
+        "float true, title:^(Picture-in-Picture)$"
+        "pin true, title:^(Picture-in-Picture)$"
         "move 69.5% 4%, title:^(Picture-in-Picture)$"
         "opacity 1.0 override, title:^(Picture-in-Picture)$"
 
         # pavucontrol
-        "float, class:^(.*org.pulseaudio.pavucontrol.*)$"
+        "float true, class:^(.*org.pulseaudio.pavucontrol.*)$"
         "size 700 600, class:^(.*org.pulseaudio.pavucontrol.*)$"
-        "center, class:^(.*org.pulseaudio.pavucontrol.*)$"
-        "pin, class:^(.*org.pulseaudio.pavucontrol.*)$"
+        "center true, class:^(.*org.pulseaudio.pavucontrol.*)$"
+        "pin true, class:^(.*org.pulseaudio.pavucontrol.*)$"
 
         # blueman-manager
-        "float, class:^(blueman-manager)$"
+        "float true, class:^(blueman-manager)$"
         "size 800 600, class:^(blueman-manager)$"
-        "center, class:^(blueman-manager)$"
+        "center true, class:^(blueman-manager)$"
 
         # Mission Center
-        "float, class:^(io.missioncenter.MissionCenter)$"
-        "pin, class:^(io.missioncenter.MissionCenter)$"
-        "center, class:^(io.missioncenter.MissionCenter)$"
+        "float true, class:^(io.missioncenter.MissionCenter)$"
+        "pin true, class:^(io.missioncenter.MissionCenter)$"
+        "center true, class:^(io.missioncenter.MissionCenter)$"
         "size 900 600, class:^(io.missioncenter.MissionCenter)$"
 
         # GNOME Calculator
-        "float, class:^(org.gnome.Calculator)$"
+        "float true, class:^(org.gnome.Calculator)$"
         "size 700 600, class:^(org.gnome.Calculator)$"
-        "center, class:^(org.gnome.Calculator)$"
+        "center true, class:^(org.gnome.Calculator)$"
 
         # Hyprland screen-share picker
-        "float, class:^(hyprland-share-picker)$"
-        "pin, class:^(hyprland-share-picker)$"
-        "center, class:^(hyprland-share-picker)$"
+        "float true, class:^(hyprland-share-picker)$"
+        "pin true, class:^(hyprland-share-picker)$"
+        "center true, class:^(hyprland-share-picker)$"
         "size 600 400, class:^(hyprland-share-picker)$"
 
         # Generic floating helper window
-        "float, class:^(dotfiles-floating)$"
+        "float true, class:^(dotfiles-floating)$"
         "size 1000 700, class:^(dotfiles-floating)$"
-        "center, class:^(dotfiles-floating)$"
+        "center true, class:^(dotfiles-floating)$"
       ];
 
-      layerrule = [
-        "noanim 1, selection"
-      ];
+      # noanim was removed as a layerrule type in Hyprland 0.47.
 
       bindm = [
         "$mainMod, mouse:272, movewindow"
