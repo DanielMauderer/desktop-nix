@@ -72,6 +72,22 @@ Write the `~/` inventory into this file's PR description so it is auditable.
 
 ## 3. Partition + format with disko (LUKS)
 
+> **Automated path (recommended).** Sections 3–4 are scripted in
+> [`scripts/install.sh`](../../scripts/install.sh) so you don't have to type
+> them by hand. After getting networking up (§2) and cloning the repo:
+>
+> ```sh
+> nix-shell -p git --run 'git clone https://github.com/DanielMauderer/desktop-nix /tmp/cfg'
+> sudo /tmp/cfg/scripts/install.sh private-laptop
+> ```
+>
+> It shows the target disk next to `lsblk` and asks for a "yes" before wiping,
+> runs disko (prompts for the LUKS passphrase), generates and wires in
+> `hardware-configuration.nix`, runs `nixos-install`, and sets maudi's
+> password. If a previous run got stuck *after* partitioning, resume with
+> `sudo /tmp/cfg/scripts/install.sh private-laptop --skip-disko`. The manual
+> steps below are the fallback / reference for what the script does.
+
 disko reads the checked-in spec and does the partitioning, LUKS container,
 formatting, and mounting under `/mnt` in one step.
 

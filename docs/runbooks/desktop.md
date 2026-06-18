@@ -85,6 +85,19 @@ before §3 wipes it.
 
 ## 3. Partition + format with disko (no LUKS)
 
+> **Automated path (recommended).** Sections 3–4 are scripted in
+> [`scripts/install.sh`](../../scripts/install.sh):
+>
+> ```sh
+> nix-shell -p git --run 'git clone https://github.com/DanielMauderer/desktop-nix /tmp/cfg'
+> sudo /tmp/cfg/scripts/install.sh desktop
+> ```
+>
+> It confirms the target disk before wiping, runs disko (no LUKS, so no
+> passphrase), wires in `hardware-configuration.nix`, runs `nixos-install`, and
+> sets maudi's password. Resume a stuck run after partitioning with
+> `--skip-disko`. The manual steps below are the fallback / reference.
+
 ```sh
 # Get the repo onto the installer.
 nix-shell -p git --run 'git clone https://github.com/DanielMauderer/desktop-nix /tmp/cfg'
