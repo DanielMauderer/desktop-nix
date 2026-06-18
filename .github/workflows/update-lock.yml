@@ -7,7 +7,7 @@
 # normal CI (flake-check + build-hosts) is green. Promotion to the work-laptop's
 # `release` branch then happens in promote-release.yml.
 #
-# SETUP (one-time, see docs/runbooks/updates.md):
+# SETUP (one-time, see modules/nixos/core/README.md → Update automation):
 #   - Create a fine-grained PAT with `contents: write` + `pull-requests: write`
 #     and store it as the `LOCKBUMP_TOKEN` repo secret. A PAT (not the default
 #     GITHUB_TOKEN) is required so the bot's PR actually triggers CI — PRs opened

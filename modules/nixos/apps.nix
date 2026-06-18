@@ -2,7 +2,6 @@
 # Decision matrix: Spotify via nixpkgs unfree (DECISIONS 029), Zen Browser via
 # 0xc000022070/zen-browser-flake twilight channel (DECISIONS 030), no flatpak
 # on NixOS (DECISIONS 031/032). mpv and imv cover video and image viewing.
-# See docs/tickets/10-flatpak-strategy.md for the full rationale.
 {
   inputs,
   pkgs,

@@ -3,10 +3,10 @@
 # Public keys only — safe to commit. Private keys never live here:
 #   - the master age key's private half is in the password manager;
 #   - per-host keys ARE the hosts' SSH host ed25519 keys, converted with
-#     `ssh-to-age` and filled in at install time (see docs/runbooks/secrets.md).
+#     `ssh-to-age` and filled in at install time (see modules/nixos/core/README.md).
 #
-# The `age1PLACEHOLDER…` recipients below are replaced per host during the
-# bootstrap runbook, then `sops updatekeys` re-encrypts. They are inert until a
+# The `age1PLACEHOLDER…` recipients below are replaced per host during secrets
+# enrollment, then `sops updatekeys` re-encrypts. They are inert until a
 # creation rule that references them is used, so the fixtures rule (test key
 # only) works today even while the production placeholders are unfilled.
 keys:

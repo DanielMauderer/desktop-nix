@@ -1,7 +1,7 @@
-# virtualisation (Ticket 09)
+# virtualisation
 
-libvirt + qemu/KVM with the virt-manager GUI and virt-viewer console, enabled
-on every host (DECISIONS 028). Built for Win11-class guests: an emulated TPM 2.0
+libvirt + qemu/KVM with the virt-manager GUI and virt-viewer console, enabled on
+every workstation (imported by `base`). Built for Win11-class guests: an emulated TPM 2.0
 via `swtpm`. UEFI firmware needs no wiring — current nixpkgs ships QEMU's OVMF
 images (including the Secure-Boot variant) by default.
 
@@ -10,9 +10,8 @@ virt-manager's system connection work without a password. The libvirt
 `default` NAT network (`virbr0`, `192.168.122.0/24`) is defined and autostarted
 by the `libvirt-default-network.service` oneshot.
 
-## Migrating existing VMs from the Silverblue / maudiblue installs
+## Migrating existing VMs
 
-This is the runbook referenced by Tickets 14 (work-laptop) and 15 (desktop).
 libvirt's on-disk format is portable, so a migration is just: copy the qcow2
 disk(s), copy the domain XML, fix the paths, redefine.
 

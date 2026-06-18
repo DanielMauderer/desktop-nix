@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # install.sh — one-shot NixOS installer for this flake, run from the NixOS
-# minimal ISO. It automates the hand-typed steps in docs/runbooks/<host>.md
-# (sections 3–4): disko partitioning, hardware-config generation, wiring the
+# minimal ISO. It automates the hand-typed steps in hosts/<host>/INSTALL.md:
+# disko partitioning, hardware-config generation, wiring the
 # generated file into the host, the actual `nixos-install`, and setting maudi's
 # password.
 #
@@ -179,7 +179,7 @@ Next:
   1. reboot   (remove the installer USB)
   2. At boot you'll get the LUKS passphrase prompt (encrypted hosts), then
      greetd -> Hyprland.
-  3. Post-install (see docs/runbooks/$HOST.md section 5): clone the repo to
+  3. Post-install (see hosts/$HOST/INSTALL.md): clone the repo to
      ~/desktop-nix, enroll this host in secrets, then run
        sudo nixos-rebuild switch --flake ~/desktop-nix#$HOST
 EOF

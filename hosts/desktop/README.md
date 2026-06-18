@@ -1,20 +1,18 @@
 # desktop
 
-Migrates last ([Ticket 15](../../docs/tickets/15-host-desktop.md)).
+Gaming + development workstation (at home). Install guide: [INSTALL.md](INSTALL.md).
 
-- Role: gaming + development
-- GPU: **AMD dGPU** (mesa/RADV)
-- Kernel: **CachyOS** via chaotic-cx/nyx (`linuxPackages_cachyos`) + sched-ext
-  `scx` scheduler — see [Ticket 11](../../docs/tickets/11-gaming-and-cachyos-kernel.md)
-- Modules: base, hyprland desktop, theming, shell, neovim, dev environment,
-  gaming (steam, gamemode, gamescope), libvirt/KVM
-- Monitor layout: DP-3@2560x1440@144 + DP-2@1920x1080@60 (formerly
-  `default.conf` in MyLinux)
-- Disk: plain **ext4, no LUKS** (desktop at home — DECISIONS 038), declaratively
-  partitioned via disko (`disk.nix`: GPT + ESP + ext4 root). Steam library is a
-  fresh re-download; single-boot (Silverblue wiped, no dual-boot).
-- Runbook: `docs/runbooks/desktop.md` (written as part of Ticket 15)
+- **Role:** gaming + dev
+- **GPU/CPU:** AMD dGPU (mesa/RADV) + AMD CPU (`kvm-amd`, `amd-ucode`)
+- **Kernel:** **CachyOS** (`linuxPackages_cachyos`) + `scx` sched-ext scheduler,
+  via chaotic-cx/nyx — desktop only
+- **Modules:** `base` + `desktop` + `gaming` (Steam, gamemode, gamescope, AMD
+  GPU/LACT, MangoHud) + `waydroid`
+- **Disk:** plain **ext4, no LUKS** (no passphrase at boot — physical security at
+  home); disko GPT + ESP + ext4 root. Steam library is a fresh re-download.
+- **Monitors:** kanshi `desktop` profile — `DP-3` 2560x1440@144 @ 0,0 and `DP-2`
+  1920x1080@60 @ 2560,0.
 
-`hardware.nix` carries the AMD enablement (`kvm-amd`, `amd-ucode`, `amdgpu` KMS,
-`radeonsi` VAAPI, zram). `hardware/` holds the generated
-`hardware-configuration.nix` (added at install — see `docs/runbooks/desktop.md`).
+`hardware.nix` carries the AMD enablement (`amdgpu` early KMS, `radeonsi` VAAPI,
+zram). `hardware/` holds the generated `hardware-configuration.nix` (added at
+install).

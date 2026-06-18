@@ -23,7 +23,7 @@
     ../../modules/nixos/waydroid
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after the install-time
-    # `nixos-generate-config --no-filesystems` (see docs/runbooks/desktop.md)
+    # `nixos-generate-config --no-filesystems` (see hosts/desktop/INSTALL.md)
   ];
 
   networking.hostName = "desktop";

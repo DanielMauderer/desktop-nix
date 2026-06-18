@@ -9,7 +9,7 @@
 # (NOT imported by default.nix), so the nixosTest VMs — which import default.nix
 # directly — never see the LUKS/ESP layout and boot off their own scratch disk.
 #
-# Install-time use (see docs/runbooks/private-laptop.md): format the disk with
+# Install-time use (see hosts/private-laptop/INSTALL.md): format the disk with
 #   sudo nix --experimental-features "nix-command flakes" run \
 #     github:nix-community/disko/latest -- --mode disko \
 #     /mnt-etc/nixos/hosts/private-laptop/disk.nix
