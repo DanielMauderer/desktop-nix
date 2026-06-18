@@ -18,10 +18,7 @@
 #   sudo nix --experimental-features "nix-command flakes" run \
 #     github:nix-community/disko/latest -- --mode disko \
 #     /tmp/cfg/hosts/home-server/disk.nix
-{ inputs, ... }:
-{
-  imports = [ inputs.disko.nixosModules.disko ];
-
+_: {
   disko.devices.disk.main = {
     type = "disk";
     # VERIFY with `lsblk` before formatting — the OS SSD, NOT the RAID LUN that

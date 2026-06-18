@@ -13,10 +13,7 @@
 #   sudo nix --experimental-features "nix-command flakes" run \
 #     github:nix-community/disko/latest -- --mode disko \
 #     /mnt-etc/nixos/hosts/work-laptop/disk.nix
-{ inputs, ... }:
-{
-  imports = [ inputs.disko.nixosModules.disko ];
-
+_: {
   disko.devices.disk.main = {
     type = "disk";
     # VERIFY with `lsblk` before formatting — NVMe laptops are usually
