@@ -12,7 +12,8 @@
     hyprpolkitagent # polkit auth agent (started via exec-once)
     wl-clipboard # clipboard backend for hyprshot
     pavucontrol # audio mixer (waybar pulseaudio on-click)
-    playerctl # media key binds + waybar mpris
+    gsimplecal # calendar popup (waybar clock on-click); stylix themes its GTK UI
+    playerctl # media key binds + waybar custom/mpris script
     wireplumber # wpctl for the volume key binds (PipeWire-native)
     networkmanagerapplet # nm-applet + nm-connection-editor
     papirus-icon-theme # icon theme used by rofi

@@ -1,136 +1,164 @@
-/* The @define-color palette (text, base, mauve, …) is prepended by waybar.nix
- * from the stylix base16 palette (DECISIONS 022); the rest of this stylesheet
- * is the old waybar/style.css verbatim. */
+/* The @define-color palette (text, base, surface, accent, …) is prepended by
+ * waybar.nix from the stylix base16 palette (DECISIONS 022). This stylesheet
+ * was reworked after the migration: the old Catppuccin sheet relied on three
+ * surface tiers that base16 collapsed into two, and on selectors / animations
+ * that no longer matched Waybar's widget tree. */
 * {
     min-height: 0;
     font-family: "JetBrainsMonoNL Nerd Font", "Fira Sans Semibold", "Font Awesome 6 Free", FontAwesome, Roboto, Helvetica, Arial, sans-serif;
     font-size: 14px;
 }
-/* Waybar */
-#waybar {
-    background-color: transparent;
-}
 
-#waybar .module {
-    color: @text;
-    padding: 0px 0px;
-    padding-left: 2px;
-    margin: -10px 7px -10px;
-    border: 2px;
-}
-
-#waybar .module:hover {
-    color: @subtext1;
-
-}
-
+/* Transparent bar: the floating module "pills" below provide all the colour and
+ * depth, so they read as raised surfaces against the wallpaper. */
 window#waybar {
+    background: transparent;
     color: @text;
-    background-color: @base;
-    transition-property:  background-color;
-    transition-duration: 0.5s;
-    border: 2px solid @mauve;
+}
+
+.modules-left,
+.modules-center,
+.modules-right {
+    margin: 0;
+    padding: 0;
+}
+
+/* Module groups: raised rounded pills with a subtle border for separation. */
+#group-1,
+#group-2,
+#group-3,
+#group-4,
+#group-5,
+#group-9,
+#group-10 {
+    background: @surface;
+    border: 1px solid @surface2;
+    border-radius: 10px;
+    padding: 0 6px;
+    margin: 2px 0;
+}
+
+/* Generic module spacing/colour. Symmetric padding keeps click hit-areas
+ * aligned with the visuals (the old negative margins made buttons flaky). */
+#clock,
+#battery,
+#bluetooth,
+#network,
+#pulseaudio,
+#backlight,
+#cpu,
+#memory,
+#temperature,
+#idle_inhibitor,
+#window,
+#custom-mpris,
+#custom-vpn,
+#custom-power-profile,
+#custom-power,
+#custom-next,
+#custom-pause,
+#custom-previous {
+    color: @text;
+    padding: 0 8px;
+    background: transparent;
+}
+
+#custom-mpris,
+#custom-next,
+#custom-pause,
+#custom-previous {
+    font-size: 15px;
+    padding: 0 6px;
+}
+
+#window {
+    color: @subtext;
 }
 
 button {
-    box-shadow: inset 0 -3px transparent;
     border: none;
-    border-radius: 2px;
-    padding: 0px 5px;
-    margin: 5px 0px;
+    border-radius: 8px;
+    padding: 0 6px;
+    margin: 2px 0;
+    box-shadow: none;
 }
 
 button:hover {
-    background: inherit;
-    box-shadow: inset 0 -3px transparent;
+    background: @surface2;
+    box-shadow: none;
 }
 
+/* Workspaces */
 #workspaces button {
+    color: @subtext;
+    background: transparent;
+    border-radius: 8px;
+    padding: 0 8px;
+    margin: 3px 2px;
     box-shadow: none;
     text-shadow: none;
-    padding: 0px;
-    border-radius: 8px;
-    margin-top: 1em;
-    margin-bottom: 1em;
-    margin-left: 0px;
-    padding-left: 3px;
-    padding-right: 3px;
-    margin-right: 0px;
-    color: @text;
-    animation: ws_normal 20s ease-in-out 1;
-}
-
-#workspaces button.active {
-    background: @mauve;
-    color: @crust;
-    border-radius:  4.5pt;
-    margin-left: 0px;
-    padding-left: 8px;
-    padding-right: 8px;
-    margin-right: 0px;
-    animation: ws_active 20s ease-in-out 1;
-    transition: all 0.4s cubic-bezier(.55,-0.68,.48,1.682);
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 #workspaces button:hover {
-    background: @mantle;
+    background: @surface2;
     color: @text;
-    animation: ws_hover 20s ease-in-out 1;
-    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.682);
 }
 
-#clock {
-    font-size: 14px;
+#workspaces button.active {
+    background: @accent;
+    color: @base;
 }
 
-#group-10,
-#group-9,
-#group-5,
-#group-4,
-#group-3,
-#group-2,
-#group-1 {
-    margin: 0px 3px;
-    border-radius: 6px;
-    background: @base;
-    border: 2px;
+#workspaces button.urgent {
+    background: @red;
+    color: @base;
 }
 
-#custom-next, #custom-pause, #custom-previous {
-  font-size: 15px;
-}
-
+/* State colours */
 #network.disconnected,
-#pulseaudio.muted {
+#pulseaudio.muted,
+#custom-vpn.disconnected {
     color: @red;
 }
 
 #battery.charging,
-#battery.plugged {
+#battery.plugged,
+#custom-vpn.connected {
     color: @green;
 }
 
-label:focus {
-    background-color: @base;
+#battery.warning:not(.charging) {
+    color: @yellow;
 }
 
 #battery.critical:not(.charging) {
     color: @red;
     animation-name: blink;
-    animation-duration: 0.5s;
-    animation-timing-function: linear;
+    animation-duration: 0.8s;
+    animation-timing-function: ease-in-out;
     animation-iteration-count: infinite;
     animation-direction: alternate;
 }
 
-#custom-vpn {
-    padding: 0 10px;
+#idle_inhibitor.activated {
+    color: @accent2;
 }
 
-#custom-vpn.connected {
-    color: @green;
+@keyframes blink {
+    to {
+        color: @text;
+    }
 }
 
-#custom-vpn.disconnected {
-    color: @red;
+/* Tooltips (battery time-left, etc.) themed to match the dark palette. */
+tooltip {
+    background: @surface;
+    border: 1px solid @accent;
+    border-radius: 10px;
+}
+
+tooltip label {
+    color: @text;
+    padding: 2px;
 }
