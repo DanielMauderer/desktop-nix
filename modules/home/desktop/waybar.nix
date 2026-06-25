@@ -13,18 +13,17 @@ let
   c = config.lib.stylix.colors.withHashtag;
   colorCss = ''
     @define-color text ${c.base05};
-    @define-color subtext1 ${c.base04};
-    @define-color subtext0 ${c.base03};
-    @define-color overlay2 ${c.base02};
-    @define-color overlay1 ${c.base01};
-    @define-color overlay0 ${c.base01};
+    @define-color subtext ${c.base04};
+    @define-color muted ${c.base03};
+    @define-color surface2 ${c.base02};
+    @define-color surface ${c.base01};
     @define-color base ${c.base00};
-    @define-color mantle ${c.base01};
-    @define-color crust ${c.base00};
-    @define-color mauve ${c.base0D};
+    @define-color accent ${c.base0D};
+    @define-color accent2 ${c.base0C};
+    @define-color tertiary ${c.base0E};
     @define-color red ${c.base08};
-    @define-color sky ${c.base0C};
     @define-color green ${c.base0B};
+    @define-color yellow ${c.base0A};
   '';
 in
 {
@@ -43,7 +42,7 @@ in
       margin-right = 5;
       margin-top = 5;
       margin-bottom = 0;
-      spacing = 15;
+      spacing = 6;
       reload_style_on_change = true;
 
       modules-left = [
@@ -60,7 +59,7 @@ in
 
       "group/group-1".modules = [ "hyprland/workspaces" ];
       "group/group-9".modules = [
-        "mpris"
+        "custom/mpris"
         "custom/previous"
         "custom/pause"
         "custom/next"
@@ -102,10 +101,32 @@ in
         separate-outputs = false;
       };
 
+      # Time on the bar; the calendar is waybar's own, rendered inside the
+      # themed tooltip and coloured straight from the stylix palette so it
+      # matches the bar exactly (Pango markup needs literal hex, hence the
+      # interpolation). Right-click toggles month/year; scroll changes month.
       clock = {
         format = "{:%H:%M}";
-        tooltip-format = "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>";
         format-alt = "{:%Y-%m-%d}";
+        tooltip-format = "<span color='${c.base0D}'><b>{:%A, %d %B %Y}</b></span>\n<tt>{calendar}</tt>";
+        calendar = {
+          mode = "month";
+          mode-mon-col = 3;
+          weeks-pos = "right";
+          on-scroll = 1;
+          format = {
+            months = "<span color='${c.base0D}'><b>{}</b></span>";
+            days = "<span color='${c.base05}'>{}</span>";
+            weekdays = "<span color='${c.base0C}'><b>{}</b></span>";
+            today = "<span color='${c.base0A}'><b><u>{}</u></b></span>";
+            weeks = "<span color='${c.base03}'>{}</span>";
+          };
+        };
+        actions = {
+          on-click-right = "mode";
+          on-scroll-up = "shift_up";
+          on-scroll-down = "shift_down";
+        };
       };
 
       cpu = {
@@ -204,14 +225,21 @@ in
         };
       };
 
-      mpris = {
-        format = "{player_icon} {title} - {artist} ";
-        format-paused = "{status_icon} {title} - {artist}";
-        player-icons.default = "󰝚 ";
-        status-icons.paused = "󰏤 ";
-        tooltip-format = "Playing: {title} - {artist}";
-        min-length = 5;
-        max-length = 18;
+      # Now-playing via a hardened playerctl script instead of the built-in
+      # `mpris` module, whose D-Bus metadata handling intermittently crashed the
+      # whole bar (e.g. on Spotify track changes). The script escapes markup and
+      # never exits non-zero, so a misbehaving player can't take the bar down.
+      "custom/mpris" = {
+        exec = "${desktopScripts.waybar-mpris}/bin/waybar-mpris";
+        return-type = "json";
+        format = "{}";
+        on-click = "playerctl play-pause";
+        on-scroll-up = "playerctl next";
+        on-scroll-down = "playerctl previous";
+        # The script already escapes Pango markup, so Waybar must not escape
+        # again (escape = true would double-escape `&` into `&amp;`).
+        escape = false;
+        max-length = 40;
       };
 
       "custom/next" = {

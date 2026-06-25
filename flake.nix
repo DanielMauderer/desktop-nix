@@ -386,7 +386,7 @@
         node = pkgs.mkShell {
           packages = with pkgs; [
             nodejs
-            nodePackages.typescript-language-server
+            typescript-language-server
           ];
         };
         python = pkgs.mkShell {
@@ -896,18 +896,20 @@
             machine.succeed("systemctl cat waydroid-container.service")
 
             # Hyprland integration: the opt-in window rules for the Android
-            # toplevels were merged into maudi's rendered hyprland.conf.
+            # toplevels were merged into maudi's rendered hyprland.conf. The
+            # rules use Hyprland 0.47+ block syntax, so each assertion matches a
+            # whole `windowrule { … }` block (multiline grep, scoped by [^}]*).
             machine.wait_for_unit("home-manager-maudi.service")
             machine.succeed(
-                "grep -q 'windowrule=float, class:\\^(waydroid.*)\\$' "
+                r"grep -Pzoq 'windowrule \{[^}]*match:class = \^\(waydroid\.\*\)\$[^}]*float = true' "
                 "/home/maudi/.config/hypr/hyprland.conf"
             )
             machine.succeed(
-                "grep -q 'windowrule=float, title:\\^(Waydroid)\\$' "
+                r"grep -Pzoq 'windowrule \{[^}]*match:title = \^\(Waydroid\)\$[^}]*float = true' "
                 "/home/maudi/.config/hypr/hyprland.conf"
             )
             machine.succeed(
-                "grep -q 'windowrule=idleinhibit focus, class:\\^(waydroid.*)\\$' "
+                r"grep -Pzoq 'windowrule \{[^}]*match:class = \^\(waydroid\.\*\)\$[^}]*idle_inhibit = focus' "
                 "/home/maudi/.config/hypr/hyprland.conf"
             )
           '';

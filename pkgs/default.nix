@@ -76,6 +76,14 @@ in
     ]
   );
 
+  waybar-mpris = app "waybar-mpris" (
+    with pkgs;
+    [
+      playerctl
+      coreutils
+    ]
+  );
+
   waybar-networkmanager = app "waybar-networkmanager" (
     with pkgs;
     [

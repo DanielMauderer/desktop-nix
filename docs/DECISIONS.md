@@ -34,6 +34,8 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **stylix** derives the palette from `modules/nixos/desktop/wallpaper.png` at
   build time. waybar/wlogout/rofi/hyprland keep custom layouts and read colours
   from `config.lib.stylix.colors`.
+- **waybar media via a playerctl script, not the built-in `mpris` module** — it crashed the bar on some D-Bus metadata; `waybar-mpris` escapes markup and never exits non-zero.
+- **waybar calendar is the built-in clock tooltip, coloured from the palette** — Pango colours interpolated from stylix; no external popup (gsimplecal clashed with the theme).
 
 ## Updates
 - **Daily `system.autoUpgrade`** (`allowReboot = false`) from the committed
