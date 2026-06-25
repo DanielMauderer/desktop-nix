@@ -18,6 +18,10 @@ emit() {
     text="${text//>/&gt;}"
     text="${text//\\/\\\\}"
     text="${text//\"/\\\"}"
+    # Flatten control characters so they can't produce invalid JSON.
+    text="${text//$'\n'/ }"
+    text="${text//$'\r'/ }"
+    text="${text//$'\t'/ }"
     class="stopped"
     case "$status" in
         Playing) class="playing" ;;
@@ -52,9 +56,10 @@ while true; do
         --format "{{status}}${sep}{{title}}${sep}{{artist}}" 2>/dev/null |
         while IFS="$sep" read -r status title artist; do
             render "$status" "$title" "$artist"
-        done
+        done || true
     # No active player (or playerctl exited): clear the label and back off so
-    # the loop doesn't spin.
+    # the loop doesn't spin. The `|| true` keeps a non-zero playerctl exit (the
+    # pipeline fails under `set -o pipefail`) from killing the script here.
     emit "" ""
     sleep 2
 done

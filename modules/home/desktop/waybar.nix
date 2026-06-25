@@ -101,13 +101,32 @@ in
         separate-outputs = false;
       };
 
-      # Time only on the bar; the calendar is delegated to gsimplecal, a GTK
-      # popup that stylix themes (replacing the unstyled {calendar} tooltip).
+      # Time on the bar; the calendar is waybar's own, rendered inside the
+      # themed tooltip and coloured straight from the stylix palette so it
+      # matches the bar exactly (Pango markup needs literal hex, hence the
+      # interpolation). Right-click toggles month/year; scroll changes month.
       clock = {
         format = "{:%H:%M}";
         format-alt = "{:%Y-%m-%d}";
-        tooltip = false;
-        on-click = "gsimplecal";
+        tooltip-format = "<span color='${c.base0D}'><b>{:%A, %d %B %Y}</b></span>\n<tt>{calendar}</tt>";
+        calendar = {
+          mode = "month";
+          mode-mon-col = 3;
+          weeks-pos = "right";
+          on-scroll = 1;
+          format = {
+            months = "<span color='${c.base0D}'><b>{}</b></span>";
+            days = "<span color='${c.base05}'>{}</span>";
+            weekdays = "<span color='${c.base0C}'><b>{}</b></span>";
+            today = "<span color='${c.base0A}'><b><u>{}</u></b></span>";
+            weeks = "<span color='${c.base03}'>{}</span>";
+          };
+        };
+        actions = {
+          on-click-right = "mode";
+          on-scroll-up = "shift_up";
+          on-scroll-down = "shift_down";
+        };
       };
 
       cpu = {
@@ -217,7 +236,9 @@ in
         on-click = "playerctl play-pause";
         on-scroll-up = "playerctl next";
         on-scroll-down = "playerctl previous";
-        escape = true;
+        # The script already escapes Pango markup, so Waybar must not escape
+        # again (escape = true would double-escape `&` into `&amp;`).
+        escape = false;
         max-length = 40;
       };
 

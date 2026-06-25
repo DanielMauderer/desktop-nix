@@ -7,7 +7,7 @@ hyprland keep their custom layouts and read `config.lib.stylix.colors`.
 | File            | Configures                                                     |
 |-----------------|---------------------------------------------------------------|
 | `hyprland.nix`  | Hyprland settings: keybinds, window rules, workspaces.        |
-| `waybar.nix`    | waybar (+ `waybar-style.css`); media via the `waybar-mpris` script, calendar via gsimplecal. |
+| `waybar.nix`    | waybar (+ `waybar-style.css`); media via the `waybar-mpris` script; styled clock calendar tooltip. |
 | `swaync.nix`    | swaync notification daemon + control center.                  |
 | `rofi.nix`      | rofi launcher (+ `rofi-theme.rasi`).                          |
 | `wlogout.nix`   | wlogout power menu (+ `wlogout-style.css`).                   |

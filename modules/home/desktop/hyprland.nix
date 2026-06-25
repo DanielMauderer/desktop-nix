@@ -346,13 +346,6 @@ in
         size = 1000 700
         center = true
       }
-      windowrule {
-        name = wr-float-gsimplecal
-        match:class = ^(gsimplecal)$
-        float = true
-        pin = true
-        move = 100%-280 40
-      }
       layerrule {
         name = lr-noanim-selection
         match:namespace = selection
