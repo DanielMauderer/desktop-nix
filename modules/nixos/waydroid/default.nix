@@ -42,5 +42,10 @@ _: {
       match:title = ^(Waydroid)$
       float = true
     }
+    windowrule {
+      name = wr-idleinhibit-waydroid
+      match:class = ^(waydroid.*)$
+      idle_inhibit = focus
+    }
   '';
 }
