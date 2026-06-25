@@ -18,6 +18,7 @@
     pkg:
     builtins.elem (lib.getName pkg) [
       "spotify"
+      "claude-code"
       "steam"
       "steam-unwrapped"
       "steam-original"
