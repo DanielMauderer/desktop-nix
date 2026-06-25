@@ -7,7 +7,7 @@ formatters, DAP). They always load together.
 
 | File         | Configures                                                        |
 |--------------|------------------------------------------------------------------|
-| `default.nix`| Global toolchains: Rust (`cargo rustc rustfmt clippy` + `cargo-nextest`, `bacon`), Go, Node (LTS), Python (`python3` + `uv`), C (`gcc gnumake`), git tooling (`git-spice`, `gh`); plus direnv + nix-direnv. |
+| `default.nix`| Global toolchains: Rust (`cargo rustc rustfmt clippy` + `cargo-nextest`, `bacon`), Go, Node (LTS), Python (`python3` + `uv`), C (`gcc gnumake`), git tooling (`git-spice`, `gh`), `claude-code`; plus direnv + nix-direnv. |
 | `claude.nix` | Links the personal Claude config (`claude/`) into `~/.claude`.    |
 
 ## Where tools come from

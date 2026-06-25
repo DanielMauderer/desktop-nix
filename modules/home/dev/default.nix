@@ -39,6 +39,9 @@
     # ── Git tooling (aliases dormant since Ticket 06) ─────────────────────────
     git-spice # `gs` alias — stacked-PR workflow
     gh # GitHub CLI — lazygit's PR commands
+
+    # ── Claude Code ───────────────────────────────────────────────────────────
+    claude-code
   ];
 
   # direnv + nix-direnv: per-project devShells load automatically on `cd`.
