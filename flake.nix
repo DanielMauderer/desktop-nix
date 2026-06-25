@@ -386,7 +386,7 @@
         node = pkgs.mkShell {
           packages = with pkgs; [
             nodejs
-            nodePackages.typescript-language-server
+            typescript-language-server
           ];
         };
         python = pkgs.mkShell {
