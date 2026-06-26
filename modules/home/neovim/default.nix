@@ -23,6 +23,15 @@
     enable = true;
     vimAlias = true;
     viAlias = true;
+    # CRITICAL for the symlink below: home-manager otherwise writes the generated
+    # init.lua (provider settings + any theming target) to ~/.config/nvim/init.lua.
+    # That turns ~/.config/nvim into a managed directory, so the `ln -sfn` in
+    # home.activation.nvimConfig can't replace it and nests the link one level deep
+    # (~/.config/nvim/nvim) — nvim then loads the generated init.lua instead of the
+    # repo's lazy.nvim config (wrong theme, no plugins). sideloadInitLua loads the
+    # provider settings via a wrapper `--cmd 'lua dofile(...)'` instead, leaving
+    # ~/.config/nvim free for the symlink. (See stylix.targets.neovim below too.)
+    sideloadInitLua = true;
     # Only the python3 provider is used (pynvim, below). Drop the Ruby/Node/Perl
     # providers that home-manager pulls in by default — nothing in the config
     # uses them, so they only bloat the closure and add :checkhealth warnings.
@@ -36,6 +45,13 @@
     extraPython3Packages = ps: [ ps.pynvim ];
   };
 
+  # Stylix themes neovim via mini.base16 (a blue base16 palette) by enabling
+  # programs.neovim's generated init.lua. We manage the colorscheme ourselves
+  # (ember, set in nvim/lua/plugins/init.lua), and that generated init.lua is what
+  # would block the ~/.config/nvim symlink — so disable the target, like the
+  # waybar/hyprland/kitty targets elsewhere.
+  stylix.targets.neovim.enable = false;
+
   # Symlink the repo's nvim/ dir into ~/.config/nvim at activation time.
   # Using home.activation instead of xdg.configFile avoids the Nix build-sandbox
   # restriction: xdg.configFile recursively enumerates directory sources at build
@@ -44,7 +60,16 @@
     after = [ "writeBoundary" ];
     before = [ ];
     data = ''
-      ln -sfn "${config.home.homeDirectory}/desktop-nix/nvim" "${config.xdg.configHome}/nvim"
+      target="${config.xdg.configHome}/nvim"
+      # `ln -sfn` descends into an existing *real* directory instead of replacing
+      # it (it would create ~/.config/nvim/nvim). With sideloadInitLua = true
+      # home-manager no longer creates that directory, but an earlier generation
+      # may have left one behind — remove it first. Existing symlinks are replaced
+      # in place by `ln -sfn`, so only real directories need clearing.
+      if [ -d "$target" ] && [ ! -L "$target" ]; then
+        rm -rf "$target"
+      fi
+      ln -sfn "${config.home.homeDirectory}/desktop-nix/nvim" "$target"
     '';
   };
 

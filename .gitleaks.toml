@@ -1,0 +1,22 @@
+# gitleaks config — auto-loaded from the repo root by the pre-commit hook and
+# the `pre-commit-check` flake check (see flake.nix).
+#
+# Extends the upstream default ruleset; the allowlist below covers the only
+# real "secret" the repo commits on purpose: the test-fixture age key, whose
+# private half is published in flake.nix and the nixosTest because it guards
+# nothing real (it encrypts only secrets/fixtures/*). Everything else — real
+# decrypted secrets, stray private keys — must still trip the scanner.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Inert test-fixture key + the sops-encrypted fixtures it protects"
+regexes = [
+  # The known fixture age private key (committed deliberately in flake.nix).
+  '''AGE-SECRET-KEY-1ZTVVG7CHXYCL2JLJ6ADJ3JDMQ32AQPEWHHYNZ3E9MVM7KA6QZQFQC2JGGK''',
+]
+paths = [
+  # Fixtures are sops-encrypted and guard nothing real; skip to avoid entropy
+  # false-positives on their ciphertext.
+  '''secrets/fixtures/.*\.yaml$''',
+]

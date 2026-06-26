@@ -12,9 +12,9 @@
 keys:
   # Personal master key — decrypts everything. Generated once; private half in
   # the password manager (runbook step 1).
-  - &master age1PLACEHOLDERmasterxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &master age15xju06k4ncker6848tmwup5x7qhx9u9n8leasp6myn6mg5mhk9xsukltyy
   # Per-host keys: ssh-to-age of each /etc/ssh/ssh_host_ed25519_key.pub.
-  - &private_laptop age1PLACEHOLDERprivatelaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &private_laptop age10gjj6tf0cpadle54ng7jv9kllel5jvz6aanj6lmfugflpuwmeq3qcmg437
   - &work_laptop age1PLACEHOLDERworklaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   - &desktop age1PLACEHOLDERdesktopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   - &home_server age1PLACEHOLDERhomeserverxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

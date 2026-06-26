@@ -40,18 +40,15 @@ return {
 				},
 			},
 
-			-- Document existing key chains (kept in sync with the actual keymaps).
+			-- Document existing key chains
 			spec = {
-				{ "<leader>c", group = "[C]laude / [C]ode", mode = { "n", "x" } },
-				{ "<leader>d", group = "[D]ebugger" },
-				{ "<leader>f", group = "[F]ind / [F]ormat" },
-				{ "<leader>g", group = "[G]it" },
-				{ "<leader>h", group = "Git [H]unk", mode = { "n", "v" } },
-				{ "<leader>l", group = "[L]SP" },
-				{ "<leader>r", group = "[R]ust / [R]un" },
+				{ "<leader>c", group = "[C]laude", mode = { "n", "x" } },
+				{ "<leader>d", group = "[D]ocument" },
+				{ "<leader>r", group = "[R]ust" },
 				{ "<leader>s", group = "[S]earch" },
-				{ "<leader>t", group = "[T]oggle / [T]ree" },
-				{ "<leader>u", group = "[U]I toggles" },
+				{ "<leader>w", group = "[W]orkspace" },
+				{ "<leader>t", group = "[T]oggle" },
+				{ "<leader>h", group = "Git [H]unk", mode = { "n", "v" } },
 				{ "<leader>x", group = "Trouble", mode = { "n", "v" } },
 			},
 		},

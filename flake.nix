@@ -51,6 +51,15 @@
       url = "git+https://github.com/nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Pre-commit secret scanning (gitleaks): installed into .git/hooks on
+    # `nix develop` and run as a flake check so local + CI catch a secret
+    # (e.g. a decrypted sops file) before it is committed. The allowlist for
+    # the inert test-fixture key lives in .gitleaks.toml.
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -64,6 +73,15 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (nixpkgs) lib;
+
+      # gitleaks pre-commit gate. `.shellHook` installs the git hook on
+      # `nix develop`; the derivation itself is wired into checks below so
+      # `nix flake check` and CI scan the tree identically. gitleaks auto-loads
+      # the repo-root .gitleaks.toml (allowlists the inert test-fixture key).
+      preCommitCheck = inputs.git-hooks.lib.${system}.run {
+        src = ./.;
+        hooks.gitleaks.enable = true;
+      };
       mkHost = import ./lib/mkHost.nix {
         inherit
           inputs
@@ -348,17 +366,21 @@
 
       devShells.${system} = {
         default = pkgs.mkShell {
-          packages = with pkgs; [
-            nil
-            statix
-            deadnix
-            nixfmt
-            # Secrets: edit/re-key sops files and convert SSH host keys to age
-            # for enrollment (see modules/nixos/core/README.md).
-            sops
-            ssh-to-age
-            age
-          ];
+          # Installs the gitleaks pre-commit hook into .git/hooks on shell entry.
+          inherit (preCommitCheck) shellHook;
+          packages =
+            (with pkgs; [
+              nil
+              statix
+              deadnix
+              nixfmt
+              # Secrets: edit/re-key sops files and convert SSH host keys to age
+              # for enrollment (see modules/nixos/core/README.md).
+              sops
+              ssh-to-age
+              age
+            ])
+            ++ preCommitCheck.enabledPackages;
         };
 
         # Per-language project shells (Ticket 08 / DECISIONS 027). Enter with
@@ -400,6 +422,10 @@
       };
 
       checks.${system} = {
+        # Secret scanning: same gitleaks run the .git/hooks pre-commit uses, so
+        # local `nix flake check` and CI fail on a committed secret too.
+        pre-commit-check = preCommitCheck;
+
         statix-check =
           pkgs.runCommand "statix-check"
             {

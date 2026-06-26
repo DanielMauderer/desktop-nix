@@ -13,6 +13,7 @@
     ./kitty.nix
     ./fastfetch.nix
     ./lazygit.nix
+    ./git.nix
   ];
 
   home = {
@@ -57,4 +58,34 @@
   # agent per shell. The home-manager service starts one agent and exports
   # SSH_AUTH_SOCK for the session instead.
   services.ssh-agent.enable = true;
+
+  # Declarative ~/.ssh/config. The agent above holds keys; this tells ssh to use
+  # the host's ed25519 key for GitHub and to load it into the agent on first use
+  # (AddKeysToAgent = "yes" → one passphrase prompt per session, not per shell).
+  # The private key itself is per-host machine-local state, NOT in the repo:
+  # bootstrap each host once with `ssh-keygen -t ed25519` and add the .pub to
+  # GitHub (`gh ssh-key add ~/.ssh/id_ed25519.pub`). Remotes use git@github.com.
+  programs.ssh = {
+    enable = true;
+    # HM's implicit `Host *` defaults are deprecated; keep the ones we want.
+    enableDefaultConfig = false;
+    settings = {
+      "*" = {
+        ForwardAgent = false;
+        AddKeysToAgent = "yes";
+        Compression = false;
+        ServerAliveInterval = 0;
+        ServerAliveCountMax = 3;
+        HashKnownHosts = false;
+        UserKnownHostsFile = "~/.ssh/known_hosts";
+        ControlMaster = "no";
+        ControlPath = "~/.ssh/master-%r@%n:%p";
+        ControlPersist = "no";
+      };
+      "github.com" = {
+        User = "git";
+        IdentityFile = "~/.ssh/id_ed25519";
+      };
+    };
+  };
 }
