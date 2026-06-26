@@ -23,6 +23,15 @@ _: {
     scrollback_lines = 10000;
     wheel_scroll_min_lines = 1;
 
+    # home-manager symlinks this config into /nix/store, and kitty's auto-reload
+    # watcher recursively inotify-watches the resolved file's parent dir — i.e.
+    # the whole store (~180k watches per window), which exhausts the per-user
+    # inotify limit and breaks other watchers (e.g. waybar's battery module
+    # crashes with "Could not watch events for .../BAT0"). The config is
+    # declarative — a rebuild restarts kitty — so live reload buys nothing.
+    # A negative value disables the watcher entirely.
+    auto_reload_config = "-1";
+
     enable_audio_bell = "no";
     window_padding_width = 10;
     hide_window_decorations = "yes";

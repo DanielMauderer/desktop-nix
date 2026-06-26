@@ -57,35 +57,59 @@ in
         "group/group-2"
       ];
 
-      "group/group-1".modules = [ "hyprland/workspaces" ];
-      "group/group-9".modules = [
-        "custom/mpris"
-        "custom/previous"
-        "custom/pause"
-        "custom/next"
-      ];
-      "group/group-10".modules = [
-        "idle_inhibitor"
-        "custom/vpn"
-      ];
-      "group/group-5".modules = [ "hyprland/window" ];
-      "group/group-4".modules = [
-        "bluetooth"
-        "battery"
-        "network"
-        "custom/power-profile"
-        "custom/power"
-      ];
-      "group/group-3".modules = [
-        "clock"
-        "pulseaudio"
-        "backlight"
-      ];
-      "group/group-2".modules = [
-        "cpu"
-        "temperature"
-        "memory"
-      ];
+      # A Waybar group lays its children out in the orientation *opposite* the
+      # bar, so on this horizontal bar every multi-module group would stack its
+      # modules vertically (tall multi-line pills). Force horizontal on each.
+      "group/group-1" = {
+        orientation = "horizontal";
+        modules = [ "hyprland/workspaces" ];
+      };
+      "group/group-9" = {
+        orientation = "horizontal";
+        modules = [
+          "custom/mpris"
+          "custom/previous"
+          "custom/pause"
+          "custom/next"
+        ];
+      };
+      "group/group-10" = {
+        orientation = "horizontal";
+        modules = [
+          "idle_inhibitor"
+          "custom/vpn"
+        ];
+      };
+      "group/group-5" = {
+        orientation = "horizontal";
+        modules = [ "hyprland/window" ];
+      };
+      "group/group-4" = {
+        orientation = "horizontal";
+        modules = [
+          "bluetooth"
+          "battery"
+          "network"
+          "custom/power-profile"
+          "custom/power"
+        ];
+      };
+      "group/group-3" = {
+        orientation = "horizontal";
+        modules = [
+          "clock"
+          "pulseaudio"
+          "backlight"
+        ];
+      };
+      "group/group-2" = {
+        orientation = "horizontal";
+        modules = [
+          "cpu"
+          "temperature"
+          "memory"
+        ];
+      };
 
       "hyprland/workspaces" = {
         on-click = "activate";
@@ -131,34 +155,28 @@ in
 
       cpu = {
         interval = 2;
-        format = " {usage:>2}%";
+        format = "󰻠 {usage:>2}%";
         on-click = floatTop;
       };
 
       temperature = {
         critical-threshold = 80;
         interval = 2;
-        format = " {temperatureC:>2}°C";
+        format = "󰔏 {temperatureC:>2}°C";
         on-click = floatTop;
       };
 
       memory = {
         interval = 2;
-        format = " {:>2}%";
+        format = "󰍛 {:>2}%";
       };
 
       backlight = {
         format = "{icon} {percent:>2}%";
         format-icons = [
-          ""
-          ""
-          ""
-          ""
-          ""
-          ""
-          ""
-          ""
-          ""
+          "󰃞"
+          "󰃟"
+          "󰃠"
         ];
       };
 
@@ -185,20 +203,20 @@ in
         };
         format = "{icon} {capacity}%";
         format-full = "{icon}";
-        format-plugged = " {capacity}%";
+        format-plugged = "󰚥 {capacity}%";
         format-icons = [
-          ""
-          ""
-          ""
-          ""
+          "󰁻"
+          "󰁽"
+          "󰁿"
+          "󰁹"
         ];
         tooltip-format = "{capacity}%, about {time} left";
       };
 
       network = {
         format = "{ifname}";
-        format-wifi = "  {essid}";
-        format-ethernet = "  {ifname}";
+        format-wifi = "󰖩  {essid}";
+        format-ethernet = "󰈀  {ifname}";
         format-disconnected = "Disconnected ⚠";
         max-length = 50;
         on-click = "${desktopScripts.waybar-networkmanager}/bin/waybar-networkmanager";
@@ -210,9 +228,9 @@ in
         format-bluetooth = "{icon} {volume}% 󰂯";
         format-muted = "󰖁 {volume}%";
         format-icons.default = [
-          ""
-          ""
-          ""
+          "󰕿"
+          "󰖀"
+          "󰕾"
         ];
         on-click = "pavucontrol";
       };
@@ -252,8 +270,8 @@ in
         on-click = "playerctl play-pause";
         tooltip = false;
         format-icons = [
-          ""
-          ""
+          "󰐊"
+          "󰏤"
         ];
       };
       "custom/previous" = {
@@ -278,7 +296,7 @@ in
       };
 
       "custom/power" = {
-        format = "";
+        format = "󰐥";
         on-click = "wlogout";
         tooltip-format = "Power Menu";
       };
