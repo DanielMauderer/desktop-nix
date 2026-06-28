@@ -49,9 +49,11 @@ store). The `test-secrets` nixosTest proves this end-to-end in `nix flake check`
 - `update-lock.yml` (daily CI) runs `nix flake update` → PR → auto-merges on
   green. Hosts run `system.autoUpgrade` daily (`allowReboot = false`) from the
   committed `flake.lock`.
-- **private-laptop + desktop track `main`.** **work-laptop tracks `release`**,
-  which only fast-forwards to a `main` commit whose `build-hosts` CI is green
-  (`promote-release.yml`).
+- **Every host tracks the CI-gated `release` branch** (default in `updates.nix`),
+  which only fast-forwards to a `main` commit whose full CI (flake-check + every
+  per-host `build-hosts` job) is green (`promote-release.yml`) — so no host ever
+  auto-pulls a revision that failed to build, even one landed by a direct push to
+  `main`.
 - **One-time repo setup:** create the `LOCKBUMP_TOKEN` fine-grained PAT (Contents
   + Pull requests: read/write) so bot PRs trigger CI; enable auto-merge; protect
   `main` requiring `nix flake check` + the per-host build checks; seed `release`

@@ -15,7 +15,7 @@ hosts/<name>/
 | Host             | Role              | Stack                                          |
 |------------------|-------------------|------------------------------------------------|
 | `private-laptop` | Media + light dev | base + desktop + waydroid                      |
-| `work-laptop`    | Heavy dev         | base + desktop (+ wireguard, release channel)  |
+| `work-laptop`    | Heavy dev         | base + desktop (+ wireguard)                   |
 | `desktop`        | Gaming + dev      | base + desktop + gaming + waydroid             |
 | `home-server`    | Headless services | core + dev + server                            |
 

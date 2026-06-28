@@ -11,13 +11,10 @@
   networking.hostName = "work-laptop";
   system.stateVersion = "25.05";
 
-  # Update channel (DECISIONS 042): the work laptop is the one HA / policy-bound
-  # machine, so it tracks the CI-gated `release` branch instead of `main`. A
-  # commit only reaches `release` after its `build-hosts` job is green
-  # (.github/workflows/promote-release.yml), so an upgrade here is never the
-  # first build of that revision. Pilot (private-laptop) + desktop stay on `main`;
-  # the daily cadence is unchanged (modules/nixos/base/updates.nix).
-  system.autoUpgrade.flake = "github:DanielMauderer/desktop-nix/release";
+  # Update channel (DECISIONS 042): the whole fleet now tracks the CI-gated
+  # `release` branch by default (modules/nixos/core/updates.nix), so this host
+  # needs no override — a commit only reaches `release` after its full CI is green
+  # (.github/workflows/promote-release.yml).
 
   # Idle policy (DECISIONS 042): keep the 5-min screen lock (modules/home/desktop/
   # lockscreen.nix) but lengthen auto-suspend from 10 → 30 min on this host, so an

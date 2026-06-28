@@ -40,8 +40,9 @@ matters lives here; the rest is in the Nix code and `git log`.
 ## Updates
 - **Daily `system.autoUpgrade`** (`allowReboot = false`) from the committed
   `flake.lock`; CI bumps the lock (`update-lock.yml`).
-- **work-laptop tracks the CI-gated `release` branch**; pilot + desktop track
-  `main`. Promotion model: `modules/nixos/core/README.md`.
+- **All hosts track the CI-gated `release` branch**, which only advances to a
+  `main` commit whose full CI is green. Promotion model:
+  `modules/nixos/core/README.md`.
 - **First-login password**: hosts ship a hashed throwaway password, force-expired
   once at first activation so `maudi` must set a real one.
 
@@ -49,5 +50,5 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **gaming** (CachyOS, Steam, AMD GPU) — desktop only.
 - **waydroid** (Android container) — private-laptop + desktop; never work-laptop.
 - **server** (WireGuard server, SSH-over-VPN, ZFS, NFS) — home-server only.
-- **work-laptop hardening** — release channel, longer auto-suspend (30 min),
-  WireGuard client + sops; no gaming, no waydroid (policy-bound machine).
+- **work-laptop hardening** — longer auto-suspend (30 min), WireGuard client +
+  sops; no gaming, no waydroid (policy-bound machine).

@@ -19,10 +19,6 @@ Work laptop — heavy development, policy-bound. Install guide:
 This is the one machine with a corporate security policy, so it tightens the
 shared baseline:
 
-- **Update channel:** tracks the CI-gated **`release`** branch
-  (`system.autoUpgrade.flake = …/desktop-nix/release`), not `main` — a revision
-  only reaches `release` after its `build-hosts` CI is green, so an upgrade here
-  is never the first build of that revision.
 - **Idle policy:** 5-min screen lock (shared) but auto-suspend lengthened to
   **30 min** so an unattended build or a long docked meeting isn't force-suspended.
 - **WireGuard VPN:** the work VPN client (`wg-quick` + sops-nix private key) —

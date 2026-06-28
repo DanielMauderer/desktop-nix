@@ -2,11 +2,12 @@
 # 039, 042): pull this flake on a daily timer and switch. No auto-reboot —
 # kernel/initrd changes take effect on the next manual reboot.
 #
-# Per-host channel (DECISIONS 042): the default tracked ref is `main`
-# (`mkDefault` below) — the private-laptop pilot and the desktop ride it. The
-# work-laptop overrides `flake` to the `…/release` branch, which CI fast-forwards
-# only after a commit's `build-hosts` job is green, so the policy machine never
-# pulls a ref that failed to build. All hosts keep the same `daily` cadence.
+# Build-gated channel (DECISIONS 042): every host tracks the CI-gated `release`
+# branch (`mkDefault` below). CI fast-forwards `release` to a `main` commit only
+# after that commit's full CI (flake-check + every per-host `build-hosts` job) is
+# green (.github/workflows/promote-release.yml), so no machine ever auto-pulls a
+# revision that failed to build — including one landed by a direct push to `main`
+# that skipped the PR checks. All hosts keep the same `daily` cadence.
 #
 # Cadence is `daily` (not `weekly`) for the Linux workstation security policy
 # §4.4/§4.5 (security updates ≤ 72h; DECISIONS 039). `autoUpgrade` rebuilds from
@@ -17,7 +18,7 @@
 {
   system.autoUpgrade = {
     enable = true;
-    flake = lib.mkDefault "github:DanielMauderer/desktop-nix";
+    flake = lib.mkDefault "github:DanielMauderer/desktop-nix/release";
     flags = [ "-L" ];
     dates = "daily";
     randomizedDelaySec = "45min";
