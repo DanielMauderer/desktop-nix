@@ -5,8 +5,6 @@
 # Hyprland session.
 { config, desktopScripts, ... }:
 let
-  floatTop = "kitty --class dotfiles-floating -e fish -c 'top; exec fish'";
-
   # Colours come from the stylix palette (DECISIONS 022). The stylix waybar
   # target is disabled below so it doesn't restyle the bar; instead we map the
   # base16 palette onto the semantic @define-color names waybar-style.css uses.
@@ -53,8 +51,8 @@ in
       modules-center = [ "group/group-5" ];
       modules-right = [
         "group/group-4"
+        "group/group-6"
         "group/group-3"
-        "group/group-2"
       ];
 
       # A Waybar group lays its children out in the orientation *opposite* the
@@ -88,8 +86,13 @@ in
         orientation = "horizontal";
         modules = [
           "bluetooth"
-          "battery"
           "network"
+        ];
+      };
+      "group/group-6" = {
+        orientation = "horizontal";
+        modules = [
+          "battery"
           "custom/power-profile"
           "custom/power"
         ];
@@ -102,15 +105,6 @@ in
           "backlight"
         ];
       };
-      "group/group-2" = {
-        orientation = "horizontal";
-        modules = [
-          "cpu"
-          "temperature"
-          "memory"
-        ];
-      };
-
       "hyprland/workspaces" = {
         on-click = "activate";
         activate-only = false;
@@ -151,24 +145,6 @@ in
           on-scroll-up = "shift_up";
           on-scroll-down = "shift_down";
         };
-      };
-
-      cpu = {
-        interval = 2;
-        format = "󰻠 {usage:>2}%";
-        on-click = floatTop;
-      };
-
-      temperature = {
-        critical-threshold = 80;
-        interval = 2;
-        format = "󰔏 {temperatureC:>2}°C";
-        on-click = floatTop;
-      };
-
-      memory = {
-        interval = 2;
-        format = "󰍛 {:>2}%";
       };
 
       backlight = {
