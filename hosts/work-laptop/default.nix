@@ -19,10 +19,12 @@
   # Idle policy (DECISIONS 042): keep the 5-min screen lock (modules/home/desktop/
   # lockscreen.nix) but lengthen auto-suspend from 10 → 30 min on this host, so an
   # unattended build/update or a long meeting on the dock isn't force-suspended.
+  # Guard the lock the same way as the shared module (lockscreen.nix) so a
+  # second swaylock never stacks and the screen isn't unlocked twice on resume.
   home-manager.users.maudi.services.swayidle.timeouts = lib.mkForce [
     {
       timeout = 300;
-      command = "${pkgs.swaylock-effects}/bin/swaylock";
+      command = "${pkgs.procps}/bin/pgrep -x swaylock || ${pkgs.swaylock-effects}/bin/swaylock -f";
     }
     {
       timeout = 1800;
