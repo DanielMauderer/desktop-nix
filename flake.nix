@@ -80,7 +80,18 @@
       # the repo-root .gitleaks.toml (allowlists the inert test-fixture key).
       preCommitCheck = inputs.git-hooks.lib.${system}.run {
         src = ./.;
-        hooks.gitleaks.enable = true;
+        # git-hooks.nix dropped its built-in `gitleaks` hook, so define it as a
+        # custom hook. `gitleaks dir` scans the filesystem (no .git required — the
+        # flake-check sandbox copies `src` without it, unlike `gitleaks git`) and
+        # auto-loads the repo-root .gitleaks.toml allowlist. pass_filenames = false
+        # so it runs once over the whole tree instead of per staged file.
+        hooks.gitleaks = {
+          enable = true;
+          name = "gitleaks";
+          package = pkgs.gitleaks;
+          entry = "${pkgs.gitleaks}/bin/gitleaks dir --no-banner --redact .";
+          pass_filenames = false;
+        };
       };
       mkHost = import ./lib/mkHost.nix {
         inherit
@@ -212,6 +223,13 @@
           name = "security updates applied daily, ≤72h window (policy §4.4, DECISIONS 039)";
           assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "daily";
         }
+        {
+          # Fleet-wide since DECISIONS 042: every host tracks the CI-gated
+          # `release` branch, which only advances to a `main` commit whose full CI
+          # is green — so no machine auto-pulls a revision that failed to build.
+          name = "tracks the CI-gated release branch (DECISIONS 042)";
+          assertion = lib.hasSuffix "/release" cfg.system.autoUpgrade.flake;
+        }
       ];
 
       # Assertions for the desktop/workstation hosts (those that import
@@ -252,14 +270,6 @@
           {
             name = "SSH daemon disabled (Ticket 14 / DECISIONS 037)";
             assertion = !cfg.services.openssh.enable;
-          }
-          {
-            name = "work-laptop tracks the CI-gated release branch; pilot/desktop track main (DECISIONS 042)";
-            assertion =
-              let
-                onRelease = lib.hasSuffix "/release" cfg.system.autoUpgrade.flake;
-              in
-              if host == "work-laptop" then onRelease else !onRelease;
           }
         ];
 
