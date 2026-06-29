@@ -8,6 +8,15 @@
 # automatically. swaylock's PAM service is enabled system-side in
 # modules/nixos/desktop.
 { pkgs, ... }:
+let
+  # Lock guard: only spawn swaylock if one isn't already running, so a second
+  # instance never stacks (e.g. the 300s idle timeout locks, then before-sleep
+  # fires on suspend) — otherwise the screen has to be unlocked twice on resume.
+  # `-f` forks after the lock surface is up so swayidle's -w is satisfied and
+  # systemd can proceed with the actual suspend. pgrep/swaylock are pinned by
+  # store path because the swayidle user service's PATH isn't guaranteed.
+  lockOnce = "${pkgs.procps}/bin/pgrep -x swaylock || ${pkgs.swaylock-effects}/bin/swaylock -f";
+in
 {
   home.packages = [ pkgs.swaybg ];
 
@@ -27,13 +36,13 @@
     timeouts = [
       {
         timeout = 300;
-        command = "${pkgs.swaylock-effects}/bin/swaylock";
+        command = lockOnce;
       }
       {
         timeout = 600;
         command = "systemctl suspend";
       }
     ];
-    events.before-sleep = "${pkgs.swaylock-effects}/bin/swaylock";
+    events.before-sleep = lockOnce;
   };
 }

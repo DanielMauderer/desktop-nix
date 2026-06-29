@@ -213,7 +213,7 @@ in
       bind = [
         # Applications
         "$mainMod, RETURN, exec, kitty"
-        "$mainMod, B, exec, flatpak run app.zen_browser.zen"
+        "$mainMod, B, exec, zen-twilight"
         "$mainMod, E, exec, thunar"
 
         # Window management
