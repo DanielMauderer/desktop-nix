@@ -35,8 +35,13 @@ nixpkgs.lib.nixosSystem {
     # here means disk.nix only needs to set `disko.devices.*`.
     inputs.disko.nixosModules.disko
     {
-      home-manager.useGlobalPkgs = true;
-      home-manager.useUserPackages = true;
+      home-manager = {
+        useGlobalPkgs = true;
+        useUserPackages = true;
+        # Flake inputs reach the home-manager modules (the neovim module imports
+        # nixvim's home module and builds a few unpackaged plugins from inputs).
+        extraSpecialArgs = { inherit inputs; };
+      };
     }
   ]
   ++ (if withChaotic then [ chaotic.nixosModules.default ] else [ ])
