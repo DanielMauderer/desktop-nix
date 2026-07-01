@@ -37,6 +37,11 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **waybar media via a playerctl script, not the built-in `mpris` module** — it crashed the bar on some D-Bus metadata; `waybar-mpris` escapes markup and never exits non-zero.
 - **waybar calendar is the built-in clock tooltip, coloured from the palette** — Pango colours interpolated from stylix; no external popup (gsimplecal clashed with the theme).
 
+## Editor
+- **Neovim is declarative via nixvim** (revises the earlier "keep lazy.nvim as-is"
+  choice): no Lua files or runtime plugin clones, plugins from nixpkgs, look/feel
+  unchanged (ember colorscheme, same keymaps). Config in `modules/home/neovim/`.
+
 ## Updates
 - **Daily `system.autoUpgrade`** (`allowReboot = false`) from the committed
   `flake.lock`; CI bumps the lock (`update-lock.yml`).

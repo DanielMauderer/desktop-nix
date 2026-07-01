@@ -60,6 +60,35 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Declarative Neovim (reverses DECISIONS 024): nixvim renders the whole
+    # editor config from Nix, so the lazy.nvim tree under nvim/ is gone. Plugins
+    # come from nixpkgs (accept its versions); the three below are not packaged
+    # there and are pulled as raw sources built with vimUtils.buildVimPlugin.
+    # follows nixpkgs to keep the fleet on a single nixpkgs (repo convention).
+    nixvim = {
+      url = "github:nix-community/nixvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # ember colorscheme — the editor's look; pinned to the commit the old
+    # lazy-lock.json used so the palette is byte-identical.
+    ember-theme = {
+      url = "github:ember-theme/nvim/7365b8dede43a82ed1df741275b75333422e5402";
+      flake = false;
+    };
+
+    # LSP hover prettifier (blink dependency) — not in nixpkgs.
+    pretty-hover = {
+      url = "github:Fildo7525/pretty_hover/934df974ef6158b100fe910e8556e6c4a66614c2";
+      flake = false;
+    };
+
+    # Code-action picker — not in nixpkgs.
+    tiny-code-action = {
+      url = "github:rachartier/tiny-code-action.nvim/0d040ed81f7953118b81cd12681fcdfcac069803";
+      flake = false;
+    };
   };
 
   outputs =
@@ -350,8 +379,11 @@
           ./hosts/private-laptop/default.nix
         ];
         _module.args.inputs = inputs;
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          extraSpecialArgs = { inherit inputs; };
+        };
       };
 
       # Gaming test node (Ticket 11): the desktop host, which mkHost composes
@@ -367,8 +399,11 @@
           ./hosts/desktop/default.nix
         ];
         _module.args.inputs = inputs;
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          extraSpecialArgs = { inherit inputs; };
+        };
       };
     in
     {
@@ -465,24 +500,6 @@
             }
             ''
               find ${./.} -name '*.nix' -print0 | xargs -0 nixfmt --check
-              touch $out
-            '';
-
-        # Neovim Lua config gate (nvim audit NV-Q-8): stylua formatting + luacheck
-        # lint. Kept here (not a separate CI step) so local `nix flake check` and
-        # CI stay identical. luacheck reads nvim/.luacheckrc for the Neovim globals.
-        nvim-lua-check =
-          pkgs.runCommand "nvim-lua-check"
-            {
-              nativeBuildInputs = [
-                pkgs.stylua
-                pkgs.lua54Packages.luacheck
-              ];
-            }
-            ''
-              stylua --check ${./nvim}
-              cd ${./nvim}
-              luacheck .
               touch $out
             '';
 
@@ -733,6 +750,17 @@
             machine.succeed("test -e /home/maudi/.config/kitty/kitty.conf")
             machine.succeed("test -e /home/maudi/.config/fastfetch/config.jsonc")
             machine.succeed("test -e /home/maudi/.config/lazygit/config.yml")
+
+            # Neovim (nixvim, DECISIONS 024 revised): the declarative editor is
+            # installed and starts cleanly headless, with the ember colorscheme
+            # applied — the config's whole point is to keep the old look/feel.
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/nvim")
+            machine.succeed(
+                "su maudi -c 'nvim --headless "
+                "\"+lua local f = io.open([[/tmp/cs]], [[w]]); "
+                "f:write(tostring(vim.g.colors_name)); f:close()\" +qa'"
+            )
+            machine.succeed("grep -qx ember /tmp/cs")
 
             # fish starts cleanly and the ported aliases/functions resolve.
             machine.succeed("su maudi -c 'fish -ic \"true\"'")
@@ -1012,8 +1040,11 @@
                 ./hosts/private-laptop/default.nix
               ];
               _module.args.inputs = inputs;
-              home-manager.useGlobalPkgs = true;
-              home-manager.useUserPackages = true;
+              home-manager = {
+                useGlobalPkgs = true;
+                useUserPackages = true;
+                extraSpecialArgs = { inherit inputs; };
+              };
 
               environment.etc."test-age-key.txt" = {
                 text = testAgeKey + "\n";
