@@ -60,6 +60,35 @@
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Declarative Neovim (reverses DECISIONS 024): nixvim renders the whole
+    # editor config from Nix, so the lazy.nvim tree under nvim/ is gone. Plugins
+    # come from nixpkgs (accept its versions); the three below are not packaged
+    # there and are pulled as raw sources built with vimUtils.buildVimPlugin.
+    # follows nixpkgs to keep the fleet on a single nixpkgs (repo convention).
+    nixvim = {
+      url = "github:nix-community/nixvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # ember colorscheme — the editor's look; pinned to the commit the old
+    # lazy-lock.json used so the palette is byte-identical.
+    ember-theme = {
+      url = "github:ember-theme/nvim/7365b8dede43a82ed1df741275b75333422e5402";
+      flake = false;
+    };
+
+    # LSP hover prettifier (blink dependency) — not in nixpkgs.
+    pretty-hover = {
+      url = "github:Fildo7525/pretty_hover/934df974ef6158b100fe910e8556e6c4a66614c2";
+      flake = false;
+    };
+
+    # Code-action picker — not in nixpkgs.
+    tiny-code-action = {
+      url = "github:rachartier/tiny-code-action.nvim/0d040ed81f7953118b81cd12681fcdfcac069803";
+      flake = false;
+    };
   };
 
   outputs =
@@ -162,6 +191,22 @@
         else
           pkgs.runCommand "host-assertions-${name}" { } ''
             ${extraScript}
+            touch $out
+          '';
+
+      # Pure-Nix unit checks (no VM, no host eval): a list of {name, assertion}
+      # pairs is imported from a *.test.nix file and checked at construction
+      # time — same failure-reporting shape as mkHostCheck above, minus the
+      # build-time extraScript (these tests never need to build anything).
+      mkUnitCheck =
+        name: tests:
+        let
+          failed = builtins.filter (t: !t.assertion) tests;
+        in
+        if failed != [ ] then
+          throw "unit-check-${name} failed:\n${lib.concatMapStringsSep "\n" (t: "  - ${t.name}") failed}"
+        else
+          pkgs.runCommand "unit-check-${name}" { } ''
             touch $out
           '';
 
@@ -350,8 +395,11 @@
           ./hosts/private-laptop/default.nix
         ];
         _module.args.inputs = inputs;
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          extraSpecialArgs = { inherit inputs; };
+        };
       };
 
       # Gaming test node (Ticket 11): the desktop host, which mkHost composes
@@ -367,8 +415,11 @@
           ./hosts/desktop/default.nix
         ];
         _module.args.inputs = inputs;
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          extraSpecialArgs = { inherit inputs; };
+        };
       };
     in
     {
@@ -468,24 +519,6 @@
               touch $out
             '';
 
-        # Neovim Lua config gate (nvim audit NV-Q-8): stylua formatting + luacheck
-        # lint. Kept here (not a separate CI step) so local `nix flake check` and
-        # CI stay identical. luacheck reads nvim/.luacheckrc for the Neovim globals.
-        nvim-lua-check =
-          pkgs.runCommand "nvim-lua-check"
-            {
-              nativeBuildInputs = [
-                pkgs.stylua
-                pkgs.lua54Packages.luacheck
-              ];
-            }
-            ''
-              stylua --check ${./nvim}
-              cd ${./nvim}
-              luacheck .
-              touch $out
-            '';
-
         # Dev devShell smoke checks (Ticket 08): each toolchain compiles/runs a
         # trivial hello-world offline, so a broken per-language shell fails the
         # flake check. Cheap (node/python/go) plus a minimal rust+nextest build.
@@ -528,6 +561,21 @@
               cargo nextest run --offline
               touch $out
             '';
+
+        # Unit tests (pure Nix, no host eval / no VM) for the nixvim conversion:
+        # lib/mkHost.nix's extraSpecialArgs wiring, and the neovim module split
+        # between default.nix (plugin building + stylix guard) and settings.nix
+        # (the actual programs.nixvim value), each documented as independently
+        # testable. See lib/mkHost.test.nix and modules/home/neovim/*.test.nix.
+        unit-mkhost-check = mkUnitCheck "mkHost" (import ./lib/mkHost.test.nix { inherit lib; });
+
+        unit-nvim-default-check = mkUnitCheck "nvim-default" (
+          import ./modules/home/neovim/default.test.nix { inherit lib pkgs; }
+        );
+
+        unit-nvim-settings-check = mkUnitCheck "nvim-settings" (
+          import ./modules/home/neovim/settings.test.nix { inherit lib pkgs; }
+        );
 
         # Eval-level checks for the per-host deltas that CI's toplevel builds
         # don't assert: chaotic only on desktop, kanshi profile ordering
@@ -733,6 +781,17 @@
             machine.succeed("test -e /home/maudi/.config/kitty/kitty.conf")
             machine.succeed("test -e /home/maudi/.config/fastfetch/config.jsonc")
             machine.succeed("test -e /home/maudi/.config/lazygit/config.yml")
+
+            # Neovim (nixvim, DECISIONS 024 revised): the declarative editor is
+            # installed and starts cleanly headless, with the ember colorscheme
+            # applied — the config's whole point is to keep the old look/feel.
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/nvim")
+            machine.succeed(
+                "su maudi -c 'nvim --headless "
+                "\"+lua local f = io.open([[/tmp/cs]], [[w]]); "
+                "f:write(tostring(vim.g.colors_name)); f:close()\" +qa'"
+            )
+            machine.succeed("grep -qx ember /tmp/cs")
 
             # fish starts cleanly and the ported aliases/functions resolve.
             machine.succeed("su maudi -c 'fish -ic \"true\"'")
@@ -1012,8 +1071,11 @@
                 ./hosts/private-laptop/default.nix
               ];
               _module.args.inputs = inputs;
-              home-manager.useGlobalPkgs = true;
-              home-manager.useUserPackages = true;
+              home-manager = {
+                useGlobalPkgs = true;
+                useUserPackages = true;
+                extraSpecialArgs = { inherit inputs; };
+              };
 
               environment.etc."test-age-key.txt" = {
                 text = testAgeKey + "\n";
