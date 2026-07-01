@@ -756,7 +756,7 @@
             # applied — the config's whole point is to keep the old look/feel.
             machine.succeed("test -x /etc/profiles/per-user/maudi/bin/nvim")
             machine.succeed(
-                "su maudi -c 'nvim --headless "
+                "su maudi -c '/etc/profiles/per-user/maudi/bin/nvim --headless "
                 "\"+lua local f = io.open([[/tmp/cs]], [[w]]); "
                 "f:write(tostring(vim.g.colors_name)); f:close()\" +qa'"
             )

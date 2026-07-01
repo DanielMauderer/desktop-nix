@@ -829,6 +829,13 @@
 
       local binary_picker = function()
         local co = coroutine.running()
+        local resumed = false
+        local function resume(value)
+          if not resumed then
+            resumed = true
+            coroutine.resume(co, value)
+          end
+        end
         vim.schedule(function()
           local cwd = vim.fn.getcwd()
           local handle = io.popen(
@@ -848,10 +855,11 @@
               return { { item.text, "Normal" } }
             end,
             confirm = function(picker, item)
+              resume(item and item.file or nil)
               picker:close()
-              if item then
-                coroutine.resume(co, item.file)
-              end
+            end,
+            on_close = function()
+              resume(nil)
             end,
           })
         end)
@@ -860,6 +868,13 @@
 
       local cargo_target_picker = function()
         local co = coroutine.running()
+        local resumed = false
+        local function resume(value)
+          if not resumed then
+            resumed = true
+            coroutine.resume(co, value)
+          end
+        end
         vim.schedule(function()
           local handle = io.popen("cargo metadata --no-deps --format-version 1 2>/dev/null")
           local items = {}
@@ -887,15 +902,19 @@
               return { { string.format("%s - %s", item.kind, item.name), "Normal" } }
             end,
             confirm = function(picker, item)
+              resume(item)
               picker:close()
-              if item then
-                coroutine.resume(co, item)
-              end
+            end,
+            on_close = function()
+              resume(nil)
             end,
           })
         end)
 
         local pick = coroutine.yield()
+        if not pick then
+          return nil
+        end
         vim.notify(
           string.format("Build command:\ncargo build --%s %s", pick.kind, pick.name),
           vim.log.levels.INFO
@@ -1390,7 +1409,15 @@
       end
 
       function LspManager.restart_all_servers()
-        local running = vim.tbl_keys(get_lsp_clients())
+        -- Only touch servers this module manages; rust_analyzer (rustaceanvim)
+        -- and any other client can't be restarted via our vim.lsp.config set.
+        local managed = {}
+        for _, server_name in ipairs(get_available_servers()) do
+          managed[server_name] = true
+        end
+        local running = vim.tbl_filter(function(server_name)
+          return managed[server_name]
+        end, vim.tbl_keys(get_lsp_clients()))
         for _, server_name in ipairs(running) do
           stop_server(server_name)
         end

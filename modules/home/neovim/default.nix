@@ -19,6 +19,7 @@
 # (cargo/rustc/rustfmt, gcc/gnumake, nodejs) still live in modules/home/dev and load
 # alongside via modules/nixos/base/home.nix.
 {
+  config,
   inputs,
   lib,
   options,
@@ -58,6 +59,45 @@ in
           tiny-code-action
           ;
       };
+    }
+
+    {
+      # Install only the parsers the old lazy.nvim config used, not nixvim's
+      # default of *all* grammars — that added ~300 parser/query derivations to
+      # every host closure (and to `nix flake check`), for no behaviour change on
+      # the languages actually edited here. Sourced from the configured
+      # nvim-treesitter package so the query files stay compatible.
+      programs.nixvim.plugins.treesitter.grammarPackages =
+        with config.programs.nixvim.plugins.treesitter.package.builtGrammars; [
+          angular
+          bash
+          c
+          cpp
+          css
+          diff
+          dockerfile
+          go
+          gomod
+          gosum
+          html
+          javascript
+          json
+          lua
+          luadoc
+          markdown
+          markdown_inline
+          python
+          query
+          regex
+          rust
+          scss
+          toml
+          tsx
+          typescript
+          vim
+          vimdoc
+          yaml
+        ];
     }
 
     # Stylix themes neovim via its generated init.lua; nixvim owns the colorscheme
