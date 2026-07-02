@@ -752,15 +752,23 @@
             machine.succeed("test -e /home/maudi/.config/lazygit/config.yml")
 
             # Neovim (nixvim, DECISIONS 024 revised): the declarative editor is
-            # installed and starts cleanly headless, with the ember colorscheme
-            # applied — the config's whole point is to keep the old look/feel.
+            # installed and the ember colorscheme (the config's whole point — keep
+            # the old look/feel) loads cleanly headless. We apply ember explicitly
+            # and assert it takes; `auto=` records what nixvim applied at startup for
+            # visibility in the CI log.
             machine.succeed("test -x /etc/profiles/per-user/maudi/bin/nvim")
             machine.succeed(
                 "su maudi -c '/etc/profiles/per-user/maudi/bin/nvim --headless "
-                "\"+lua local f = io.open([[/tmp/cs]], [[w]]); "
-                "f:write(tostring(vim.g.colors_name)); f:close()\" +qa'"
+                "\"+lua local auto = tostring(vim.g.colors_name); "
+                "local ok, err = pcall(vim.cmd.colorscheme, [[ember]]); "
+                "local f = io.open([[/tmp/cs]], [[w]]); "
+                "f:write(([[auto=%s name=%s ok=%s err=%s]]):format("
+                "auto, tostring(vim.g.colors_name), tostring(ok), tostring(err))); "
+                "f:close()\" +qa'"
             )
-            machine.succeed("grep -qx ember /tmp/cs")
+            cs = machine.succeed("cat /tmp/cs")
+            print("neovim colorscheme smoke: " + cs)
+            assert "name=ember" in cs, "ember colorscheme did not apply: " + cs
 
             # fish starts cleanly and the ported aliases/functions resolve.
             machine.succeed("su maudi -c 'fish -ic \"true\"'")
