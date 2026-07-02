@@ -100,12 +100,14 @@ in
         ];
     }
 
-    # Stylix themes neovim via its generated init.lua; nixvim owns the colorscheme
-    # (ember), so disable the stylix target where the option exists. Guarded because
-    # stylix is only imported on desktop hosts (headless home-server has no stylix,
-    # and defining an undeclared option is an eval error).
+    # Stylix themes nixvim by injecting a mini.base16 palette into the generated
+    # init.lua, which overrides our `ember` colorscheme. We use programs.nixvim, so
+    # the relevant target is `nixvim` (the `neovim` target only applies to
+    # programs.neovim, which we don't use — disabling it was a no-op). Guarded
+    # because stylix is only imported on desktop hosts (headless home-server has no
+    # stylix, and defining an undeclared option is an eval error).
     (lib.optionalAttrs (options ? stylix) {
-      stylix.targets.neovim.enable = false;
+      stylix.targets.nixvim.enable = false;
     })
   ];
 }

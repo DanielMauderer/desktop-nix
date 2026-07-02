@@ -157,6 +157,8 @@
       aerial-nvim
       oil-nvim
       fzf-lua
+      fzfWrapper # base fzf vim plugin (fzf#run), dependency of fzf.vim
+      fzf-vim # :Rg / :Files / :GFiles / :Buffers commands
       grug-far-nvim
       neo-tree-nvim
       neogit
