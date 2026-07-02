@@ -21,7 +21,7 @@
 - GUI apps: Flatpak (`flatpak install`).
 
 ## Dev Environment
-- Editor: Neovim (config in `~/.config/nvim/` → `~/desktop-nix/nvim/`, lazy.nvim)
+- Editor: Neovim (configured declaratively with nixvim in `modules/home/neovim/`)
 - Version control UI: Neogit / fugitive inside Neovim; lazygit (`lg`)
 - Rust watcher: `bacon` (run in a split or via the `cw` alias)
 - Containers: Podman (aliased as `docker`)
