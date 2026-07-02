@@ -1,7 +1,7 @@
 # Installing `desktop`
 
-Gaming + dev workstation. Plain **ext4, no LUKS** (no boot passphrase). Single
-boot — the disk is wiped.
+Gaming + dev workstation. **LUKS2 + ext4** full-disk encryption (passphrase at
+boot, like the laptops). Single boot — the disk is wiped.
 
 ## 0. Before you wipe
 
@@ -31,11 +31,11 @@ nix-shell -p git --run 'git clone https://github.com/DanielMauderer/desktop-nix 
 sudo /tmp/cfg/scripts/install.sh desktop
 ```
 
-`install.sh` confirms the target disk, runs disko (no LUKS — no passphrase),
+`install.sh` confirms the target disk, runs disko (**LUKS passphrase prompt**),
 generates and wires in `hardware-configuration.nix`, runs `nixos-install`, and
 prompts for `maudi`'s password. Resume a stuck run with `--skip-disko` (after
 partitioning) or `--skip-hardware`. Then `reboot` (remove the USB) → systemd-boot
-→ greetd → Hyprland.
+→ LUKS passphrase → greetd → Hyprland.
 
 ## 2. Post-install
 

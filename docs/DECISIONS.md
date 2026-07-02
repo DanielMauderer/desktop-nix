@@ -4,7 +4,7 @@ The key choices behind this config and why, one line each. The reasoning that
 matters lives here; the rest is in the Nix code and `git log`.
 
 ## Structure
-- **Plain flake, no flake-parts** — three hosts don't justify the abstraction; a
+- **Plain flake, no flake-parts** — four hosts don't justify the abstraction; a
   small `lib/mkHost.nix` factory keeps `flake.nix` readable.
 - **home-manager as a NixOS module** — one `nixos-rebuild switch` updates system
   + home atomically; a single generation rolls both back together.
@@ -22,9 +22,10 @@ matters lives here; the rest is in the Nix code and `git log`.
   chaotic-cx/nyx flake input and its binary cache. Laptops (Intel) never pull it.
 
 ## Storage & secrets
-- **disko-declared disks.** Laptops: **LUKS2 + ext4 + zram**. Desktop: **plain
-  ext4, no LUKS** (at home — different physical-security profile, no passphrase
-  at every boot). home-server: SSD root + ZFS data pool.
+- **disko-declared disks.** All workstations (laptops + desktop): **LUKS2 + ext4
+  + zram**, passphrase at boot — the desktop's earlier no-LUKS exemption
+  (unattended boot at home) was reversed in favour of encryption at rest.
+  home-server: SSD root + ZFS data pool (unencrypted; must boot unattended).
 - **sops-nix secrets.** Each host decrypts with its SSH host ed25519 key
   converted to age; a personal master age key (private half in the password
   manager) is a recipient on every secret for recovery/re-keying. Scheme and

@@ -20,5 +20,6 @@
   # below via this module argument.
   _module.args.desktopScripts = import ../../../pkgs { inherit pkgs; };
 
-  home.stateVersion = "25.05";
+  # home.stateVersion is owned by modules/home/cli (mkDefault "25.05"), which
+  # every host loads alongside this module via modules/nixos/base/home.nix.
 }

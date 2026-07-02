@@ -1,4 +1,5 @@
-# Desktop stack — imported by every host (Ticket 04, Machines: all).
+# Desktop stack — imported by every workstation host (Ticket 04); the headless
+# home-server deliberately skips it (DECISIONS 049).
 # The NixOS side registers the Hyprland session, greeter, portals and polkit
 # agent; the per-user Hyprland/waybar/etc. config lives in home-manager and is
 # wired in by ./home.nix.

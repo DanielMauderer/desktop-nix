@@ -1,23 +1,24 @@
-# Declarative disk layout for the desktop (Ticket 15 / DECISIONS 038).
+# Declarative disk layout for the desktop (Ticket 15 / DECISIONS 038, revised).
 #
-# Full-disk NixOS over the wiped Silverblue install. Unlike the laptops
-# (DECISIONS 036/037), the desktop is NOT LUKS-encrypted: it stays at home, a
-# different physical-security profile, and skipping LUKS avoids a passphrase
-# prompt at every boot on a headless-at-power-on gaming box. Layout: a 1 GiB EFI
-# System Partition (systemd-boot, mounted at /boot per modules/nixos/base/boot.nix)
-# and a plain ext4 root filling the rest. Swap is zram (hardware.nix), so there
-# is no swap partition. The Steam library is re-downloaded onto this root
-# (DECISIONS 038), so there is no separate data partition to mount.
+# Same strategy as the laptops (DECISIONS 036/037): a 1 GiB EFI System Partition
+# (systemd-boot, mounted at /boot per modules/nixos/core/boot.nix) and a LUKS2
+# container filling the rest, holding the ext4 root. The original layout skipped
+# LUKS to avoid a passphrase prompt on a headless-at-power-on gaming box; that
+# trade-off was reversed — encryption at rest now outweighs the boot-time prompt,
+# so every workstation is LUKS2 + ext4. Swap is zram (hardware.nix), so there is
+# no encrypted swap partition to manage. The Steam library is re-downloaded onto
+# this root (DECISIONS 038), so there is no separate data partition to mount.
 #
 # This file is added to the host only via lib/mkHost's module list in flake.nix
 # (NOT imported by default.nix), so the nixosTest VMs — which import default.nix
-# directly — never see this layout and boot off their own scratch disk.
+# directly — never see the LUKS/ESP layout and boot off their own scratch disk.
 #
 # Install-time use (see hosts/desktop/INSTALL.md): format the disk with
 #   sudo nix --experimental-features "nix-command flakes" run \
-#     github:nix-community/disko/latest -- --mode disko \
+#     --inputs-from /tmp/cfg disko -- --mode disko \
 #     /tmp/cfg/hosts/desktop/disk.nix
-# disko then generates fileSystems."/" and "/boot" for the running system.
+# disko then generates fileSystems."/" and "/boot" plus
+# boot.initrd.luks.devices."cryptroot" for the running system.
 _: {
   disko.devices.disk.main = {
     type = "disk";
@@ -39,12 +40,19 @@ _: {
             mountOptions = [ "umask=0077" ];
           };
         };
-        root = {
+        luks = {
           size = "100%";
           content = {
-            type = "filesystem";
-            format = "ext4";
-            mountpoint = "/";
+            type = "luks";
+            name = "cryptroot";
+            # TRIM through to the SSD. Mild metadata leak (which blocks are
+            # unused) in exchange for SSD longevity — same call as the laptops.
+            settings.allowDiscards = true;
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/";
+            };
           };
         };
       };

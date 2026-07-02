@@ -9,7 +9,7 @@
 # ../dev (Ticket 08) lands the system-level dev pieces (podman) on every
 # workstation, matching how home.nix wires the dev home module.
 # ../virtualisation (Ticket 09, DECISIONS 028) lands libvirt/KVM — maudiblue
-# enabled libvirtd globally and all three desktop machines keep it.
+# enabled libvirtd globally and every workstation keeps it.
 # ./audio.nix (PipeWire), ./fonts.nix and ./home.nix (the cli/neovim/dev home
 # modules) round out the workstation baseline.
 _: {

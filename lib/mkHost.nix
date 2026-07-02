@@ -5,14 +5,16 @@
   chaotic,
 }:
 {
-  hostname,
   modules,
   system ? "x86_64-linux",
   withChaotic ? false,
 }:
 nixpkgs.lib.nixosSystem {
   inherit system;
-  specialArgs = { inherit inputs hostname; };
+  # Only `inputs` is passed through: each host sets its own networking.hostName
+  # in hosts/<name>/default.nix (the nixosTest nodes import those files directly
+  # and must stay self-contained, so mkHost is not the hostname owner).
+  specialArgs = { inherit inputs; };
   modules = [
     home-manager.nixosModules.home-manager
     # stylix's NixOS module is added here (not via an `inputs` module arg

@@ -3,8 +3,9 @@
 # Disko owns ONLY the install SSD: a 1 GiB EFI System Partition (systemd-boot,
 # mounted at /boot per modules/nixos/core/boot.nix) and a plain ext4 root filling
 # the rest. No LUKS — the server stays powered-on headless at home and must boot
-# unattended (same physical-security trade-off as the desktop, DECISIONS 038).
-# Swap is zram (hardware.nix), so there is no swap partition.
+# unattended, so it is the one machine that keeps the unencrypted-root trade-off
+# (the workstations are all LUKS2 now). Swap is zram (hardware.nix), so there is
+# no swap partition.
 #
 # The ZFS DATA pool is NOT touched here: it lives on a separate hardware-RAID LUN
 # that pre-exists and is imported at runtime (modules/nixos/server/zfs.nix), so a
@@ -16,8 +17,9 @@
 #
 # Install-time use (see hosts/home-server/INSTALL.md): format with
 #   sudo nix --experimental-features "nix-command flakes" run \
-#     github:nix-community/disko/latest -- --mode disko \
+#     --inputs-from /tmp/cfg disko -- --mode disko \
 #     /tmp/cfg/hosts/home-server/disk.nix
+# (--inputs-from pins disko to this repo's flake.lock — no version skew.)
 _: {
   disko.devices.disk.main = {
     type = "disk";
