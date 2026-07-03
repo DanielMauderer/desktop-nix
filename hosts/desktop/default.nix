@@ -21,6 +21,10 @@
     # Waydroid (Ticket 16 / DECISIONS 040) is opt-in per host: the desktop and
     # private laptop run the Android container, work-laptop does not.
     ../../modules/nixos/waydroid
+    # home-server VPN client: `ssh home-server` + the NFS share. Enrolled +
+    # enabled per hosts/desktop/INSTALL.md (needs the desktop age key filled in
+    # .sops.yaml first — it is still a placeholder).
+    ../../modules/nixos/net
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after the install-time
     # `nixos-generate-config --no-filesystems` (see hosts/desktop/INSTALL.md)
@@ -28,6 +32,15 @@
 
   networking.hostName = "desktop";
   system.stateVersion = "25.05";
+
+  # home-server client. Always at home, so the share mounts direct over the LAN
+  # (no crypto on big transfers); SSH still rides the tunnel (server SSH is
+  # wg0-only). `enable` stays off until enrollment; flip it on last.
+  services.homeServerClient = {
+    # enable = true;                     # ← after enrollment (INSTALL.md)
+    address = "10.100.0.2/32";
+    nfsHost = "192.168.1.2"; # ← EDIT: the home-server's LAN IP
+  };
 
   # Host-specific kanshi profile: dual-head desktop. Prepended (mkBefore) so it
   # matches ahead of the generic laptop-internal fallback in modules/home/desktop.

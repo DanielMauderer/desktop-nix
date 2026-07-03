@@ -39,6 +39,25 @@ creation_rules:
           - *master
           - *work_laptop
 
+  # Desktop-scoped secrets (the home-server WireGuard client key): master + only
+  # the owning host. NOTE the &desktop recipient is still a placeholder — enroll
+  # the real desktop age key before creating a file here (hosts/desktop/
+  # INSTALL.md), or sops can only encrypt to the master key.
+  - path_regex: secrets/desktop/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *master
+          - *desktop
+
+  # Private-laptop-scoped secrets (the home-server WireGuard client key): master
+  # + only the owning host. The &private_laptop age key is already enrolled, so a
+  # secret can be created here today.
+  - path_regex: secrets/private-laptop/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *master
+          - *private_laptop
+
   # Home-server-scoped secrets (scaffolding for a future migration of the
   # WireGuard server key off the install-time /etc/wireguard/wg0.key path onto
   # sops, once the host's age key is enrolled — DECISIONS 049): master + the

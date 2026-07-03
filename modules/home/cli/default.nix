@@ -85,6 +85,16 @@
           User = "git";
           IdentityFile = "~/.ssh/id_ed25519";
         };
+        # `ssh home-server` → the box over the VPN. Its SSH is firewalled to the
+        # wg0 interface only (modules/nixos/server/ssh.nix), so the HostName is
+        # the tunnel IP; reaching it needs the WireGuard client from
+        # modules/nixos/net (host must be an enrolled wg0 peer). The host key is
+        # pinned system-wide via programs.ssh.knownHosts there, so no TOFU prompt.
+        "home-server" = {
+          User = "maudi";
+          HostName = "10.100.0.1";
+          IdentityFile = "~/.ssh/id_ed25519";
+        };
       };
     };
   };

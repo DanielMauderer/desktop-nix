@@ -18,12 +18,18 @@ _: {
     listenPort = 51820;
     privateKeyFile = "/etc/wireguard/wg0.key";
 
-    # Add one block per client. allowedIPs is the address(es) routed to that
-    # peer inside the tunnel — a /32 per client for a hub-and-spoke layout.
+    # One block per client (the client half is modules/nixos/net; each host
+    # enrolls per its INSTALL.md). allowedIPs is the address routed to that peer
+    # inside the tunnel — a /32 per client for a hub-and-spoke layout. Paste each
+    # client's PUBLIC key (non-secret, safe to commit) and uncomment.
     peers = [
       # {
-      #   publicKey = "<client public key>";
+      #   publicKey = "<desktop public key>";
       #   allowedIPs = [ "10.100.0.2/32" ];
+      # }
+      # {
+      #   publicKey = "<private-laptop public key>";
+      #   allowedIPs = [ "10.100.0.3/32" ];
       # }
     ];
   };

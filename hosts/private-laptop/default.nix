@@ -20,6 +20,9 @@ _: {
     # Waydroid (Ticket 16 / DECISIONS 040) is opt-in per host: the private
     # laptop and desktop run the Android container, work-laptop does not.
     ../../modules/nixos/waydroid
+    # home-server VPN client: `ssh home-server` + the NFS share. Enrolled +
+    # enabled per hosts/private-laptop/INSTALL.md.
+    ../../modules/nixos/net
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after the install-time
     # `nixos-generate-config --no-filesystems` (see hosts/private-laptop/INSTALL.md)
@@ -27,4 +30,12 @@ _: {
 
   networking.hostName = "private-laptop";
   system.stateVersion = "25.05";
+
+  # home-server client. Roams, so it reaches the share over the VPN (nfsHost
+  # defaults to the server's VPN IP 10.100.0.1). `enable` stays off until
+  # enrollment; flip it on last.
+  services.homeServerClient = {
+    # enable = true;                     # ← after enrollment (INSTALL.md)
+    address = "10.100.0.3/32";
+  };
 }

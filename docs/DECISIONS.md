@@ -55,5 +55,10 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **gaming** (CachyOS, Steam, AMD GPU) — desktop only.
 - **waydroid** (Android container) — private-laptop + desktop; never work-laptop.
 - **server** (WireGuard server, SSH-over-VPN, ZFS, NFS) — home-server only.
+- **net / home-server client** (`services.homeServerClient`) — desktop +
+  private-laptop. WireGuard client of the server (split-tunnel, so `ssh
+  home-server` works — server SSH is wg0-only) + `x-systemd.automount` NFS share.
+  Desktop mounts over the LAN (no crypto on big files), the laptop over the VPN.
+  `enable`-gated so an un-enrolled host (and keyless CI) still builds.
 - **work-laptop hardening** — longer auto-suspend (30 min), WireGuard client +
   sops; no gaming, no waydroid (policy-bound machine).

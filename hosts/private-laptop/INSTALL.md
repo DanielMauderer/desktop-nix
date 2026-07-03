@@ -49,6 +49,39 @@ cat /etc/ssh/ssh_host_ed25519_key.pub | nix run nixpkgs#ssh-to-age
 sudo nixos-rebuild switch --flake ~/desktop-nix#private-laptop
 ```
 
+## 2b. home-server VPN client (`ssh home-server` + the file share)
+
+The `net` module is imported but `services.homeServerClient.enable` is off until
+the box knows this peer. Server SSH is `wg0`-only, so the tunnel is what makes
+both SSH and the NFS mount reachable. One-time enrollment:
+
+```sh
+cd ~/desktop-nix
+# 1. Generate this host's WireGuard keypair (private half → sops, public → server)
+wg genkey | tee /tmp/wg.key | wg pubkey       # note the printed PUBLIC key
+# 2. Store the private key as a per-host secret (age key already enrolled in §2)
+sops edit secrets/private-laptop/wireguard.yaml   # home-server-wg-key: <paste /tmp/wg.key>
+sops updatekeys secrets/private-laptop/wireguard.yaml
+shred -u /tmp/wg.key
+```
+
+Then one-time server/module edits (commit them):
+- `modules/nixos/server/wireguard.nix` — uncomment the private-laptop peer, paste
+  the PUBLIC key from step 1 (`allowedIPs = [ "10.100.0.3/32" ]`).
+- `modules/nixos/net/home-server-client.nix` — fill the `endpoint`,
+  `serverPublicKey` (server's `wg show` pubkey) and `serverHostKey`
+  (`cat /etc/ssh/ssh_host_ed25519_key.pub` on the server) defaults. Shared by
+  every client, so this is done once.
+- `hosts/private-laptop/default.nix` — set `services.homeServerClient.enable = true`.
+
+Rebuild the **server first** (so the peer is admitted), then this host:
+```sh
+sudo nixos-rebuild switch --flake ~/desktop-nix#private-laptop
+sudo wg show                       # handshake with 10.100.0.1 within ~25 s
+ssh home-server                    # no host/IP/TOFU prompt
+ls /mnt/home-server                # triggers the automount
+```
+
 ## 3. Verify
 
 - Wi-Fi, audio (`wpctl status`), Bluetooth, suspend/resume, brightness + volume

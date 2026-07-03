@@ -51,6 +51,37 @@ cat /etc/ssh/ssh_host_ed25519_key.pub | nix run nixpkgs#ssh-to-age
 sudo nixos-rebuild switch --flake ~/desktop-nix#desktop
 ```
 
+## 2b. home-server VPN client (`ssh home-server` + the file share)
+
+The `net` module is imported but `services.homeServerClient.enable` is off until
+the box knows this peer. This host is always home, so the share mounts **direct
+over the LAN** (`nfsHost` in `default.nix` — set it to the server's LAN IP); SSH
+still rides the tunnel (server SSH is `wg0`-only). Enroll the desktop age key in
+§2 **first** — `&desktop` in `.sops.yaml` is a placeholder, so sops can't encrypt
+a per-host secret until it is real. Then:
+
+```sh
+cd ~/desktop-nix
+wg genkey | tee /tmp/wg.key | wg pubkey            # note the printed PUBLIC key
+sops edit secrets/desktop/wireguard.yaml           # home-server-wg-key: <paste /tmp/wg.key>
+sops updatekeys secrets/desktop/wireguard.yaml
+shred -u /tmp/wg.key
+```
+
+One-time server/module edits (commit them):
+- `modules/nixos/server/wireguard.nix` — uncomment the desktop peer, paste the
+  PUBLIC key (`allowedIPs = [ "10.100.0.2/32" ]`).
+- `modules/nixos/net/home-server-client.nix` — fill `endpoint`, `serverPublicKey`,
+  `serverHostKey` (shared by every client; skip if a laptop already did it).
+- `hosts/desktop/default.nix` — set the real `nfsHost` LAN IP and
+  `services.homeServerClient.enable = true`.
+
+Rebuild the **server first**, then this host:
+```sh
+sudo nixos-rebuild switch --flake ~/desktop-nix#desktop
+sudo wg show && ssh home-server && ls /mnt/home-server
+```
+
 **Steam** — launch Steam, log in (Cloud saves sync), re-download games. GE-Proton
 is declarative (`extraCompatPackages`) — select it under a title's Compatibility
 settings. Restore non-cloud saves into `compatdata/<appid>/`.

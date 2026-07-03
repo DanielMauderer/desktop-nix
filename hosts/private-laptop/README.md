@@ -6,8 +6,10 @@ Personal laptop — media consumption and light development. Install guide:
 - **Role:** media + some dev
 - **GPU:** Intel iGPU — VAAPI/QSV hardware video decode (`hardware.nix`)
 - **Kernel:** default nixpkgs
-- **Modules:** `base` + `desktop` + `waydroid` (Android container). Laptop power
-  management (power-profiles-daemon, brightnessctl) comes with the desktop stack.
+- **Modules:** `base` + `desktop` + `waydroid` (Android container) + `net`
+  (home-server VPN client — `ssh home-server` + the NFS share, mounted over the
+  VPN when roaming; enrolled per INSTALL.md). Laptop power management
+  (power-profiles-daemon, brightnessctl) comes with the desktop stack.
 - **Disk:** disko **LUKS2 + ext4 root + ESP**, zram swap. Full-disk single-boot.
 - **Monitors:** single internal panel — covered by the shared `laptop-internal`
   kanshi fallback, so no host-specific profile.
