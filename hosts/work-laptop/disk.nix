@@ -11,8 +11,9 @@
 #
 # Install-time use (see hosts/work-laptop/INSTALL.md):
 #   sudo nix --experimental-features "nix-command flakes" run \
-#     github:nix-community/disko/latest -- --mode disko \
+#     --inputs-from /mnt-etc/nixos disko -- --mode disko \
 #     /mnt-etc/nixos/hosts/work-laptop/disk.nix
+# (--inputs-from pins disko to this repo's flake.lock — no version skew.)
 _: {
   disko.devices.disk.main = {
     type = "disk";

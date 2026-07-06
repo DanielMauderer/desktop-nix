@@ -11,8 +11,9 @@
 #
 # Install-time use (see hosts/private-laptop/INSTALL.md): format the disk with
 #   sudo nix --experimental-features "nix-command flakes" run \
-#     github:nix-community/disko/latest -- --mode disko \
+#     --inputs-from /mnt-etc/nixos disko -- --mode disko \
 #     /mnt-etc/nixos/hosts/private-laptop/disk.nix
+# (--inputs-from pins disko to this repo's flake.lock — no version skew.)
 # disko then generates fileSystems."/" and "/boot" plus
 # boot.initrd.luks.devices."cryptroot" for the running system.
 _: {

@@ -34,6 +34,18 @@ jobs:
     name: Bump flake.lock
     runs-on: ubuntu-latest
     steps:
+      # Fail fast with a readable error when the PAT is missing — without this,
+      # checkout dies with the cryptic "Input required and not supplied: token"
+      # (which is exactly how this job failed silently for weeks). Secrets can't
+      # be referenced in `if:` expressions, so route it through env.
+      - name: Require LOCKBUMP_TOKEN
+        env:
+          HAVE_TOKEN: ${{ secrets.LOCKBUMP_TOKEN != '' }}
+        run: |
+          if [ "$HAVE_TOKEN" != "true" ]; then
+            echo "::error::LOCKBUMP_TOKEN secret is missing — the daily flake.lock bump cannot run. Create a fine-grained PAT (contents: write + pull-requests: write, this repo only) and store it as the LOCKBUMP_TOKEN repo secret. See modules/nixos/core/README.md (Update automation)."
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           # Use the PAT so the resulting PR triggers CI (GITHUB_TOKEN would not).

@@ -133,7 +133,6 @@
 
       hosts = {
         private-laptop = mkHost {
-          hostname = "private-laptop";
           # disk.nix carries the disko spec (LUKS + ext4 + ESP) and is added
           # only to the real nixosConfiguration — the nixosTest nodes below
           # import default.nix alone, so the QEMU VMs use their own scratch
@@ -144,7 +143,6 @@
           ];
         };
         work-laptop = mkHost {
-          hostname = "work-laptop";
           # disk.nix carries the disko LUKS spec and is added only here — not
           # imported by default.nix — so nixosTest VMs use their own scratch disk.
           modules = [
@@ -153,10 +151,9 @@
           ];
         };
         desktop = mkHost {
-          hostname = "desktop";
-          # disk.nix carries the disko spec (GPT + ESP + plain ext4, no LUKS)
-          # and is added only here — not imported by default.nix — so nixosTest
-          # VMs use their own scratch disk.
+          # disk.nix carries the disko LUKS spec (LUKS2 + ext4 + ESP, like the
+          # laptops) and is added only here — not imported by default.nix — so
+          # nixosTest VMs use their own scratch disk.
           modules = [
             ./hosts/desktop/default.nix
             ./hosts/desktop/disk.nix
@@ -164,7 +161,6 @@
           withChaotic = true;
         };
         home-server = mkHost {
-          hostname = "home-server";
           # disk.nix carries the disko spec for the OS SSD only (GPT + ESP +
           # plain ext4); the ZFS data pool lives on a separate hardware-RAID LUN
           # imported at runtime (modules/nixos/server/zfs.nix). Added only here —

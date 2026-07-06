@@ -146,7 +146,10 @@ if [ "$SKIP_DISKO" -eq 1 ]; then
   mountpoint -q /mnt || die "/mnt is not mounted — drop --skip-disko to partition."
 else
   echo "==> Partitioning + formatting with disko (will prompt for the LUKS passphrase if this host uses LUKS)..."
-  nix run github:nix-community/disko/latest -- --mode disko "$DISK_NIX"
+  # --inputs-from resolves `disko` from this repo's flake.lock, so the disko
+  # that partitions the disk is the exact revision the config was tested with
+  # (no version skew from an unpinned `disko/latest`).
+  nix run --inputs-from "$REPO" disko -- --mode disko "$DISK_NIX"
 fi
 
 echo "==> Filesystems under /mnt:"

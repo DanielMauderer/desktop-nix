@@ -34,7 +34,7 @@ reviews:
         Do NOT request a typed `enable`/options interface or parameterised
         usernames for a module just because it sets config directly — most
         modules here intentionally have no options block.
-        This is a single-user, three-host personal config: the user is `maudi`
+        This is a single-user, four-host personal config: the user is `maudi`
         on every machine (DECISIONS 007) and per-feature groups (libvirtd,
         gamemode, etc.) are added by their own modules by design. Referencing
         `maudi` directly is the established convention, not a defect — do not

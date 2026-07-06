@@ -9,7 +9,9 @@
 # `workflow_run` only fires for workflow files that exist on the default branch,
 # so this takes effect once it is merged to `main`. Pushing to a non-existent
 # `release` ref creates it, so the model is self-bootstrapping; you can also run
-# it once manually (workflow_dispatch) to seed `release`.
+# it manually (workflow_dispatch) to seed `release` — the dispatch path verifies
+# main's head has a green CI run before promoting, so a manual run can never
+# push an untested commit to the channel the fleet auto-pulls.
 name: promote-release
 
 on:
@@ -21,6 +23,8 @@ on:
 
 permissions:
   contents: write
+  # The workflow_dispatch guard lists CI runs for the promoted commit.
+  actions: read
 
 concurrency:
   group: promote-release
@@ -41,6 +45,24 @@ jobs:
           fetch-depth: 0
           # Don't persist the token in .git/config; the push below auths explicitly.
           persist-credentials: false
+      # Manual-dispatch guard: the workflow_run path is already gated by the
+      # job-level `conclusion == 'success'` condition, but a workflow_dispatch
+      # would otherwise promote whatever main's head happens to be — including a
+      # commit whose CI failed or hasn't finished. Refuse unless that exact sha
+      # has a completed, successful CI run.
+      - name: Verify CI is green for the promoted commit (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha="${{ github.sha }}"
+          green="$(gh run list --repo "${{ github.repository }}" --workflow CI \
+            --commit "$sha" --status success --json databaseId --jq 'length')"
+          if [ "${green:-0}" -eq 0 ]; then
+            echo "::error::No successful CI run found for main@$sha — refusing to promote an untested commit to release. Wait for CI to go green (or fix it), then re-dispatch."
+            exit 1
+          fi
+          echo "CI is green for $sha ($green successful run(s)); promoting."
       - name: Fast-forward release to the tested commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

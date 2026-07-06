@@ -11,7 +11,7 @@ hosts/<name>/README.md     what the machine is (role, hardware, modules)
 hosts/<name>/INSTALL.md    how to install it
 modules/nixos/<group>/     system modules — each group dir has a README.md
 modules/home/<group>/      home-manager modules — each group dir has a README.md
-lib/mkHost.nix             nixosConfiguration factory (name, modules, withChaotic)
+lib/mkHost.nix             nixosConfiguration factory (modules, withChaotic)
 flake.nix                  inputs/outputs + per-host nixosTests/assertions
 docs/DECISIONS.md          short list of the key architecture choices
 ```

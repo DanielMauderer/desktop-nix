@@ -7,8 +7,8 @@
 # dropdown already offers the Secure-Boot variant Windows 11 needs.
 #
 # maudiblue enabled libvirtd on every machine; on NixOS that becomes per-host,
-# and DECISIONS 028 keeps all three. The module is therefore pulled in from
-# modules/nixos/base (like dev/podman) rather than imported per host.
+# and DECISIONS 028 keeps every workstation. The module is therefore pulled in
+# from modules/nixos/base (like dev/podman) rather than imported per host.
 { pkgs, ... }:
 {
   virtualisation.libvirtd = {

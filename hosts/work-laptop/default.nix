@@ -84,6 +84,13 @@
   # 3. Fill in the peer block below and uncomment.
   # 4. sudo nixos-rebuild switch --flake ~/desktop-nix#work-laptop
   #
+  # Waybar caveat: the bar's VPN toggle (pkgs/scripts/waybar-vpn-toggle.sh)
+  # drives NetworkManager (`nmcli connection up/down`), which cannot control a
+  # wg-quick systemd unit. If you want click-to-toggle from the bar, import the
+  # tunnel as an NM connection instead of the wg-quick block below
+  # (`nmcli connection import type wireguard file wg0.conf`, with the private
+  # key from the sops path) — or keep wg-quick and toggle via systemctl.
+  #
   # sops.secrets.wireguard-key = {
   #   sopsFile = ../../secrets/work-laptop/wireguard.yaml;
   # };
