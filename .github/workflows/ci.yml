@@ -63,6 +63,10 @@ jobs:
       # a slower worst case instead of a dead job.
       - name: Add swap (host eval peaks past runner RAM)
         run: |
+          # ubuntu-latest images now ship with an active /swapfile; fallocate
+          # refuses to resize a file in use as swap ("Text file busy"). Release
+          # it first so this works on images with or without a preexisting swap.
+          sudo swapoff /swapfile 2>/dev/null || true
           sudo fallocate -l 12G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
