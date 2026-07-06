@@ -26,7 +26,7 @@
     # .sops.yaml first — it is still a placeholder).
     ../../modules/nixos/net
     ./hardware.nix
-    # ./hardware/hardware-configuration.nix  # uncomment after the install-time
+    ./hardware/hardware-configuration.nix  # uncomment after the install-time
     # `nixos-generate-config --no-filesystems` (see hosts/desktop/INSTALL.md)
   ];
 

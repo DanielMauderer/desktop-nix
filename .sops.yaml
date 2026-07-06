@@ -16,7 +16,7 @@ keys:
   # Per-host keys: ssh-to-age of each /etc/ssh/ssh_host_ed25519_key.pub.
   - &private_laptop age10gjj6tf0cpadle54ng7jv9kllel5jvz6aanj6lmfugflpuwmeq3qcmg437
   - &work_laptop age1PLACEHOLDERworklaptopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  - &desktop age1PLACEHOLDERdesktopxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &desktop age1uhav7r22gq0ayyt8kkuwsxv8rptrc7hnnwtjndtndyk2trgxy4fslqste3
   - &home_server age1PLACEHOLDERhomeserverxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   # Fixture/test key: PUBLIC half of the known key the test-secrets nixosTest
   # injects into the VM. Its private half is committed in the test (it guards
