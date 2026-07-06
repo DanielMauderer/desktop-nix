@@ -3,6 +3,7 @@ _: {
     ../../modules/nixos/base
     ../../modules/nixos/desktop
     ../../modules/nixos/waydroid
+    ../../modules/nixos/discord
     ../../modules/nixos/net
     ./hardware.nix
     # ./hardware/hardware-configuration.nix  # uncomment after install-time

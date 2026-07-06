@@ -5,6 +5,7 @@
     ../../modules/nixos/desktop
     ../../modules/nixos/gaming
     ../../modules/nixos/waydroid
+    ../../modules/nixos/discord
     ../../modules/nixos/net
     ./hardware.nix
     ./hardware/hardware-configuration.nix
