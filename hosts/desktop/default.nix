@@ -6,13 +6,6 @@
     ../../modules/nixos/gaming
     ../../modules/nixos/waydroid
     ../../modules/nixos/discord
-<<<<<<< HEAD
-=======
-    # home-server VPN client: `ssh home-server` + the NFS share. Keys, the sops
-    # secret (secrets/desktop/wireguard.yaml) and the server's public wiring are
-    # all in place; only `enable` below is left — flip it on last, once the
-    # server is installed and reachable (hosts/desktop/INSTALL.md).
->>>>>>> b931bdd (discord and homeserver strategy)
     ../../modules/nixos/net
     ./hardware.nix
     ./hardware/hardware-configuration.nix
