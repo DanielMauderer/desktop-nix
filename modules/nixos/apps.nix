@@ -12,6 +12,7 @@
     builtins.elem (lib.getName pkg) [
       "spotify"
       "claude-code"
+      "discord"
       "steam"
       "steam-unwrapped"
       "steam-original"

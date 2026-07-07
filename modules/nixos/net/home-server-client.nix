@@ -27,19 +27,22 @@ in
     # Same for every client, so kept here as defaults (fill once, non-secret).
     endpoint = lib.mkOption {
       type = lib.types.str;
-      default = "REPLACE.WITH.SERVER.DDNS:51820";
+      # NOTE: WireGuard is UDP/51820. Cloudflare's proxy (orange-cloud) only
+      # handles HTTP/S, so vpn.mauderer.work MUST be a DNS-only (grey-cloud)
+      # record pointing at the WAN IP, or the handshake never reaches the server.
+      default = "vpn.mauderer.work:51820";
       description = "Public host:port of the home-server's WireGuard endpoint.";
     };
 
     serverPublicKey = lib.mkOption {
       type = lib.types.str;
-      default = "REPLACE_WITH_SERVER_WG_PUBLIC_KEY";
+      default = "qu9Ov4yxMb0+abHf6A9JMKYbEqEMVwoJ5JU5dEHtlz8=";
       description = "The home-server's WireGuard public key (non-secret).";
     };
 
     serverHostKey = lib.mkOption {
       type = lib.types.str;
-      default = "ssh-ed25519 AAAA_REPLACE_WITH_SERVER_SSH_HOST_KEY";
+      default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIycBJJ+ZA+Ln4bkHzpc2sDbyGV3lcvLHvi1dfW3Y/3D";
       description = "The home-server's SSH host public key — pins known-hosts so first login has no TOFU prompt.";
     };
   };

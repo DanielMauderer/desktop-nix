@@ -30,6 +30,13 @@ matters lives here; the rest is in the Nix code and `git log`.
   converted to age; a personal master age key (private half in the password
   manager) is a recipient on every secret for recovery/re-keying. Scheme and
   enrollment steps live in `modules/nixos/core/README.md`.
+- **WireGuard server key on sops.** The home-server's `wg0` private key is a
+  `sops.secrets` entry (`secrets/home-server/wireguard.yaml`), not a hand-created
+  `/etc/wireguard/wg0.key`, so it is versioned and decrypts at activation.
+- **home-server installed with nixos-anywhere.** The one headless host is brought
+  up remotely; its SSH host key is pre-generated and pushed via `--extra-files`
+  so its age identity is enrolled before first boot and sops decrypts on boot.
+  The workstations keep the local `scripts/install.sh` (ISO) flow.
 
 ## Theming
 - **stylix** derives the palette from `modules/nixos/desktop/wallpaper.png` at

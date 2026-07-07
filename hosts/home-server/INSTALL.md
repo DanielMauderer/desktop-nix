@@ -1,62 +1,92 @@
 # Installing `home-server`
 
-Headless services host. **No GUI** — administered over SSH (VPN-only). disko owns
-**only the OS SSD** (ext4, no LUKS, unattended boot); the pre-existing **ZFS data
-pool** on the RAID LUN is imported at runtime and is never touched by the install.
+Headless services host, installed **remotely with nixos-anywhere** (no ISO
+juggling on a box with no display). disko owns **only the OS SSD** (ext4, no
+LUKS, unattended boot); the pre-existing **ZFS data pool** on the RAID LUN is
+imported at runtime and is never touched by the install.
 
-## 0. Before you install
+Because the server holds real secrets (its WireGuard key), its age identity must
+exist **before** first boot. We do that by pre-generating the SSH host key and
+pushing it in during the install (`--extra-files`), so sops decrypts on first
+boot — no after-the-fact key enrollment.
 
-- **Enroll your SSH key first.** SSH is key-only and the box is headless — if you
-  don't add a key you'll lock yourself out. Put your public key in
-  `users.users.maudi.openssh.authorizedKeys.keys` in
-  `hosts/home-server/default.nix` and commit it before installing.
-- Verify the **OS SSD** device in `hosts/home-server/disk.nix` (`lsblk` — usually
-  `/dev/nvme0n1`). **Make sure it is NOT the RAID LUN that holds the ZFS pool.**
-- Note the ZFS pool name (`zfs.extraPools` in `modules/nixos/server/zfs.nix`,
-  default `tank`) and edit the LAN subnet in `modules/nixos/server/nfs.nix`.
-- Confirm the **sops master age key** is in the password manager.
+## 0. Already prepared (committed to the repo)
 
-## 1. Install
+The secrets-first work is done and in git:
 
-Boot the **NixOS minimal ISO**, get networking up (`ping -c1 cache.nixos.org`):
+- Admin SSH key authorized in `default.nix` (`maudi@desktop`).
+- Server age key enrolled in `.sops.yaml`; WireGuard server key encrypted in
+  `secrets/home-server/wireguard.yaml`.
+- Client keys in `secrets/{desktop,private-laptop}/wireguard.yaml`; their public
+  keys wired into `peers` (`modules/nixos/server/wireguard.nix`) and the server's
+  public/host keys into the client module (`modules/nixos/net/home-server-client.nix`).
+- The matching **plaintext** SSH host key + WireGuard keys are in the gitignored
+  `secrets-seed/` on the desktop (used for `--extra-files` below). Keep it until
+  the install succeeds.
 
-```sh
-nix-shell -p git --run 'git clone https://github.com/DanielMauderer/desktop-nix /tmp/cfg'
-sudo /tmp/cfg/scripts/install.sh home-server
+## 1. Check before you install
+
+- **OS SSD device** in `hosts/home-server/disk.nix` (`lsblk` on the target —
+  usually `/dev/nvme0n1`). **Must NOT be the RAID LUN that holds the ZFS pool.**
+- **ZFS `hostId`** in `hardware.nix` is unique; ZFS pool name (`zfs.extraPools`,
+  default `tank`) and the LAN subnet in `modules/nixos/server/nfs.nix`.
+- **`nfsHost`/LAN IP** for the desktop client in `hosts/desktop/default.nix`.
+- **sops master age key** is in the password manager.
+- **DNS:** `vpn.mauderer.work` must be a **DNS-only (grey-cloud)** Cloudflare
+  record → the WAN IP. Cloudflare's proxy does not carry WireGuard's UDP/51820.
+
+## 2. Boot the target into an installer
+
+Get the box onto the network in an environment nixos-anywhere can SSH into as
+root — the NixOS minimal ISO (set a root password + start `sshd`) or a kexec
+image. Note its IP (`<ip>`). Uncomment the hardware import in
+`hosts/home-server/default.nix`:
+
+```nix
+./hardware/hardware-configuration.nix
 ```
 
-`install.sh` confirms the target disk, runs disko (no LUKS), wires in
-`hardware-configuration.nix`, runs `nixos-install`, and prompts for `maudi`'s
-password. Reconcile the `hostId` in `hardware.nix` (ZFS needs a unique one). Then
-`reboot` — it comes up headless to multi-user; log in over SSH.
+## 3. Run nixos-anywhere (from the desktop, in the repo)
 
-## 2. Post-install
+```sh
+nix run github:nix-community/nixos-anywhere -- \
+  --flake .#home-server \
+  --generate-hardware-config nixos-generate-config ./hosts/home-server/hardware/hardware-configuration.nix \
+  --extra-files ./secrets-seed \
+  root@<ip>
+```
+
+- `--generate-hardware-config` probes the target and writes the real
+  `hardware-configuration.nix` into the host dir (stage it — `git add -N
+  hosts/home-server/hardware/` — if the flake build says it's untracked).
+- disko (`hosts/home-server/disk.nix`) partitions the OS SSD; the ZFS LUN is
+  untouched.
+- `--extra-files ./secrets-seed` lands the pre-generated
+  `/etc/ssh/ssh_host_ed25519_key`; the activation script in
+  `modules/nixos/core/secrets.nix` keeps it (only generates one when absent), so
+  the host's age identity matches `.sops.yaml`.
+
+The box reboots into the installed system. On first boot sops decrypts the
+WireGuard key with the seeded identity.
+
+## 4. Post-install
 
 ```sh
 git clone https://github.com/DanielMauderer/desktop-nix ~/desktop-nix
+sudo passwd maudi           # set a real password (config ships none)
 ```
 
-**Secrets** — enroll this host (full scheme in
-[modules/nixos/core/README.md](../../modules/nixos/core/README.md)):
-```sh
-cat /etc/ssh/ssh_host_ed25519_key.pub | nix run nixpkgs#ssh-to-age
-# → replace the home-server age1PLACEHOLDER… in .sops.yaml, then `sops updatekeys`
-```
+Enable the clients **last**, once the server is reachable: uncomment
+`services.homeServerClient.enable = true;` in `hosts/desktop/default.nix` and
+`hosts/private-laptop/default.nix`, then `update` on each.
 
-**WireGuard server** — generate the server key on the box (kept out of git/CI):
-```sh
-sudo sh -c 'umask 077; wg genkey > /etc/wireguard/wg0.key'
-```
-Add each client's **public** key (non-secret) to `peers` in
-`modules/nixos/server/wireguard.nix`, then:
-```sh
-sudo nixos-rebuild switch --flake ~/desktop-nix#home-server
-```
+## 5. Verify
 
-## 3. Verify
-
-- SSH reachable **only over the VPN** (`wg show`; port 22 closed on the WAN).
-- ZFS pool imported: `zpool status` shows the data pool; `zfs list`.
-- NFS export reachable from the LAN/VPN only: `showmount -e <server>`.
-- Firewall: only UDP 51820 open on the WAN (`nft list ruleset`).
+- On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
+  `wg show` lists `wg0` with the two client peers.
+- SSH reachable **only over the VPN** (port 22 closed on the WAN); from an
+  enabled client `ssh home-server` has no TOFU prompt (host key pinned).
+- `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
+  the export; `nft list ruleset` shows only UDP 51820 open on the WAN.
+- Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.

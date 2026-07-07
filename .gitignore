@@ -5,6 +5,11 @@ result-*
 # direnv
 .direnv/
 
+# Pre-seeded install material for nixos-anywhere (home-server): the plaintext
+# SSH host key injected via --extra-files and the scratch WireGuard keys. NEVER
+# commit — the private halves live encrypted under secrets/ instead.
+secrets-seed/
+
 # Editor/IDE
 .idea/
 *.swp

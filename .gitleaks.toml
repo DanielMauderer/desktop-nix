@@ -19,4 +19,8 @@ paths = [
   # Fixtures are sops-encrypted and guard nothing real; skip to avoid entropy
   # false-positives on their ciphertext.
   '''secrets/fixtures/.*\.yaml$''',
+  # secrets-seed/ holds transient *plaintext* host keys produced during install;
+  # it's gitignored (that's the real commit gate) and absent from the flake `src`
+  # (git-tracked files only), so this only silences the local working-tree scan.
+  '''secrets-seed/.*''',
 ]
