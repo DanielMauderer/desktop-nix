@@ -13,9 +13,38 @@ permissions:
   actions: write
 
 jobs:
-  flake-check:
-    name: nix flake check
+  # Enumerate the flake's checks so the `check` job below can fan them out over
+  # one runner each. `builtins.attrNames` forces only the attrset keys, so this
+  # builds nothing (~1-2 min) and keeps the list dynamic — a new check in
+  # flake.nix is picked up with no CI edit (flake stays the source of truth).
+  discover-checks:
+    name: discover checks
     runs-on: ubuntu-latest
+    outputs:
+      checks: ${{ steps.list.outputs.checks }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@v30
+        with:
+          nix_conf: experimental-features = nix-command flakes
+      - id: list
+        run: |
+          echo "checks=$(nix eval --json .#checks.x86_64-linux --apply builtins.attrNames)" >> "$GITHUB_OUTPUT"
+
+  # One runner per check, all in parallel. This replaces a single `nix flake
+  # check -L` that built every host toplevel and booted all eight VM tests
+  # serially on one 2-core runner (~52 min). VMs cannot boot concurrently on one
+  # runner, so fanning out drops wall-clock to roughly the slowest single check.
+  check:
+    name: ${{ matrix.check }}
+    needs: discover-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.discover-checks.outputs.checks) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,40 +70,29 @@ jobs:
             extra-system-features = nixos-test
             extra-substituters = https://nyx-cache.chaotic.cx/
             extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
-      # Cache /nix in the repo's GitHub Actions cache (replaces the discontinued
-      # magic-nix-cache). Exact key hit on unchanged inputs; otherwise restore
-      # the newest previous cache and rebuild only the delta. gc-max-store-size
-      # trims the store before saving and purge keeps only the newest entry per
-      # prefix, so this stays within the repo's 10 GB Actions-cache quota
-      # alongside the shared build-hosts cache below.
+      # Per-check cache entry, mirroring the per-host build cache below: each
+      # check caches independently (exact-key hit lets an unchanged check be
+      # skipped entirely), with a cross-check fallback restore so a check whose
+      # entry is missing still seeds from a sibling. gc-max-store-size is trimmed
+      # to 2G because many more entries now share the repo's 10 GB Actions-cache
+      # quota; GitHub's LRU eviction absorbs any overflow and evicted paths
+      # re-substitute from cache.nixos.org / the chaotic cache rather than rebuild.
       - uses: nix-community/cache-nix-action@v6
         with:
-          primary-key: nix-check-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
-          restore-prefixes-first-match: nix-check-${{ runner.os }}-
-          gc-max-store-size-linux: 4G
+          primary-key: nix-check-${{ matrix.check }}-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
+          restore-prefixes-first-match: |
+            nix-check-${{ matrix.check }}-${{ runner.os }}-
+            nix-check-
+          gc-max-store-size-linux: 2G
           purge: true
-          purge-prefixes: nix-check-${{ runner.os }}-
+          purge-prefixes: nix-check-${{ matrix.check }}-${{ runner.os }}-
           purge-created: 0
           purge-primary-key: never
-      # `nix flake check` evaluates all four NixOS systems plus every check/VM
-      # derivation in ONE nix process; upstream Nix's evaluator peaks past the
-      # runner's RAM ("The runner has received a shutdown signal" = OOM-killed
-      # VM, seen on run 28596800090). Swap lets the eval spike spill to disk —
-      # a slower worst case instead of a dead job.
-      - name: Add swap (host eval peaks past runner RAM)
-        run: |
-          # ubuntu-latest images now ship with an active /swapfile; fallocate
-          # refuses to resize a file in use as swap ("Text file busy"). Release
-          # it first so this works on images with or without a preexisting swap.
-          sudo swapoff /swapfile 2>/dev/null || true
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          free -h
-      # Formatting is covered by the nixfmt-check flake check, so this single
-      # command is the whole gate (local `nix flake check` == CI).
-      - run: nix flake check -L
+      # Building the check derivation is equivalent to what `nix flake check`
+      # does for it; formatting/lint are themselves checks (nixfmt-check etc.),
+      # so the union of all matrix legs is the same gate as local
+      # `nix flake check`.
+      - run: nix build -L .#checks.x86_64-linux.${{ matrix.check }}
 
   build-hosts:
     name: Build ${{ matrix.host }}
@@ -96,7 +114,7 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
           sudo docker image prune --all --force >/dev/null 2>&1 || true
           df -h /
-      # See the flake-check job for why nix-quick-install + cache-nix-action.
+      # See the check job for why nix-quick-install + cache-nix-action.
       # The desktop closure includes the CachyOS kernel; pull it (and the rest
       # of chaotic) from the chaotic cache instead of building it.
       - uses: nixbuild/nix-quick-install-action@v30
