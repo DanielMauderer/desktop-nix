@@ -1,52 +1,41 @@
-# Dev environment (home-manager) — Ticket 08, Machines: all (wired in base).
-#
-# Replaces the Silverblue `dev-tools` toolbox container with nix-native tooling.
-# Strategy (DECISIONS 027): a thin set of global language toolchains (the daily
-# drivers, also needed by the neovim LSP/treesitter stack) plus per-project
-# `devShells` via direnv/nix-direnv for everything pinned. rustup is an
-# anti-pattern on NixOS, so Rust comes straight from nixpkgs.
-#
-# This module *owns the language toolchains*; the neovim module (Ticket 07) keeps
-# only editor-specific tooling (LSP servers, formatters, DAP adapters). The two
-# always load together via modules/nixos/base/home.nix.
+# Global language toolchains (daily drivers + the neovim LSP/treesitter stack);
+# everything pinned goes in per-project devShells via direnv/nix-direnv.
 { pkgs, ... }:
 {
   imports = [ ./claude.nix ];
 
   home.packages = with pkgs; [
-    # ── Rust toolchain (nixpkgs stable — DECISIONS 027) ───────────────────────
+    # Rust
     cargo
     rustc
-    rustfmt # also used by the Claude rustfmt PostToolUse hook + conform.nvim
-    clippy # `ck` alias, /clippy command, the Claude clippy Stop hook
-    cargo-nextest # `ct` alias, /nextest command (was a toolbox `cargo install`)
-    bacon # `cw` alias — background cargo check/clippy/test watcher (was toolbox)
+    rustfmt
+    clippy
+    cargo-nextest
+    bacon # background cargo check/clippy/test watcher
 
-    # ── Go ────────────────────────────────────────────────────────────────────
+    # Go
     go
 
-    # ── Node (single global LTS — replaces nvm/`load_nvm`) ─────────────────────
-    nodejs # npm/npx for the nf/nl/nt/nx aliases; nvim treesitter + js-debug
+    # Node
+    nodejs
 
-    # ── Python (venv is stdlib → venv-selector workflow) ──────────────────────
+    # Python
     python3
-    uv # fast project venvs / installs
+    uv
 
-    # ── C toolchain ───────────────────────────────────────────────────────────
+    # C toolchain
     gcc
     gnumake
 
-    # ── Git tooling (aliases dormant since Ticket 06) ─────────────────────────
-    git-spice # `gs` alias — stacked-PR workflow
-    gh # GitHub CLI — lazygit's PR commands
+    # Git tooling
+    git-spice # `gs` — stacked-PR workflow
+    gh
 
-    # ── Claude Code ───────────────────────────────────────────────────────────
     claude-code
   ];
 
-  # direnv + nix-direnv: per-project devShells load automatically on `cd`.
-  # Fish integration is wired automatically because programs.fish is enabled
-  # (modules/home/cli). nix-direnv adds fast, GC-pinned `use flake` caching.
+  # Per-project devShells load automatically on `cd` (fish integration is
+  # wired because programs.fish is enabled).
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;

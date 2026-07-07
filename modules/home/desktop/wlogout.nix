@@ -1,7 +1,5 @@
-# Logout / power menu. Ported from the old wlogout/layout. The per-button PNG
-# icon backgrounds are dropped (text labels only). stylix has no wlogout target,
-# so the @base/@mauve colours are prepended from the stylix palette here
-# (DECISIONS 022).
+# Logout / power menu. stylix has no wlogout target, so the colours are
+# prepended from the stylix palette here.
 { config, ... }:
 let
   c = config.lib.stylix.colors.withHashtag;

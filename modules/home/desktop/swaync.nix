@@ -1,8 +1,3 @@
-# Notifications — SwayNotificationCenter (DECISIONS 022), replacing dunst.
-# swaync ships a slide-out control center (DND, history, media controls) and is
-# themed by stylix's swaync target, so this module only owns layout/behaviour.
-# It registers its own systemd user service (wanted by graphical-session.target),
-# so no exec-once is needed.
 _: {
   services.swaync = {
     enable = true;

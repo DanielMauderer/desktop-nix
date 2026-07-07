@@ -1,41 +1,14 @@
-# Theming — Stylix (Ticket 05 / DECISIONS 022).
-#
-# Stylix derives one base16 palette from `stylix.image` at build time and
-# themes the whole desktop declaratively. Because home-manager runs as a NixOS
-# module, stylix's home-manager integration copies `stylix.*` into the maudi
-# home automatically, so this one module themes both system and home.
-#
-# Wallpaper change == rebuild: the rofi wallpaper picker
-# (pkgs/scripts/theme-wallpaper-select.sh) overwrites ./wallpaper.png in the
-# local flake checkout and runs `nixos-rebuild switch`, which re-derives the
-# palette. The committed default below is what every host falls back to (and
-# what `system.autoUpgrade` restores, since it builds from git main).
-#
-# Stylix owns GTK, Qt (qtct → kvantum under the hood), kitty, swaync, swaylock,
-# the cursor, fonts and icons. The Wayland apps with hand-tuned layouts from
-# Ticket 04 (waybar, wlogout, rofi, hyprland) keep their own CSS/settings but
-# source their colours from `config.lib.stylix.colors`; their stylix targets
-# are disabled in the matching home modules so stylix does not fight the custom
-# layouts.
-#
-# The stylix NixOS module itself is added to the module list in lib/mkHost.nix
-# (and the nixosTest node in flake.nix), not imported here via an `inputs`
-# module argument — the latter infinitely recurses in the test node, where
-# `inputs` is supplied through `_module.args` rather than `specialArgs`.
 { pkgs, ... }:
 {
   stylix = {
     enable = true;
     polarity = "dark";
 
-    # Default wallpaper; the picker replaces this file and rebuilds. Stylix
-    # generates the palette from it and points swaylock/swaybg at it too.
+    # Palette source; the rofi picker replaces this file and rebuilds.
     image = ./wallpaper.png;
     imageScalingMode = "fill";
 
-    # Terminal transparency, ported from the old kitty.conf (background_opacity
-    # 0.7). Set here because stylix's kitty target owns `background_opacity`
-    # (Ticket 06 / DECISIONS 022).
+    # Set here because stylix's kitty target owns `background_opacity`.
     opacity.terminal = 0.7;
 
     cursor = {

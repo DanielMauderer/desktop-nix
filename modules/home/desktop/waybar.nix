@@ -1,13 +1,7 @@
-# Waybar, translated from the old waybar/config.jsonc into native settings.
-# Only the modules actually placed on the bar are ported; the many unused
-# module definitions in the old config are dropped. Script on-clicks point at
-# the packaged wrappers in pkgs/. Runs as a systemd user service bound to the
-# Hyprland session.
 { config, desktopScripts, ... }:
 let
-  # Colours come from the stylix palette (DECISIONS 022). The stylix waybar
-  # target is disabled below so it doesn't restyle the bar; instead we map the
-  # base16 palette onto the semantic @define-color names waybar-style.css uses.
+  # Map the stylix base16 palette onto the @define-color names waybar-style.css
+  # uses (the stylix waybar target is disabled below).
   c = config.lib.stylix.colors.withHashtag;
   colorCss = ''
     @define-color text ${c.base05};
@@ -55,9 +49,8 @@ in
         "group/group-3"
       ];
 
-      # A Waybar group lays its children out in the orientation *opposite* the
-      # bar, so on this horizontal bar every multi-module group would stack its
-      # modules vertically (tall multi-line pills). Force horizontal on each.
+      # Groups default to the orientation opposite the bar (vertical here), so
+      # force horizontal on each.
       "group/group-1" = {
         orientation = "horizontal";
         modules = [ "hyprland/workspaces" ];
@@ -119,10 +112,8 @@ in
         separate-outputs = false;
       };
 
-      # Time on the bar; the calendar is waybar's own, rendered inside the
-      # themed tooltip and coloured straight from the stylix palette so it
-      # matches the bar exactly (Pango markup needs literal hex, hence the
-      # interpolation). Right-click toggles month/year; scroll changes month.
+      # Calendar in the tooltip, coloured from the stylix palette (Pango needs
+      # literal hex, hence the interpolation).
       clock = {
         format = "{:%H:%M}";
         format-alt = "{:%Y-%m-%d}";
@@ -219,10 +210,8 @@ in
         };
       };
 
-      # Now-playing via a hardened playerctl script instead of the built-in
-      # `mpris` module, whose D-Bus metadata handling intermittently crashed the
-      # whole bar (e.g. on Spotify track changes). The script escapes markup and
-      # never exits non-zero, so a misbehaving player can't take the bar down.
+      # playerctl script instead of the built-in `mpris` module, which crashed
+      # the bar on some D-Bus metadata.
       "custom/mpris" = {
         exec = "${desktopScripts.waybar-mpris}/bin/waybar-mpris";
         return-type = "json";
@@ -230,8 +219,7 @@ in
         on-click = "playerctl play-pause";
         on-scroll-up = "playerctl next";
         on-scroll-down = "playerctl previous";
-        # The script already escapes Pango markup, so Waybar must not escape
-        # again (escape = true would double-escape `&` into `&amp;`).
+        # Script already escapes Pango markup; don't double-escape.
         escape = false;
         max-length = 40;
       };

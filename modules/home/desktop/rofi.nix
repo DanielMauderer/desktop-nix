@@ -1,13 +1,8 @@
-# Application launcher. The launcher behaviour (modi, icons, fonts) is native
-# home-manager config; the visual theme stays a rasi file (rofi-theme.rasi),
-# ported from the old rofi/theme.rasi. The old theme's `@import "colors"`
-# (matugen) becomes the colour block prepended below from the stylix palette
-# (DECISIONS 022); stylix's own rofi target is disabled so it doesn't override
-# the custom layout.
+# Launcher behaviour is native home-manager config; the visual theme stays a
+# rasi file with a stylix-derived colour block prepended (stylix rofi target off).
 { config, pkgs, ... }:
 let
   c = config.lib.stylix.colors.withHashtag;
-  # The palette `* { … }` block the old theme expected from @import "colors".
   colorRasi = ''
     * {
         bg:           ${c.base00};
@@ -21,9 +16,8 @@ let
         border:       ${c.base0D};
     }
   '';
-  # builtins.toFile yields a store-path *string*; home-manager's rofi module
-  # treats that as a theme path and writes `@theme "<path>"` into config.rasi.
-  # (A derivation, e.g. pkgs.writeText, is misread as an inline rasi attrset.)
+  # toFile yields a store-path string, which the rofi module treats as a theme
+  # path (a derivation like writeText would be misread as an inline attrset).
   rofiTheme = builtins.toFile "rofi-theme.rasi" (colorRasi + builtins.readFile ./rofi-theme.rasi);
 in
 {

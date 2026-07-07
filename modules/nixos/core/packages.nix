@@ -1,6 +1,4 @@
-# Minimal system-wide package set. User-facing CLI tools (bat, fd, ripgrep,
-# fzf, tree, btop, …) live in home-manager (Ticket 06); base keeps only what
-# the system itself needs for recovery, flakes and VPN.
+# Minimal system-wide set; user-facing CLI tools live in home-manager.
 { pkgs, ... }:
 {
   environment.systemPackages = with pkgs; [

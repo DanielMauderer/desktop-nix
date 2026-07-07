@@ -1,9 +1,3 @@
-# User-facing desktop apps and the CLI helpers the Hyprland binds / waybar
-# modules call. Programs with their own home-manager module (waybar, rofi,
-# wlogout, swaylock, dunst) are NOT listed here.
-#
-# kitty (the SUPER+RETURN terminal) is provided by `programs.kitty` in the cli
-# module (Ticket 06). Flatpak apps (zen-browser, spotify, …) are Ticket 10.
 { pkgs, ... }:
 {
   home.packages = with pkgs; [

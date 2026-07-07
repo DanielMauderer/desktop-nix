@@ -1,7 +1,5 @@
-# nixvim settings for modules/home/neovim/default.nix, split out as a plain function
-# returning the `programs.nixvim` value so it can be built standalone (nixvim's
-# makeNixvimWithModule) as well as consumed by the home-manager module. The three
-# unpackaged plugins are passed in as built derivations; claudecode uses pkgs.
+# The `programs.nixvim` value, a plain function so it can be built standalone as
+# well as consumed by the home-manager module.
 {
   pkgs,
   ember,

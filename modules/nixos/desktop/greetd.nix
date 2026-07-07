@@ -1,5 +1,3 @@
-# Greeter: greetd + tuigreet (DECISIONS 015). A minimal Wayland-native TUI
-# greeter that launches the Hyprland session for the selected user.
 { pkgs, ... }:
 {
   services.greetd = {

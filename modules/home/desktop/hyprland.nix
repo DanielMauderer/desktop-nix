@@ -1,14 +1,3 @@
-# Hyprland, translated from the old MyLinux hypr/ config tree into native
-# home-manager settings (wayland.windowManager.hyprland.settings).
-#
-# The session binary and portal come from the system (programs.hyprland, which
-# uses the upstream Hyprland flake — DECISIONS 006), so package/portalPackage
-# are null here: this module only owns ~/.config/hypr.
-#
-# Colours: the gradient-border variables below are sourced from the stylix
-# base16 palette (DECISIONS 022). stylix's own hyprland target is disabled (see
-# below) so it does not flatten the multi-stop gradient into a single colour or
-# pull in hyprpaper — swaybg keeps painting `stylix.image`.
 {
   config,
   desktopScripts,
@@ -30,9 +19,7 @@ let
     "$mainMod CTRL, ${workspaceKey n}, exec, ${desktopScripts.hypr-move-to}/bin/hypr-move-to ${toString n}"
   ) workspaces;
 
-  # Gradient-border palette, derived from the stylix base16 colours so the
-  # borders track the wallpaper. base0D/0C/0E are the accent hues, base02/03
-  # the muted surface/outline tones the inactive border used.
+  # Gradient-border palette, derived from the stylix base16 colours.
   c = config.lib.stylix.colors;
   colors = {
     "$primary" = "rgba(${c.base0D}ff)";
@@ -43,29 +30,23 @@ let
   };
 in
 {
-  # Cursor is owned by stylix.cursor (modules/nixos/desktop/theming.nix), which
-  # sets home.pointerCursor for us.
-
-  # stylix would otherwise theme hyprland (single-colour borders + hyprpaper);
-  # we drive the gradient borders ourselves and keep swaybg, so turn it off.
+  # We drive the gradient borders ourselves and keep swaybg, so disable stylix's
+  # hyprland target (it would flatten borders and pull in hyprpaper).
   stylix.targets.hyprland.enable = false;
 
   wayland.windowManager.hyprland = {
     enable = true;
-    # Provided by the system (modules/nixos/desktop/hyprland.nix).
+    # Session binary + portal come from the system module.
     package = null;
     portalPackage = null;
     systemd.enable = true;
-    # Keep the hyprlang config generator (the settings below are hyprlang, not
-    # the new Lua format that becomes the default at stateVersion 26.05).
+    # Keep the hyprlang generator (Lua becomes the default at stateVersion 26.05).
     configType = "hyprlang";
 
     settings = colors // {
       "$mainMod" = "SUPER";
 
-      # Generic fallback; real per-output geometry is applied by kanshi
-      # (modules/home/desktop/kanshi.nix). Per-host workspace→monitor rules
-      # land in hosts/<name>/ in Tickets 13–15.
+      # Generic fallback; real per-output geometry is applied by kanshi.
       monitor = [ ",preferred,auto,1" ];
 
       env = [
@@ -85,8 +66,6 @@ in
 
       exec-once = [
         "systemctl --user start hyprpolkitagent.service"
-        # swaybg paints the stylix wallpaper (a store path; the picker swaps it
-        # live and triggers a rebuild that re-derives the palette).
         "swaybg -i ${config.stylix.image} -m fill"
       ];
 
@@ -188,17 +167,11 @@ in
         pass_mouse_when_bound = false;
       };
 
-      # gestures.workspace_swipe_* were removed in Hyprland 0.47; the new
-      # touch-gesture system has no equivalent knobs yet.
-
       misc = {
         disable_hyprland_logo = true;
         disable_splash_rendering = true;
         initial_workspace_tracking = 1;
       };
-
-      # windowrule/layerrule blocks are generated via extraConfig below
-      # (Hyprland 0.47+ uses block syntax incompatible with settings key-value).
 
       bindm = [
         "$mainMod, mouse:272, movewindow"
@@ -275,8 +248,7 @@ in
       ++ moveAllBinds;
     };
 
-    # Hyprland 0.47+ uses block syntax for windowrule/layerrule; the settings
-    # attrset only generates flat key=value lines so we write these raw.
+    # windowrule/layerrule use block syntax (settings only emits flat key=value).
     extraConfig = ''
       windowrule {
         name = wr-float-nm-editor

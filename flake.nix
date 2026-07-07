@@ -16,16 +16,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Theming engine (Ticket 05 / DECISIONS 022): derives one base16 palette
-    # from a wallpaper image at build time and themes GTK/Qt/kitty/rofi/waybar/
-    # hyprland/swaylock/swaync declaratively.
+    # Theming: derives a base16 palette from a wallpaper image at build time.
     stylix = {
       url = "git+https://github.com/nix-community/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Zen Browser (Ticket 10 / DECISIONS 030): community flake, twilight channel
-    # for reproducibility (official release artifacts may be deleted by the Zen team).
+    # twilight channel for reproducibility (release artifacts may be deleted).
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs = {
@@ -34,57 +31,39 @@
       };
     };
 
-    # Secrets (Ticket 12 / DECISIONS 035): sops-nix decrypts secrets at
-    # activation time using each host's SSH host ed25519 key (converted to age)
-    # plus a personal master age key. Nothing is decrypted at eval time, so
-    # keyless CI runners still build every host.
     sops-nix = {
       url = "git+https://github.com/Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Declarative disk partitioning (Ticket 13 / DECISIONS 036): the pilot
-    # (private-laptop) is partitioned from a checked-in disko spec so a
-    # reinstall reproduces the exact LUKS + ext4 + ESP layout. Imported only by
-    # the host that uses it (hosts/private-laptop/disk.nix), not globally.
     disko = {
       url = "git+https://github.com/nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Pre-commit secret scanning (gitleaks): installed into .git/hooks on
-    # `nix develop` and run as a flake check so local + CI catch a secret
-    # (e.g. a decrypted sops file) before it is committed. The allowlist for
-    # the inert test-fixture key lives in .gitleaks.toml.
+    # gitleaks secret scanning: installed into .git/hooks on `nix develop` and
+    # run as a flake check.
     git-hooks = {
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Declarative Neovim (reverses DECISIONS 024): nixvim renders the whole
-    # editor config from Nix, so the lazy.nvim tree under nvim/ is gone. Plugins
-    # come from nixpkgs (accept its versions); the three below are not packaged
-    # there and are pulled as raw sources built with vimUtils.buildVimPlugin.
-    # follows nixpkgs to keep the fleet on a single nixpkgs (repo convention).
     nixvim = {
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # ember colorscheme — the editor's look; pinned to the commit the old
-    # lazy-lock.json used so the palette is byte-identical.
+    # The three below aren't packaged in nixpkgs; built with buildVimPlugin.
     ember-theme = {
       url = "github:ember-theme/nvim/7365b8dede43a82ed1df741275b75333422e5402";
       flake = false;
     };
 
-    # LSP hover prettifier (blink dependency) — not in nixpkgs.
     pretty-hover = {
       url = "github:Fildo7525/pretty_hover/934df974ef6158b100fe910e8556e6c4a66614c2";
       flake = false;
     };
 
-    # Code-action picker — not in nixpkgs.
     tiny-code-action = {
       url = "github:rachartier/tiny-code-action.nvim/0d040ed81f7953118b81cd12681fcdfcac069803";
       flake = false;
@@ -103,17 +82,11 @@
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (nixpkgs) lib;
 
-      # gitleaks pre-commit gate. `.shellHook` installs the git hook on
-      # `nix develop`; the derivation itself is wired into checks below so
-      # `nix flake check` and CI scan the tree identically. gitleaks auto-loads
-      # the repo-root .gitleaks.toml (allowlists the inert test-fixture key).
       preCommitCheck = inputs.git-hooks.lib.${system}.run {
         src = ./.;
-        # git-hooks.nix dropped its built-in `gitleaks` hook, so define it as a
-        # custom hook. `gitleaks dir` scans the filesystem (no .git required — the
-        # flake-check sandbox copies `src` without it, unlike `gitleaks git`) and
-        # auto-loads the repo-root .gitleaks.toml allowlist. pass_filenames = false
-        # so it runs once over the whole tree instead of per staged file.
+        # git-hooks.nix dropped its built-in gitleaks hook, so define a custom
+        # one. `gitleaks dir` scans the filesystem (no .git, which the flake-check
+        # sandbox lacks); pass_filenames = false runs it once over the whole tree.
         hooks.gitleaks = {
           enable = true;
           name = "gitleaks";
@@ -131,29 +104,22 @@
           ;
       };
 
+      # disk.nix is added only to the real config, never to the nixosTest nodes
+      # (which import default.nix alone), so VMs use their own scratch disk.
       hosts = {
         private-laptop = mkHost {
-          # disk.nix carries the disko spec (LUKS + ext4 + ESP) and is added
-          # only to the real nixosConfiguration — the nixosTest nodes below
-          # import default.nix alone, so the QEMU VMs use their own scratch
-          # disk and never the host's LUKS layout.
           modules = [
             ./hosts/private-laptop/default.nix
             ./hosts/private-laptop/disk.nix
           ];
         };
         work-laptop = mkHost {
-          # disk.nix carries the disko LUKS spec and is added only here — not
-          # imported by default.nix — so nixosTest VMs use their own scratch disk.
           modules = [
             ./hosts/work-laptop/default.nix
             ./hosts/work-laptop/disk.nix
           ];
         };
         desktop = mkHost {
-          # disk.nix carries the disko LUKS spec (LUKS2 + ext4 + ESP, like the
-          # laptops) and is added only here — not imported by default.nix — so
-          # nixosTest VMs use their own scratch disk.
           modules = [
             ./hosts/desktop/default.nix
             ./hosts/desktop/disk.nix
@@ -161,11 +127,6 @@
           withChaotic = true;
         };
         home-server = mkHost {
-          # disk.nix carries the disko spec for the OS SSD only (GPT + ESP +
-          # plain ext4); the ZFS data pool lives on a separate hardware-RAID LUN
-          # imported at runtime (modules/nixos/server/zfs.nix). Added only here —
-          # not imported by default.nix — so a nixosTest VM uses its own scratch
-          # disk and never the server's layout.
           modules = [
             ./hosts/home-server/default.nix
             ./hosts/home-server/disk.nix
@@ -173,10 +134,8 @@
         };
       };
 
-      # Eval-time host assertions (DECISIONS 021): facts about the evaluated
-      # config are checked while the check derivation is *constructed*, so a
-      # failure aborts `nix flake check` naming every failed assertion for the
-      # host. extraScript runs at build time against rendered files.
+      # Eval-time host assertions: a failure aborts `nix flake check` naming
+      # every failed assertion; extraScript runs at build time on rendered files.
       mkHostCheck =
         name: assertions: extraScript:
         let
@@ -196,9 +155,7 @@
       kanshiProfileNames =
         cfg: map (p: p.profile.name) cfg.home-manager.users.maudi.services.kanshi.settings;
 
-      # Assertions shared by EVERY host — desktops and the headless home-server
-      # alike. The host-type-specific lists below (baseAssertions /
-      # serverAssertions) extend this with their own deltas.
+      # Shared by every host; baseAssertions / serverAssertions extend it.
       commonAssertions = host: cfg: [
         {
           name = "hostName is ${host}";
@@ -217,101 +174,95 @@
           assertion = cfg.home-manager.users ? maudi;
         }
         {
-          name = "fish managed in home (Ticket 06)";
+          name = "fish managed in home";
           assertion = cfg.home-manager.users.maudi.programs.fish.enable;
         }
         {
-          name = "starship prompt enabled (Ticket 06)";
+          name = "starship prompt enabled";
           assertion = cfg.home-manager.users.maudi.programs.starship.enable;
         }
         {
-          name = "podman enabled with docker compat (Ticket 08)";
+          name = "podman enabled with docker compat";
           assertion = cfg.virtualisation.podman.enable && cfg.virtualisation.podman.dockerCompat;
         }
         {
-          name = "sops age key derived from host ssh ed25519 key (Ticket 12)";
+          name = "sops age key derived from host ssh ed25519 key";
           assertion = builtins.elem "/etc/ssh/ssh_host_ed25519_key" cfg.sops.age.sshKeyPaths;
         }
         {
-          name = "root account locked (Ticket 14 / DECISIONS 037)";
+          name = "root account locked";
           assertion = cfg.users.users.root.hashedPassword == "!";
         }
         {
-          name = "firewall enabled (Ticket 14 / DECISIONS 037)";
+          name = "firewall enabled";
           assertion = cfg.networking.firewall.enable;
         }
         {
-          name = "auditd enabled for security-event logging (policy §4.3/4.5, DECISIONS 039)";
+          name = "auditd enabled for security-event logging";
           assertion = cfg.security.auditd.enable && cfg.security.audit.enable;
         }
         {
-          name = "security updates applied daily, ≤72h window (policy §4.4, DECISIONS 039)";
+          name = "security updates applied daily";
           assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "daily";
         }
         {
-          # Fleet-wide since DECISIONS 042: every host tracks the CI-gated
-          # `release` branch, which only advances to a `main` commit whose full CI
-          # is green — so no machine auto-pulls a revision that failed to build.
-          name = "tracks the CI-gated release branch (DECISIONS 042)";
+          name = "tracks the CI-gated release branch";
           assertion = lib.hasSuffix "/release" cfg.system.autoUpgrade.flake;
         }
       ];
 
-      # Assertions for the desktop/workstation hosts (those that import
-      # modules/nixos/base): the shared baseline plus the desktop-only deltas.
+      # For the desktop/workstation hosts (those that import modules/nixos/base).
       baseAssertions =
         host: cfg:
         commonAssertions host cfg
         ++ [
           {
-            name = "stylix enabled with a wallpaper (Ticket 05)";
+            name = "stylix enabled with a wallpaper";
             assertion = cfg.stylix.enable && cfg.stylix.image != null;
           }
           {
-            name = "direnv + nix-direnv enabled in home (Ticket 08)";
+            name = "direnv + nix-direnv enabled in home";
             assertion =
               cfg.home-manager.users.maudi.programs.direnv.enable
               && cfg.home-manager.users.maudi.programs.direnv.nix-direnv.enable;
           }
           {
-            name = "libvirtd enabled with swtpm TPM emulation (Ticket 09)";
+            name = "libvirtd enabled with swtpm TPM emulation";
             assertion = cfg.virtualisation.libvirtd.enable && cfg.virtualisation.libvirtd.qemu.swtpm.enable;
           }
           {
-            name = "virt-manager enabled and maudi in libvirtd group (Ticket 09)";
+            name = "virt-manager enabled and maudi in libvirtd group";
             assertion =
               cfg.programs.virt-manager.enable && builtins.elem "libvirtd" cfg.users.users.maudi.extraGroups;
           }
           {
-            name = "allowUnfreePredicate whitelists spotify (Ticket 10)";
+            name = "allowUnfreePredicate whitelists spotify";
             assertion = cfg.nixpkgs.config.allowUnfreePredicate pkgs.spotify;
           }
           {
-            name = "spotify in maudi home.packages (Ticket 10)";
+            name = "spotify in maudi home.packages";
             assertion = builtins.any (
               p: (p.pname or "") == "spotify"
             ) cfg.home-manager.users.maudi.home.packages;
           }
           {
-            name = "SSH daemon disabled (Ticket 14 / DECISIONS 037)";
+            name = "SSH daemon disabled";
             assertion = !cfg.services.openssh.enable;
           }
         ];
 
-      # Assertions for the headless home-server (imports modules/nixos/core +
-      # modules/nixos/server, NOT base): the shared baseline plus the
-      # server-only deltas (DECISIONS 049). Notably SSH is ENABLED here — the one
-      # host that allows remote login — but only across the VPN.
+      # For the headless home-server (core + server, not base). SSH is enabled
+      # here — the one host that allows remote login — but only across the VPN.
       serverAssertions =
         host: cfg:
         commonAssertions host cfg
         ++ [
           {
-            name = "SSH daemon enabled (DECISIONS 049)";
+            name = "SSH daemon enabled";
             assertion = cfg.services.openssh.enable;
           }
           {
-            name = "SSH is key-only, no root login (DECISIONS 049)";
+            name = "SSH is key-only, no root login";
             assertion =
               (cfg.services.openssh.settings.PasswordAuthentication == false)
               && (cfg.services.openssh.settings.PermitRootLogin == "no");
@@ -363,10 +314,8 @@
         inherit system pkgs;
       };
 
-      # Shared nixosTest node: the private-laptop host plus the home-manager
-      # NixOS module and `inputs` that mkHost normally supplies (the host now
-      # pulls in modules/nixos/desktop, which configures home-manager and reads
-      # the Hyprland flake input).
+      # nixosTest node: the private-laptop host plus the home-manager module and
+      # `inputs` that mkHost normally supplies.
       testNode = {
         imports = [
           home-manager.nixosModules.home-manager
@@ -382,10 +331,8 @@
         };
       };
 
-      # Gaming test node (Ticket 11): the desktop host, which mkHost composes
-      # with the chaotic module (CachyOS kernel + scx) on top of the same
-      # home-manager/stylix/inputs wiring as testNode. The shared testNode can't
-      # be reused — it boots private-laptop, which deliberately has no chaotic.
+      # Gaming test node: the desktop host with the chaotic module. Can't reuse
+      # testNode, which boots private-laptop (no chaotic).
       gamingTestNode = {
         imports = [
           home-manager.nixosModules.home-manager
@@ -415,8 +362,7 @@
               statix
               deadnix
               nixfmt
-              # Secrets: edit/re-key sops files and convert SSH host keys to age
-              # for enrollment (see modules/nixos/core/README.md).
+              # Edit/re-key sops files and convert SSH host keys to age.
               sops
               ssh-to-age
               age
@@ -424,9 +370,8 @@
             ++ preCommitCheck.enabledPackages;
         };
 
-        # Per-language project shells (Ticket 08 / DECISIONS 027). Enter with
-        # `nix develop ~/desktop-nix#rust`, or scaffold a project with
-        # `nix flake init -t ~/desktop-nix#rust` (drops a flake.nix + .envrc).
+        # Per-language project shells. `nix develop ~/desktop-nix#rust`, or
+        # scaffold with `nix flake init -t ~/desktop-nix#rust`.
         rust = pkgs.mkShell {
           packages = with pkgs; [
             cargo
@@ -487,8 +432,7 @@
               touch $out
             '';
 
-        # Formatting is gated here (not as a separate CI step) so that local
-        # `nix flake check` and CI stay identical (Ticket 02: no drift).
+        # Formatting is gated here so local `nix flake check` and CI stay identical.
         nixfmt-check =
           pkgs.runCommand "nixfmt-check"
             {
@@ -499,9 +443,8 @@
               touch $out
             '';
 
-        # Dev devShell smoke checks (Ticket 08): each toolchain compiles/runs a
-        # trivial hello-world offline, so a broken per-language shell fails the
-        # flake check. Cheap (node/python/go) plus a minimal rust+nextest build.
+        # Dev devShell smoke checks: each toolchain compiles/runs a trivial
+        # hello-world offline, so a broken per-language shell fails the check.
         dev-node-check = pkgs.runCommand "dev-node-check" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
           node -e 'process.exit(0)'
           touch $out
@@ -543,9 +486,7 @@
             '';
 
         # Eval-level checks for the per-host deltas that CI's toplevel builds
-        # don't assert: chaotic only on desktop, kanshi profile ordering
-        # (docked/dual-head profiles must match before the laptop-internal
-        # fallback) and the rendered kanshi config the daemon actually reads.
+        # don't assert (chaotic only on desktop, kanshi profile ordering, …).
         host-assertions-private-laptop =
           let
             cfg = hosts.private-laptop.config;
@@ -562,16 +503,16 @@
                   name = "kanshi has only the laptop-internal fallback";
                   assertion = kanshiProfileNames cfg == [ "laptop-internal" ];
                 }
-                # Gaming stack (Ticket 11) is desktop-only — the Intel laptop
-                # must not pull in scx, Steam or 32-bit graphics.
+                # Gaming stack is desktop-only — the Intel laptop must not pull
+                # in scx, Steam or 32-bit graphics.
                 {
                   name = "no gaming stack (scx + steam disabled)";
                   assertion =
                     !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
                 }
-                # Waydroid (Ticket 16 / DECISIONS 040) is opt-in on private-laptop.
+                # Waydroid is opt-in on private-laptop.
                 {
-                  name = "waydroid enabled (Ticket 16)";
+                  name = "waydroid enabled";
                   assertion = cfg.virtualisation.waydroid.enable;
                 }
               ]
@@ -592,16 +533,15 @@
                   name = "chaotic module NOT loaded";
                   assertion = !(hosts.work-laptop.options ? chaotic);
                 }
-                # Gaming stack (Ticket 11) is desktop-only.
+                # Gaming stack is desktop-only.
                 {
                   name = "no gaming stack (scx + steam disabled)";
                   assertion =
                     !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
                 }
-                # Waydroid (Ticket 16 / DECISIONS 040): the Android container is
-                # deliberately absent from the work laptop.
+                # Waydroid is deliberately absent from the work laptop.
                 {
-                  name = "waydroid NOT enabled (Ticket 16)";
+                  name = "waydroid NOT enabled";
                   assertion = !cfg.virtualisation.waydroid.enable;
                 }
                 {
@@ -636,7 +576,7 @@
                   name = "chaotic module loaded (chaotic.nyx options present)";
                   assertion = (hosts.desktop.options ? chaotic) && (hosts.desktop.options.chaotic ? nyx);
                 }
-                # Gaming stack (Ticket 11), desktop-only.
+                # Gaming stack, desktop-only.
                 {
                   name = "CachyOS kernel selected";
                   assertion = cfg.boot.kernelPackages.kernel == hosts.desktop.pkgs.linuxPackages_cachyos.kernel;
@@ -654,9 +594,9 @@
                   name = "MangoHud enabled in maudi's home";
                   assertion = cfg.home-manager.users.maudi.programs.mangohud.enable;
                 }
-                # Waydroid (Ticket 16 / DECISIONS 040) is opt-in on desktop.
+                # Waydroid is opt-in on desktop.
                 {
-                  name = "waydroid enabled (Ticket 16)";
+                  name = "waydroid enabled";
                   assertion = cfg.virtualisation.waydroid.enable;
                 }
                 {
@@ -676,12 +616,9 @@
               test "$(grep '^profile' "$conf" | tail -1)" = 'profile laptop-internal {'
             '';
 
-        # Home-server eval assertions (DECISIONS 049): the server uses its own
-        # serverAssertions set (NOT baseAssertions — it has no desktop stack and
-        # deliberately enables SSH, which baseAssertions forbids). The CI
-        # build-hosts matrix builds its toplevel; a nixosTest is omitted because
-        # the VPN-only SSH, ZFS pool and NFS export can't be exercised in a
-        # disk/key-less QEMU node, so these eval checks are the gate.
+        # Home-server eval assertions: it uses serverAssertions (not
+        # baseAssertions — no desktop stack, and it enables SSH). A nixosTest is
+        # omitted because VPN-only SSH, ZFS and NFS can't run in a QEMU node.
         host-assertions-home-server =
           let
             cfg = hosts.home-server.config;
@@ -705,8 +642,7 @@
             ]
           ) "";
 
-        # Template nixosTest: boot private-laptop config, assert multi-user.target.
-        # Later tickets copy this pattern (e.g. assert Hyprland unit, libvirtd active).
+        # Boot private-laptop config, assert multi-user.target.
         test-boot-private-laptop = testLib.makeTest {
           name = "boot-private-laptop";
           nodes.machine = testNode;
@@ -737,8 +673,7 @@
             # Fonts actually land.
             machine.succeed("fc-list | grep -i 'JetBrainsMono Nerd Font'")
 
-            # Shell & CLI environment (Ticket 06): base now wires the cli home
-            # module, so the maudi home generation built fish + the tool configs.
+            # Shell & CLI environment: the maudi home generation built fish + configs.
             machine.wait_for_unit("home-manager-maudi.service")
 
             # Configs rendered for fish, kitty, fastfetch and lazygit.
@@ -747,11 +682,8 @@
             machine.succeed("test -e /home/maudi/.config/fastfetch/config.jsonc")
             machine.succeed("test -e /home/maudi/.config/lazygit/config.yml")
 
-            # Neovim (nixvim, DECISIONS 024 revised): the declarative editor is
-            # installed and the ember colorscheme (the config's whole point — keep
-            # the old look/feel) loads cleanly headless. We apply ember explicitly
-            # and assert it takes; `auto=` records what nixvim applied at startup for
-            # visibility in the CI log.
+            # Neovim (nixvim) is installed and the ember colorscheme loads cleanly
+            # headless. `auto=` records what nixvim applied at startup, for the CI log.
             machine.succeed("test -x /etc/profiles/per-user/maudi/bin/nvim")
             machine.succeed(
                 "su maudi -c '/etc/profiles/per-user/maudi/bin/nvim --headless "
@@ -774,8 +706,7 @@
                 "su maudi -c 'fish -ic \"functions -q mkcd; and functions -q gst\"'"
             )
 
-            # Prompt is declarative starship (no tide / no universal-var setup):
-            # the binary is installed and fish's interactive init sources it.
+            # starship is installed and fish's interactive init sources it.
             machine.succeed("test -x /etc/profiles/per-user/maudi/bin/starship")
             machine.succeed("grep -q 'starship init fish' /home/maudi/.config/fish/config.fish")
 
@@ -785,20 +716,15 @@
                 "test -x /etc/profiles/per-user/maudi/bin/$b; done"
             )
 
-            # Hardening (Ticket 14 / DECISIONS 037): SSH daemon must not be running
-            # and the firewall must be active.
+            # Hardening: SSH daemon off, firewall active.
             machine.fail("systemctl is-active sshd")
             machine.succeed("nft list ruleset | grep -q 'type filter hook input'")
 
-            # Security-event logging (policy §4.3/4.5/4.6, DECISIONS 039): auditd is
-            # up with our rules loaded, sudo logs to its dedicated file, and the
-            # journal is persistent.
+            # Security-event logging: auditd up with rules loaded, sudo logs to
+            # its file, journal persistent.
             machine.wait_for_unit("auditd.service")
-            # Rules are applied by the audit-rules-nixos.service oneshot at
-            # sysinit (before multi-user.target, already reached above). Assert
-            # it succeeded and the priv_esc rule is live — `succeed`, not a long
-            # `wait_until_succeeds`, so a future rule-load regression fails in
-            # seconds instead of timing out after 900s (DECISIONS 041).
+            # Rules load at sysinit; assert with `succeed` (not a long
+            # wait_until_succeeds) so a regression fails fast.
             machine.succeed("systemctl is-active audit-rules-nixos.service")
             machine.succeed("auditctl -l | grep -q priv_esc")
             machine.succeed("grep -q 'logfile=/var/log/sudo.log' /etc/sudoers")
@@ -807,9 +733,8 @@
           '';
         };
 
-        # Desktop stack (Ticket 04): the host now imports modules/nixos/desktop,
-        # so booting it exercises the Hyprland session registration, greeter,
-        # polkit agent and the maudi home-manager generation (waybar, swaylock).
+        # Desktop stack: Hyprland session registration, greeter, polkit agent and
+        # the maudi home-manager generation (waybar, swaylock).
         test-desktop = testLib.makeTest {
           name = "desktop";
           nodes.machine = testNode;
@@ -844,8 +769,7 @@
                 "test -e /home/maudi/.config/systemd/user/hyprland-session.target.wants/kanshi.service"
             )
 
-            # swaync: notification daemon unit installed and config rendered
-            # (replaces dunst — DECISIONS 022).
+            # swaync: notification daemon unit installed and config rendered.
             machine.succeed("test -e /home/maudi/.config/systemd/user/swaync.service")
             machine.succeed("test -e /home/maudi/.config/swaync/config.json")
 
@@ -882,10 +806,8 @@
           '';
         };
 
-        # Dev containers (Ticket 08): the dev system module is imported by base,
-        # so booting any host gives podman. Run a container from a store-loaded
-        # image (the VM has no network) and verify the docker→podman compat shim
-        # and podman-compose are present.
+        # Dev containers: run a container from a store-loaded image (the VM has no
+        # network) and verify the docker→podman compat shim and podman-compose.
         test-podman =
           let
             image = pkgs.dockerTools.buildImage {
@@ -918,11 +840,9 @@
             '';
           };
 
-        # Virtualisation (Ticket 09): the libvirt module is imported by base, so
-        # booting any host gives libvirtd. Assert the daemon is up, maudi reaches
-        # qemu:///system via libvirtd-group socket access, the default NAT network
-        # is defined+autostarting, and the GUI/console clients are installed.
-        # Starting an actual guest needs nested KVM and is left to manual testing.
+        # Virtualisation: libvirtd up, maudi reaches qemu:///system via group
+        # socket access, default NAT network defined+autostarting, clients
+        # installed. Starting a guest needs nested KVM and is left to manual testing.
         test-virtualisation = testLib.makeTest {
           name = "virtualisation";
           nodes.machine = testNode;
@@ -946,12 +866,9 @@
           '';
         };
 
-        # Waydroid (Ticket 16, private-laptop + desktop): the shared testNode
-        # boots private-laptop, which imports modules/nixos/waydroid. Assert the
-        # CLI and the waydroid-container service unit are installed and the
-        # Hyprland window rules landed. A full Android session needs binder +
-        # KVM and an imperative `waydroid init` image download, so starting the
-        # container is left to manual on-hardware testing (Ticket 16 checklist).
+        # Waydroid: assert the CLI, the waydroid-container service unit, and the
+        # Hyprland window rules landed. A full Android session needs binder + KVM
+        # and an imperative image download, so it's left to manual testing.
         test-waydroid = testLib.makeTest {
           name = "waydroid";
           nodes.machine = testNode;
@@ -983,11 +900,9 @@
           '';
         };
 
-        # Gaming stack (Ticket 11, desktop only): boot the desktop host on the
-        # CachyOS kernel and assert the sched-ext scheduler is live and the
-        # Steam/GPU/overlay pieces are installed. The kernel + steam closure are
-        # pulled from the chaotic cache (CI extra-conf), not built. Launching a
-        # real game / GPU control needs hardware and is left to manual testing.
+        # Gaming stack (desktop only): boot on the CachyOS kernel and assert the
+        # sched-ext scheduler is live and the Steam/GPU/overlay pieces installed.
+        # Launching a real game / GPU control needs hardware (manual testing).
         test-gaming = testLib.makeTest {
           name = "gaming";
           nodes.machine = gamingTestNode;
@@ -1021,15 +936,11 @@
           '';
         };
 
-        # Secrets (Ticket 12): prove sops-nix decrypts at *activation* time. The
-        # production key source is each host's SSH host key, but the VM's host
-        # key is not a recipient of the fixture — so this node forces it off and
-        # injects a known test age identity instead (its private half guards
-        # nothing real: it only decrypts secrets/fixtures/test.yaml). Asserts the
-        # secret lands in /run/secrets with the right owner/mode, is not
-        # world-readable, and that the plaintext is absent from the nix store
-        # (encrypted-at-rest). Keyless CI host builds are the negative test that
-        # this is activation-time, not eval-time.
+        # Secrets: prove sops-nix decrypts at activation time. The VM's host key
+        # is not a fixture recipient, so force it off and inject a known test age
+        # identity (its private half only decrypts secrets/fixtures/test.yaml).
+        # Asserts the secret lands in /run/secrets with the right owner/mode and
+        # that the plaintext is absent from the store.
         test-secrets =
           let
             testAgeKey = "AGE-SECRET-KEY-1ZTVVG7CHXYCL2JLJ6ADJ3JDMQ32AQPEWHHYNZ3E9MVM7KA6QZQFQC2JGGK";
@@ -1064,9 +975,8 @@
                 };
                 gnupg.sshKeyPaths = lib.mkForce [ ];
 
-                # Two secrets from the same fixture key: one root-owned (the
-                # wireguard case, Ticket 14) and one user-owned (the token case),
-                # both 0400 so neither is world-readable.
+                # Two secrets from the same fixture key: one root-owned, one
+                # user-owned, both 0400 so neither is world-readable.
                 secrets = {
                   fixture_secret = {
                     sopsFile = ./secrets/fixtures/test.yaml;
@@ -1115,9 +1025,8 @@
 
       nixosConfigurations = hosts;
 
-      # devShell templates for `nix flake init -t ~/desktop-nix#<lang>`
-      # (Ticket 08 / DECISIONS 027). Each drops a flake.nix + .envrc (`use flake`)
-      # so direnv loads the toolchain on `cd`.
+      # devShell templates for `nix flake init -t ~/desktop-nix#<lang>`. Each
+      # drops a flake.nix + .envrc (`use flake`) so direnv loads the toolchain.
       templates = {
         rust = {
           path = ./templates/rust;

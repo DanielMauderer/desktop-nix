@@ -1,30 +1,11 @@
-# Declarative disk layout for the home server's OS SSD (DECISIONS 049).
-#
-# Disko owns ONLY the install SSD: a 1 GiB EFI System Partition (systemd-boot,
-# mounted at /boot per modules/nixos/core/boot.nix) and a plain ext4 root filling
-# the rest. No LUKS — the server stays powered-on headless at home and must boot
-# unattended, so it is the one machine that keeps the unencrypted-root trade-off
-# (the workstations are all LUKS2 now). Swap is zram (hardware.nix), so there is
-# no swap partition.
-#
-# The ZFS DATA pool is NOT touched here: it lives on a separate hardware-RAID LUN
-# that pre-exists and is imported at runtime (modules/nixos/server/zfs.nix), so a
-# reinstall reformats the OS SSD without endangering the data.
-#
-# This file is added to the host via flake.nix's mkHost module list (NOT imported
-# by default.nix), so any nixosTest that imports default.nix boots off its own
-# scratch disk.
-#
-# Install-time use (see hosts/home-server/INSTALL.md): format with
-#   sudo nix --experimental-features "nix-command flakes" run \
-#     --inputs-from /tmp/cfg disko -- --mode disko \
-#     /tmp/cfg/hosts/home-server/disk.nix
-# (--inputs-from pins disko to this repo's flake.lock — no version skew.)
+# The OS SSD only: 1 GiB ESP + plain ext4 root. No LUKS — the server boots
+# unattended headless (the one unencrypted-root machine). The ZFS data pool lives
+# on a separate RAID LUN imported at runtime (server/zfs.nix). Added to the host
+# via flake.nix's mkHost module list, not default.nix. Install: see INSTALL.md.
 _: {
   disko.devices.disk.main = {
     type = "disk";
-    # VERIFY with `lsblk` before formatting — the OS SSD, NOT the RAID LUN that
-    # carries the ZFS pool. An NVMe SSD is usually /dev/nvme0n1; SATA is /dev/sda.
+    # VERIFY with `lsblk` — the OS SSD, NOT the RAID LUN carrying the ZFS pool.
     device = "/dev/nvme0n1";
     content = {
       type = "gpt";
@@ -36,8 +17,7 @@ _: {
             type = "filesystem";
             format = "vfat";
             mountpoint = "/boot";
-            # Lock down the ESP: only root can read it (it holds the
-            # unencrypted kernel/initrd).
+            # Root-only: the ESP holds the unencrypted kernel/initrd.
             mountOptions = [ "umask=0077" ];
           };
         };

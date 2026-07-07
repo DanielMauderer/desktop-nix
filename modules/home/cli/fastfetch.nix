@@ -1,6 +1,3 @@
-# fastfetch — ported from MyLinux fastfetch/config.jsonc, translated to native
-# home-manager settings (DECISIONS 019). The $schema key is dropped; HM writes
-# the config that fastfetch reads.
 _: {
   programs.fastfetch.enable = true;
 

@@ -1,10 +1,3 @@
-# fish shell — ported from MyLinux fish/{config,aliases,functions}.fish.
-#
-# Retired from the old setup: fisher + tide (→ starship, DECISIONS 023), the
-# nvm fisher plugin and load_nvm (→ Ticket 08), the per-shell ssh-agent eval
-# (→ services.ssh-agent in ./default.nix), the toolbox `tb`/`tbr` aliases and
-# the cargo-env / tide / key-binding-migration conf.d files. completions.fish
-# only covered flatpak + toolbox and is dropped with them.
 _: {
   programs.fish = {
     enable = true;
@@ -18,7 +11,6 @@ _: {
       lt = "eza -a --tree --level=1 --icons=always";
       wifi = "nmtui";
 
-      # docker→podman stays (DECISIONS); podman arrives with Ticket 08.
       docker = "podman";
 
       # npm / nx
@@ -27,7 +19,7 @@ _: {
       nt = "npm run test";
       nx = "npx nx";
 
-      # Rust / cargo (tools land in Ticket 08; aliases dormant until then)
+      # Rust / cargo
       cb = "cargo build";
       cbr = "cargo build --release";
       cch = "cargo check"; # not 'cc' — avoid shadowing the C compiler
@@ -36,16 +28,13 @@ _: {
       cr = "cargo run";
       cw = "bacon"; # background cargo check/clippy/test watcher
 
-      # System management. `update` was `rpm-ostree upgrade`; on NixOS it
-      # rebuilds from the local flake checkout (matches the wallpaper picker's
-      # FLAKE_DIR default, DECISIONS 022). The host is selected by hostname.
+      # System management. Rebuilds from the local flake checkout, host by hostname.
       update = "sudo nixos-rebuild switch --flake ~/desktop-nix";
       shutdown = "systemctl poweroff";
       reboot = "systemctl reboot";
       suspend = "systemctl suspend";
 
-      # Git. `gs`=git-spice and lazygit's gh PR commands are dormant until
-      # Ticket 08; `lg` is plain lazygit now (was `toolbox run -c dev-tools`).
+      # Git
       gs = "git-spice";
       ga = "git add";
       gc = "git checkout";
@@ -113,9 +102,7 @@ _: {
         end
       '';
 
-      # Find and kill processes matching a pattern. pgrep -f matches safely
-      # (no grep-on-ps-aux self-matches); guard the empty-pattern case so we
-      # never feed kill an empty arg list.
+      # Find and kill processes matching a pattern.
       killf = ''
         if test (count $argv) -eq 0
             echo "usage: killf <pattern>"
