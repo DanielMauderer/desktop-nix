@@ -1,8 +1,3 @@
-# Per-user desktop environment (home-manager) — Ticket 04, themed in Ticket 05.
-# Ported from the old MyLinux dotfiles, translated to native home-manager
-# settings. Colours come from stylix (DECISIONS 022): stylix themes most apps
-# directly, while waybar/wlogout/rofi/hyprland keep their custom layouts and
-# source colours from `config.lib.stylix.colors`.
 { pkgs, ... }:
 {
   imports = [
@@ -16,10 +11,6 @@
     ./packages.nix
   ];
 
-  # The packaged hypr/waybar scripts (pkgs/) are shared across the modules
-  # below via this module argument.
+  # Shared packaged hypr/waybar scripts (pkgs/) for the modules below.
   _module.args.desktopScripts = import ../../../pkgs { inherit pkgs; };
-
-  # home.stateVersion is owned by modules/home/cli (mkDefault "25.05"), which
-  # every host loads alongside this module via modules/nixos/base/home.nix.
 }

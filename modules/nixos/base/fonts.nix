@@ -1,4 +1,3 @@
-# System fonts. Nerd Fonts + Google Fonts ported from maudiblue (INVENTORY §3).
 { pkgs, ... }:
 {
   fonts = {

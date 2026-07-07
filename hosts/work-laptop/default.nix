@@ -11,16 +11,8 @@
   networking.hostName = "work-laptop";
   system.stateVersion = "25.05";
 
-  # Update channel (DECISIONS 042): the whole fleet now tracks the CI-gated
-  # `release` branch by default (modules/nixos/core/updates.nix), so this host
-  # needs no override — a commit only reaches `release` after its full CI is green
-  # (.github/workflows/promote-release.yml).
-
-  # Idle policy (DECISIONS 042): keep the 5-min screen lock (modules/home/desktop/
-  # lockscreen.nix) but lengthen auto-suspend from 10 → 30 min on this host, so an
-  # unattended build/update or a long meeting on the dock isn't force-suspended.
-  # Guard the lock the same way as the shared module (lockscreen.nix) so a
-  # second swaylock never stacks and the screen isn't unlocked twice on resume.
+  # Keep the 5-min lock but lengthen auto-suspend to 30 min on this host. Guard
+  # the lock like the shared module so a second swaylock never stacks.
   home-manager.users.maudi.services.swayidle.timeouts = lib.mkForce [
     {
       timeout = 300;
@@ -32,10 +24,8 @@
     }
   ];
 
-  # Host-specific kanshi profiles: docked at the desk (two external monitors,
-  # internal panel off) or docked at home (internal + HDMI). Prepended
-  # (mkBefore) so a docked profile matches before the generic laptop-internal
-  # fallback; undocked falls through to that fallback.
+  # Docked-at-desk (dual external) or docked-at-home (internal + HDMI); mkBefore
+  # so a docked profile matches before the generic laptop-internal fallback.
   home-manager.users.maudi.services.kanshi.settings = lib.mkBefore [
     {
       profile = {
@@ -74,22 +64,13 @@
   ];
 
   # --- WireGuard VPN (uncomment after enrolling secrets/work-laptop/wireguard.yaml) ---
-  # NOTE: the block below reads `config.sops.secrets…`, so when you uncomment it,
-  # add `config` to this module's signature on line 1
-  # (`{ lib, pkgs, ... }:` → `{ lib, pkgs, config, ... }:`); otherwise eval fails
-  # with "config not in scope" (audit S-5).
-  # 1. Replace age1PLACEHOLDERworklaptop… in .sops.yaml with the real host key:
+  # The block reads `config.sops.secrets…`, so also add `config` to the module
+  # signature on line 1 when you uncomment it.
+  # 1. Replace the placeholder host key in .sops.yaml:
   #      cat /etc/ssh/ssh_host_ed25519_key.pub | nix run nixpkgs#ssh-to-age
   # 2. sops edit secrets/work-laptop/wireguard.yaml  (paste the WireGuard private key)
   # 3. Fill in the peer block below and uncomment.
   # 4. sudo nixos-rebuild switch --flake ~/desktop-nix#work-laptop
-  #
-  # Waybar caveat: the bar's VPN toggle (pkgs/scripts/waybar-vpn-toggle.sh)
-  # drives NetworkManager (`nmcli connection up/down`), which cannot control a
-  # wg-quick systemd unit. If you want click-to-toggle from the bar, import the
-  # tunnel as an NM connection instead of the wg-quick block below
-  # (`nmcli connection import type wireguard file wg0.conf`, with the private
-  # key from the sops path) — or keep wg-quick and toggle via systemctl.
   #
   # sops.secrets.wireguard-key = {
   #   sopsFile = ../../secrets/work-laptop/wireguard.yaml;

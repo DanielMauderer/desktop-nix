@@ -1,23 +1,6 @@
-# Neovim home-manager module — Machines: all.
-#
-# Strategy (DECISIONS 024, revised): the editor is configured declaratively with
-# **nixvim** (programs.nixvim). The old lazy.nvim tree under nvim/ is gone — there
-# are no Lua files and no runtime git-clones; every plugin comes from Nix. Plugins
-# are pinned by nixpkgs (we accept its versions); the three not packaged there
-# (ember, pretty_hover, tiny-code-action) are built from flake inputs below.
-#
-# The look/feel is deliberately unchanged from the lazy.nvim config: same `ember`
-# colorscheme, same options/keymaps/autocmds (ported into opts/globals/keymaps and
-# extraConfigLua), same plugin set and settings. Treesitter uses nixvim's typed
-# module (main branch, grammars from Nix); everything bespoke is inlined as Lua so
-# its behaviour is byte-identical to before. The actual programs.nixvim value lives
-# in ./settings.nix so it can also be built standalone for testing.
-#
-# LSP servers / formatters / DAP adapters are provided to Neovim via extraPackages
-# (Mason is not used — Mason-downloaded binaries break under NixOS dynamic linking).
-# rust_analyzer is owned by rustaceanvim. The language toolchains/runtimes
-# (cargo/rustc/rustfmt, gcc/gnumake, nodejs) still live in modules/home/dev and load
-# alongside via modules/nixos/base/home.nix.
+# Neovim configured declaratively with nixvim. Plugins come from nixpkgs; the
+# three not packaged there are built from flake inputs below. The programs.nixvim
+# value lives in ./settings.nix so it can also be built standalone for testing.
 {
   config,
   inputs,
@@ -62,11 +45,8 @@ in
     }
 
     {
-      # Install only the parsers the old lazy.nvim config used, not nixvim's
-      # default of *all* grammars — that added ~300 parser/query derivations to
-      # every host closure (and to `nix flake check`), for no behaviour change on
-      # the languages actually edited here. Sourced from the configured
-      # nvim-treesitter package so the query files stay compatible.
+      # Only the parsers actually used, not nixvim's default of *all* grammars
+      # (~300 derivations added to every host closure).
       programs.nixvim.plugins.treesitter.grammarPackages =
         with config.programs.nixvim.plugins.treesitter.package.builtGrammars; [
           angular
@@ -100,12 +80,8 @@ in
         ];
     }
 
-    # Stylix themes nixvim by injecting a mini.base16 palette into the generated
-    # init.lua, which overrides our `ember` colorscheme. We use programs.nixvim, so
-    # the relevant target is `nixvim` (the `neovim` target only applies to
-    # programs.neovim, which we don't use — disabling it was a no-op). Guarded
-    # because stylix is only imported on desktop hosts (headless home-server has no
-    # stylix, and defining an undeclared option is an eval error).
+    # Disable stylix's nixvim target so it doesn't override the `ember`
+    # colorscheme. Guarded because stylix is absent on the headless home-server.
     (lib.optionalAttrs (options ? stylix) {
       stylix.targets.nixvim.enable = false;
     })

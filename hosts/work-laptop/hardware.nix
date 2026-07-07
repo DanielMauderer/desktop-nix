@@ -1,10 +1,3 @@
-# Hardware enablement for the work laptop. Same pattern as the pilot
-# (hosts/private-laptop/hardware.nix): Intel iGPU assumption (iHD, Gen8+) that
-# must be verified during the hardware-capture step in
-# hosts/work-laptop/INSTALL.md. If the iGPU is pre-Broadwell swap to
-# `intel-vaapi-driver` / `i965`. The machine-specific kernel-module probe
-# produced by `nixos-generate-config --no-filesystems` is committed separately
-# as hardware/hardware-configuration.nix at install time.
 {
   config,
   lib,
@@ -12,8 +5,8 @@
   ...
 }:
 {
-  # Sensible initrd baseline for a modern Intel NVMe laptop — re-confirm against
-  # `nixos-generate-config --no-filesystems` at install, dropping duplicates.
+  # Initrd baseline for a modern Intel NVMe laptop so the committed config boots
+  # before the generated hardware-configuration.nix is added.
   boot.initrd.availableKernelModules = [
     "xhci_pci"
     "thunderbolt"
@@ -24,25 +17,21 @@
   boot.kernelModules = [ "kvm-intel" ];
 
   hardware = {
-    # Firmware (Wi-Fi/Bluetooth/GPU) + Intel CPU microcode.
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 
-    # Intel iGPU: hardware video acceleration (VAAPI/QSV). programs.hyprland
-    # already enables hardware.graphics; this only adds the Intel VAAPI drivers.
+    # Intel iGPU VAAPI/QSV drivers (hardware.graphics is on via programs.hyprland).
     graphics = {
       enable = true;
       extraPackages = with pkgs; [
-        # iHD: Gen8+ (Broadwell and newer). For pre-Broadwell swap to
-        # intel-vaapi-driver (i965) and set LIBVA_DRIVER_NAME = "i965".
+        # iHD: Gen8+ (Broadwell+). Pre-Broadwell: intel-vaapi-driver + i965.
         intel-media-driver
-        # oneVPL runtime for QuickSync (replaces the old intel-media-sdk).
-        vpl-gpu-rt
+        vpl-gpu-rt # oneVPL runtime for QuickSync
       ];
     };
   };
   environment.sessionVariables.LIBVA_DRIVER_NAME = "iHD";
 
-  # Compressed RAM swap — no encrypted swap partition, no hibernation (accepted).
+  # zram swap instead of an encrypted swap partition (no hibernation).
   zramSwap.enable = true;
 }

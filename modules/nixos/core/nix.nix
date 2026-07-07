@@ -1,4 +1,3 @@
-# Nix daemon settings: flakes, scheduled GC + store optimisation, trusted users.
 _: {
   nix = {
     settings = {

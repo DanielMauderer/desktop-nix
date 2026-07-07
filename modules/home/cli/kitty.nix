@@ -1,10 +1,4 @@
-# kitty terminal — ported from MyLinux kitty/kitty.conf.
-#
-# Colours and font are owned by stylix (DECISIONS 022): the old `include
-# colors.conf` (matugen output) is dropped, and `font_family`/`font_size` are
-# left to stylix.fonts.monospace. Window transparency (old background_opacity
-# 0.7) is set the stylix way via `stylix.opacity.terminal` in the theming
-# module, since stylix's kitty target writes `background_opacity` itself.
+# Colours, font and opacity are owned by stylix (see the theming module).
 _: {
   programs.kitty.enable = true;
 
@@ -23,13 +17,8 @@ _: {
     scrollback_lines = 10000;
     wheel_scroll_min_lines = 1;
 
-    # home-manager symlinks this config into /nix/store, and kitty's auto-reload
-    # watcher recursively inotify-watches the resolved file's parent dir — i.e.
-    # the whole store (~180k watches per window), which exhausts the per-user
-    # inotify limit and breaks other watchers (e.g. waybar's battery module
-    # crashes with "Could not watch events for .../BAT0"). The config is
-    # declarative — a rebuild restarts kitty — so live reload buys nothing.
-    # A negative value disables the watcher entirely.
+    # Disabled: the watcher would inotify-watch the whole nix store (config is a
+    # store symlink), exhausting the per-user inotify limit and breaking waybar.
     auto_reload_config = "-1";
 
     enable_audio_bell = "no";
@@ -41,9 +30,7 @@ _: {
     selection_foreground = "none";
     selection_background = "none";
 
-    # Per-user runtime socket (0700, owned by us) rather than world-accessible
-    # /tmp; kitty expands $XDG_RUNTIME_DIR and appends the PID so instances do
-    # not collide.
+    # Per-user runtime socket rather than world-accessible /tmp.
     allow_remote_control = "yes";
     listen_on = "unix:$XDG_RUNTIME_DIR/kitty";
   };

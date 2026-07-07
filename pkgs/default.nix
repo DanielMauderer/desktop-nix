@@ -1,24 +1,8 @@
-# Custom packages: the surviving shell scripts from the old MyLinux hypr/ and
-# waybar/ dirs, each wrapped with writeShellApplication so shellcheck runs at
-# build time and runtime dependencies are explicit.
+# The hypr/waybar helper scripts, each wrapped with writeShellApplication so
+# shellcheck runs at build time and runtime dependencies are explicit.
 #
-# Scripts made obsolete by the migration are intentionally NOT packaged:
-#   monitor-hotplug.sh, switch_hypr_env.sh  → replaced by kanshi
-#   apply_matugen.sh                        → replaced by stylix (Ticket 05);
-#                                             theme-wallpaper-select.sh is the
-#                                             new (rebuild-based) wallpaper flow
-#   xdg.sh, loadconfig.sh                   → handled by systemd/xdg.portal
-#   hypridle.sh, restart-hypridle.sh        → lock standardised on swayidle
-#   power.sh, toggleallfloat.sh,            → unbound in the active config
-#   systeminfo.sh, keybindings.sh
-#   hypr-gamemode.sh                        → dropped in Ticket 11 (unused; the
-#                                             gaming stack uses feralinteractive
-#                                             gamemode, not the cosmetic toggle)
-#
-# hyprctl is resolved from the running Hyprland session at runtime, so it is
-# deliberately left out of runtimeInputs (keeps these scripts' closures small).
-# Likewise `sudo` and `nixos-rebuild` (system commands) are left out of
-# theme-wallpaper-select's inputs and resolved from the ambient PATH.
+# hyprctl (from the running session) and `sudo`/`nixos-rebuild` are resolved from
+# the ambient PATH, so they're deliberately left out of runtimeInputs.
 { pkgs }:
 let
   app =

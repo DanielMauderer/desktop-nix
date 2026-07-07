@@ -1,11 +1,3 @@
-# Per-user shell & CLI environment (home-manager) — Ticket 06, Machines: all.
-# Ported from the old MyLinux dotfiles (fish/kitty/fastfetch/lazygit), replacing
-# the setup.sh symlink flow and the imperative fisher/toolbox installs.
-#
-# CLI tools live here, not in the base system module (DECISIONS 013). Tools that
-# belong to other tickets are deliberately absent: cargo/bacon/nextest, podman,
-# git-spice and gh come with the dev environment (Ticket 08); flatpak with
-# Ticket 10. The aliases that reference them stay dormant until then.
 { pkgs, lib, ... }:
 {
   imports = [
@@ -18,8 +10,8 @@
 
   home = {
     packages = with pkgs; [
-      eza # ls replacement (was cargo/toolbox in the old setup)
-      bat # cat/less/more replacement
+      eza # ls replacement
+      bat # cat/less replacement
       fd # find replacement
       ripgrep # rg
       fzf # fuzzy finder
@@ -34,36 +26,25 @@
       GIT_EDITOR = "nvim";
     };
 
-    # Replaces `set -gx PATH $PATH ~/.local/bin` from config.fish.
     sessionPath = [ "$HOME/.local/bin" ];
 
-    # mkDefault so this module is self-sufficient on a hypothetical host that
-    # loads base but not the desktop module (which also sets 25.05).
+    # mkDefault so this module is self-sufficient on a host that loads base but
+    # not the desktop module (which also sets 25.05).
     stateVersion = lib.mkDefault "25.05";
   };
 
-  # Grouped under one `programs` attr (statix repeated-keys lint) rather than
-  # separate `programs.zoxide`/`programs.starship`/`programs.ssh` assignments.
+  # Grouped under one `programs` attr for the statix repeated-keys lint.
   programs = {
-    # zoxide ships a fish hook (the `z`/`zi` smart-cd) — enable its integration
-    # rather than just dropping the binary in.
     zoxide = {
       enable = true;
       enableFishIntegration = true;
     };
 
-    # Prompt: starship (declarative) replaces the old fisher-installed tide, whose
-    # state lived in universal variables and was not reproducible (DECISIONS 023).
     # stylix has a starship target, so the palette is themed automatically.
     starship.enable = true;
 
-    # Declarative ~/.ssh/config. The ssh-agent service below holds keys; this tells
-    # ssh to use the host's ed25519 key for GitHub and to load it into the agent on
-    # first use (AddKeysToAgent = "yes" → one passphrase prompt per session, not
-    # per shell). The private key itself is per-host machine-local state, NOT in
-    # the repo: bootstrap each host once with `ssh-keygen -t ed25519` and add the
-    # .pub to GitHub (`gh ssh-key add ~/.ssh/id_ed25519.pub`). Remotes use
-    # git@github.com.
+    # Private key is per-host machine-local state (bootstrap with `ssh-keygen
+    # -t ed25519`), not in the repo. AddKeysToAgent → one passphrase per session.
     ssh = {
       enable = true;
       # HM's implicit `Host *` defaults are deprecated; keep the ones we want.
@@ -85,11 +66,7 @@
           User = "git";
           IdentityFile = "~/.ssh/id_ed25519";
         };
-        # `ssh home-server` → the box over the VPN. Its SSH is firewalled to the
-        # wg0 interface only (modules/nixos/server/ssh.nix), so the HostName is
-        # the tunnel IP; reaching it needs the WireGuard client from
-        # modules/nixos/net (host must be an enrolled wg0 peer). The host key is
-        # pinned system-wide via programs.ssh.knownHosts there, so no TOFU prompt.
+        # Reached over the VPN (its SSH is wg0-only); host must be an enrolled peer.
         "home-server" = {
           User = "maudi";
           HostName = "10.100.0.1";
@@ -99,8 +76,5 @@
     };
   };
 
-  # The old config did `eval (ssh-agent -c)` in config.fish, spawning a fresh
-  # agent per shell. The home-manager service starts one agent and exports
-  # SSH_AUTH_SOCK for the session instead.
   services.ssh-agent.enable = true;
 }
