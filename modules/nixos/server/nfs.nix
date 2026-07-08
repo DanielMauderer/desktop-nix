@@ -1,13 +1,13 @@
 let
   # EDIT to match your network. The VPN subnet matches wireguard.nix.
-  lanSubnet = "192.168.1.0/24";
+  lanSubnet = "192.168.178.0/24";
   vpnSubnet = "10.100.0.0/24";
 in
 {
   services.nfs.server = {
     enable = true;
     exports = ''
-      /tank/share ${lanSubnet}(rw,sync,no_subtree_check,root_squash,fsid=0) ${vpnSubnet}(rw,sync,no_subtree_check,root_squash,fsid=0)
+      /hdd_pool_1/share ${lanSubnet}(rw,sync,no_subtree_check,root_squash,fsid=0) ${vpnSubnet}(rw,sync,no_subtree_check,root_squash,fsid=0)
     '';
   };
 
