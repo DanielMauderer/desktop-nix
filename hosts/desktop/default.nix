@@ -17,9 +17,13 @@
   # Always at home, so the share mounts direct over the LAN (SSH still rides the
   # tunnel). `enable` stays off until enrollment.
   services.homeServerClient = {
-    # enable = true;                     # ← flip on last, once the server is up
+    enable = true;
     address = "10.100.0.2/32";
-    nfsHost = "192.168.1.2"; # ← EDIT: the home-server's LAN IP
+    nfsHost = "192.168.178.96"; # home-server's LAN IP
+    # Always-home + same LAN as the server: tunnel straight to its LAN IP so the
+    # handshake doesn't depend on Fritz!Box NAT hairpin. Roaming hosts keep the
+    # default vpn.mauderer.work:51820 (WAN) endpoint.
+    endpoint = "192.168.178.96:51820";
   };
 
   # Dual-head desktop; mkBefore so it matches ahead of the laptop-internal fallback.
