@@ -40,10 +40,15 @@ matters lives here; the rest is in the Nix code and `git log`.
 
 ## Theming
 - **stylix** derives the palette from `modules/nixos/desktop/wallpaper.png` at
-  build time. waybar/wlogout/rofi/hyprland keep custom layouts and read colours
-  from `config.lib.stylix.colors`.
-- **waybar media via a playerctl script, not the built-in `mpris` module** — it crashed the bar on some D-Bus metadata; `waybar-mpris` escapes markup and never exits non-zero.
-- **waybar calendar is the built-in clock tooltip, coloured from the palette** — Pango colours interpolated from stylix; no external popup (gsimplecal clashed with the theme).
+  build time and themes the apps (kitty/GTK/Qt); hyprland keeps its custom
+  gradient borders read from `config.lib.stylix.colors`.
+- **Noctalia is the desktop shell** (replaces the waybar/rofi/swaync/swaylock/
+  swayidle/swaybg/wlogout stack) — one native Wayland shell for bar, launcher,
+  notifications, control center, OSD, lock, wallpaper and session menu.
+- **Split theming, shared wallpaper** — Noctalia colours its own UI from the
+  wallpaper (`theme.source = "wallpaper"`); stylix themes the apps from the same
+  image. `theme-sync-wallpaper` copies Noctalia's chosen wallpaper to the stylix
+  source and rebuilds, so both track one picture without runtime file collisions.
 
 ## Editor
 - **Neovim is declarative via nixvim** (revises the earlier "keep lazy.nvim as-is"

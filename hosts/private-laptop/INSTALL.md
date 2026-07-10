@@ -85,8 +85,9 @@ ls /mnt/home-server                # triggers the automount
 ## 3. Verify
 
 - Wi-Fi, audio (`wpctl status`), Bluetooth, suspend/resume, brightness + volume
-  keys, battery + power-profile waybar modules.
-- Hyprland from greetd; swaync notifications; swaylock + auto-lock.
-- New wallpaper re-themes GTK/Qt/kitty/waybar/rofi; `nvim :checkhealth` clean.
+  keys (Noctalia OSD), battery + power-profile widgets in the Noctalia bar.
+- Hyprland from greetd; Noctalia bar/launcher/notifications; lock + auto-lock.
+- Pick a wallpaper (SUPER+W); `SUPER+SHIFT+W` syncs it so GTK/Qt/kitty re-theme;
+  `nvim :checkhealth` clean.
 - `mpv` plays 4K with hardware decode (`vainfo` lists the iHD driver).
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.

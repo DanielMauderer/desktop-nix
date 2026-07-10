@@ -6,6 +6,6 @@ own README.
 | Group     | What it configures                                                  |
 |-----------|---------------------------------------------------------------------|
 | `cli`     | Shell environment: fish + starship, kitty, fastfetch, lazygit, CLI tools. All hosts. |
-| `desktop` | Per-user Hyprland/waybar/swaync/rofi/wlogout/lockscreen/kanshi + stylix. Workstations. |
+| `desktop` | Per-user Hyprland + Noctalia shell + kanshi + stylix. Workstations. |
 | `dev`     | Language toolchains (Rust/Go/Node/Python/C), direnv, the Claude config. |
 | `neovim`  | Neovim configured declaratively with nixvim + LSP/formatter/DAP packages. |

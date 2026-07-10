@@ -66,7 +66,7 @@ sudo wg show          # interface + peer should appear
 - ⛔ WireGuard tunnel up: `sudo wg show`, internal host reachable, internal DNS resolves.
 - ⛔ Clone a representative work repo, `direnv allow`, build + tests **green**.
 - ⛔ `cargo`/`go`/`node`/`python`/`gh` on PATH in their devshells; `docker` → podman.
-- General: Wi-Fi/audio/Bluetooth/suspend/brightness; Hyprland + waybar; nvim with
+- General: Wi-Fi/audio/Bluetooth/suspend/brightness; Hyprland + Noctalia; nvim with
   Jira/GitLab tokens re-entered; firewall on; rollback drill passes.
 
 Add any corporate CAs to `security.pki.certificates` in `default.nix` if internal

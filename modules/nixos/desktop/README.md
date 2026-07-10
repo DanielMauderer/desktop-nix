@@ -1,8 +1,8 @@
 # desktop
 
 The NixOS side of the Hyprland desktop — imported by every workstation host. The
-per-user Hyprland/waybar/etc. config lives in `modules/home/desktop` and is wired
-in by `./home.nix`.
+per-user Hyprland + Noctalia shell config lives in `modules/home/desktop` and is
+wired in by `./home.nix`.
 
 | File          | Configures                                                       |
 |---------------|-----------------------------------------------------------------|

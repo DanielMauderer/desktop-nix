@@ -22,6 +22,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Noctalia: native Wayland desktop shell (bar, launcher, notifications, OSD,
+    # lock screen, wallpaper, session menu). Replaces the waybar/rofi/swaync/
+    # swaylock/swayidle/swaybg/wlogout stack. Its home module auto-provides the
+    # package. Needs nixpkgs-unstable, which this flake already tracks.
+    noctalia = {
+      url = "github:noctalia-dev/noctalia";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # twilight channel for reproducibility (release artifacts may be deleted).
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
@@ -734,7 +743,7 @@
         };
 
         # Desktop stack: Hyprland session registration, greeter, polkit agent and
-        # the maudi home-manager generation (waybar, swaylock).
+        # the maudi home-manager generation (Noctalia shell).
         test-desktop = testLib.makeTest {
           name = "desktop";
           nodes.machine = testNode;
@@ -745,15 +754,16 @@
             machine.wait_for_unit("greetd.service")
             machine.succeed("test -x /run/current-system/sw/bin/Hyprland")
 
-            # Power-profile backend for the waybar module. It is D-Bus
+            # Power-profile backend for Noctalia's power widget/OSD. It is D-Bus
             # activated (inactive at boot), so verify it is installed and
             # actually starts rather than waiting for it.
             machine.succeed("systemctl start power-profiles-daemon.service")
+            # UPower backs Noctalia's battery widget + idle handling.
+            machine.succeed("systemctl start upower.service")
 
-            # maudi's home generation built the user desktop: the bar, the lock
-            # binary and the polkit agent unit are all present in the profile.
-            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/waybar")
-            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/swaylock")
+            # maudi's home generation built the user desktop: the Noctalia shell
+            # binary and the polkit agent unit are present in the profile.
+            machine.succeed("test -x /etc/profiles/per-user/maudi/bin/noctalia")
             machine.succeed(
                 "test -e /etc/profiles/per-user/maudi/share/systemd/user/hyprpolkitagent.service"
             )
@@ -761,6 +771,8 @@
             # The Hyprland user config was rendered by home-manager.
             machine.wait_for_unit("home-manager-maudi.service")
             machine.succeed("test -e /home/maudi/.config/hypr/hyprland.conf")
+            # Hyprland binds drive Noctalia over IPC (launcher toggle).
+            machine.succeed("grep -q 'panel-toggle launcher' /home/maudi/.config/hypr/hyprland.conf")
 
             # kanshi: config rendered, service wired to hyprland-session.target.
             machine.succeed("test -e /home/maudi/.config/kanshi/config")
@@ -769,29 +781,19 @@
                 "test -e /home/maudi/.config/systemd/user/hyprland-session.target.wants/kanshi.service"
             )
 
-            # swaync: notification daemon unit installed and config rendered.
-            machine.succeed("test -e /home/maudi/.config/systemd/user/swaync.service")
-            machine.succeed("test -e /home/maudi/.config/swaync/config.json")
-
-            # stylix theming reached the user config: the waybar palette block
-            # is prepended from the base16 colours, and swaync got a stylix style.
-            machine.succeed("grep -q '@define-color base ' /home/maudi/.config/waybar/style.css")
-            machine.succeed("test -e /home/maudi/.config/swaync/style.css")
-
-            # swayidle: wanted by graphical-session.target, locks via swaylock.
+            # Noctalia shell: user service unit installed and wired to the
+            # graphical session, and its TOML config was rendered + validated.
+            machine.succeed("test -e /home/maudi/.config/systemd/user/noctalia.service")
             machine.succeed(
-                "test -e /home/maudi/.config/systemd/user/graphical-session.target.wants/swayidle.service"
+                "test -e /home/maudi/.config/systemd/user/graphical-session.target.wants/noctalia.service"
             )
-            machine.succeed("grep -q swaylock /home/maudi/.config/systemd/user/swayidle.service")
+            machine.succeed("test -e /home/maudi/.config/noctalia/config.toml")
+            # Theming (wallpaper-derived) and idle (auto-suspend) settings landed.
+            machine.succeed("grep -q 'source = \"wallpaper\"' /home/maudi/.config/noctalia/config.toml")
+            machine.succeed("grep -q 'systemctl suspend' /home/maudi/.config/noctalia/config.toml")
 
-            # rofi launcher config + ported rasi theme (referenced from
-            # config.rasi via @theme, generated with the stylix palette);
-            # wlogout; swaylock config.
-            machine.succeed("test -e /home/maudi/.config/rofi/config.rasi")
-            machine.succeed("grep -q '@theme' /home/maudi/.config/rofi/config.rasi")
-            machine.succeed("test -e /home/maudi/.config/wlogout/layout")
-            machine.succeed("test -e /home/maudi/.config/wlogout/style.css")
-            machine.succeed("test -e /home/maudi/.config/swaylock/config")
+            # stylix still themes the apps from the wallpaper: kitty config rendered.
+            machine.succeed("test -e /home/maudi/.config/kitty/kitty.conf")
 
             # SUPER+RETURN terminal target is installed.
             machine.succeed("test -x /etc/profiles/per-user/maudi/bin/kitty")

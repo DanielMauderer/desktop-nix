@@ -4,7 +4,7 @@
     enable = true;
     polarity = "dark";
 
-    # Palette source; the rofi picker replaces this file and rebuilds.
+    # Palette source; theme-sync-wallpaper replaces this file and rebuilds.
     image = ./wallpaper.png;
     imageScalingMode = "fill";
 
