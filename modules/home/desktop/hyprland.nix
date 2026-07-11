@@ -30,8 +30,8 @@ let
   };
 in
 {
-  # We drive the gradient borders ourselves and keep swaybg, so disable stylix's
-  # hyprland target (it would flatten borders and pull in hyprpaper).
+  # We drive the gradient borders ourselves, so disable stylix's hyprland target
+  # (it would flatten borders and pull in hyprpaper). Noctalia draws the wallpaper.
   stylix.targets.hyprland.enable = false;
 
   wayland.windowManager.hyprland = {
@@ -64,9 +64,10 @@ in
         "SDL_VIDEODRIVER,wayland"
       ];
 
+      # Noctalia (bar/wallpaper/notifications/…) starts via its own systemd user
+      # service, wired to the graphical session.
       exec-once = [
         "systemctl --user start hyprpolkitagent.service"
-        "swaybg -i ${config.stylix.image} -m fill"
       ];
 
       input = {
@@ -212,14 +213,18 @@ in
         "$mainMod ALT, up, swapwindow, u"
         "$mainMod ALT, down, swapwindow, d"
 
-        # Actions
+        # Actions (Noctalia shell panels via IPC)
         "$mainMod CTRL, R, exec, hyprctl reload"
-        "$mainMod, SPACE, exec, pkill rofi || rofi -show drun -replace -i"
-        "$mainMod, L, exec, swaylock"
+        "$mainMod, SPACE, exec, noctalia msg panel-toggle launcher"
+        "$mainMod, N, exec, noctalia msg panel-toggle control-center"
+        "$mainMod, X, exec, noctalia msg panel-toggle session"
+        "$mainMod, V, exec, noctalia msg panel-toggle clipboard"
+        "$mainMod, L, exec, noctalia msg session lock"
         "$mainMod, S, exec, hyprshot -m region --clipboard-only --freeze"
         "$mainMod SHIFT, S, exec, hyprshot -m window --clipboard-only"
         "$mainMod, Z, exec, ${desktopScripts.hypr-focus-mode}/bin/hypr-focus-mode"
-        "$mainMod, W, exec, ${desktopScripts.theme-wallpaper-select}/bin/theme-wallpaper-select"
+        "$mainMod, W, exec, noctalia msg panel-toggle wallpaper"
+        "$mainMod SHIFT, W, exec, ${desktopScripts.theme-sync-wallpaper}/bin/theme-sync-wallpaper"
 
         # Workspace navigation
         "$mainMod, Tab, workspace, m+1"
@@ -228,18 +233,20 @@ in
         "$mainMod, mouse_up, workspace, e-1"
         "$mainMod CTRL, down, workspace, empty"
 
-        # Media / brightness keys
-        ", XF86MonBrightnessUp, exec, brightnessctl -q s +5%"
-        ", XF86MonBrightnessDown, exec, brightnessctl -q s 5%-"
-        ", XF86AudioRaiseVolume, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"
-        ", XF86AudioLowerVolume, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-"
-        ", XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-        ", XF86AudioMicMute, exec, wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+        # Media / brightness keys — volume & brightness go through Noctalia so its
+        # OSD overlay shows the change (replaces the old wpctl/brightnessctl binds).
+        ", XF86MonBrightnessUp, exec, noctalia msg brightness-up"
+        ", XF86MonBrightnessDown, exec, noctalia msg brightness-down"
+        ", XF86AudioRaiseVolume, exec, noctalia msg volume-up"
+        ", XF86AudioLowerVolume, exec, noctalia msg volume-down"
+        ", XF86AudioMute, exec, noctalia msg volume-mute"
+        ", XF86AudioMicMute, exec, noctalia msg mic-mute"
         ", XF86AudioPlay, exec, playerctl play-pause"
         ", XF86AudioPause, exec, playerctl pause"
         ", XF86AudioNext, exec, playerctl next"
         ", XF86AudioPrev, exec, playerctl previous"
-        ", XF86Lock, exec, swaylock"
+        ", XF86Lock, exec, noctalia msg session lock"
+        # Keyboard backlight (MacBook SMC) has no Noctalia equivalent — keep brightnessctl.
         ", code:238, exec, brightnessctl -d smc::kbd_backlight s +10"
         ", code:237, exec, brightnessctl -d smc::kbd_backlight s 10-"
       ]

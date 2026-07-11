@@ -1,10 +1,13 @@
 { pkgs, ... }:
 {
   services = {
-    # Backend for the waybar power-profile module.
+    # Backend for Noctalia's power-profile control + OSD.
     power-profiles-daemon.enable = true;
 
-    # Bluetooth pairing GUI (waybar's bluetooth module opens it on click).
+    # Battery/power state for Noctalia's battery widget and idle handling.
+    upower.enable = true;
+
+    # Bluetooth pairing GUI (floated by a window rule; Noctalia handles toggling).
     blueman.enable = true;
 
     # Unlocks secrets (Wi-Fi/VPN/app credentials) at login; greetd has no
@@ -15,8 +18,8 @@
     udev.packages = [ pkgs.brightnessctl ];
   };
 
-  # swaylock authenticates via PAM; without this it can never unlock.
-  security.pam.services.swaylock = { };
+  # Noctalia's lock screen authenticates against the standard "login" PAM
+  # service, which NixOS provides by default — no dedicated PAM service needed.
 
   environment.systemPackages = [ pkgs.brightnessctl ];
   users.users.maudi.extraGroups = [ "video" ];

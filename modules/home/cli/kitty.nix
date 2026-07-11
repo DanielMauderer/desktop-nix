@@ -18,7 +18,8 @@ _: {
     wheel_scroll_min_lines = 1;
 
     # Disabled: the watcher would inotify-watch the whole nix store (config is a
-    # store symlink), exhausting the per-user inotify limit and breaking waybar.
+    # store symlink), exhausting the per-user inotify limit and starving other
+    # inotify users (e.g. the shell's config watchers).
     auto_reload_config = "-1";
 
     enable_audio_bell = "no";

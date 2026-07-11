@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ lib, ... }:
 {
   imports = [
     ../../modules/nixos/base
@@ -11,18 +11,8 @@
   networking.hostName = "work-laptop";
   system.stateVersion = "25.05";
 
-  # Keep the 5-min lock but lengthen auto-suspend to 30 min on this host. Guard
-  # the lock like the shared module so a second swaylock never stacks.
-  home-manager.users.maudi.services.swayidle.timeouts = lib.mkForce [
-    {
-      timeout = 300;
-      command = "${pkgs.procps}/bin/pgrep -x swaylock || ${pkgs.swaylock-effects}/bin/swaylock -f";
-    }
-    {
-      timeout = 1800;
-      command = "systemctl suspend";
-    }
-  ];
+  # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
+  home-manager.users.maudi.local.idleSuspendSeconds = 1800;
 
   # Docked-at-desk (dual external) or docked-at-home (internal + HDMI); mkBefore
   # so a docked profile matches before the generic laptop-internal fallback.

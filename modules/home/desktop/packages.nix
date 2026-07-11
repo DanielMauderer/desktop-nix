@@ -5,12 +5,10 @@
     hyprshot # SUPER+S / SUPER+SHIFT+S screenshots
     hyprpolkitagent # polkit auth agent (started via exec-once)
     wl-clipboard # clipboard backend for hyprshot
-    pavucontrol # audio mixer (waybar pulseaudio on-click)
-    playerctl # media key binds + waybar custom/mpris script
-    wireplumber # wpctl for the volume key binds (PipeWire-native)
-    networkmanagerapplet # nm-applet + nm-connection-editor
-    papirus-icon-theme # icon theme used by rofi
+    pavucontrol # audio mixer (float rule; Noctalia control-center on-click)
+    playerctl # play/pause/next/prev media key binds
+    networkmanagerapplet # nm-connection-editor (floated by a window rule)
     libnotify # notify-send for the packaged scripts
-    jq # JSON parsing for the SUPER+SHIFT+Q kill bind
+    jq # JSON parsing for the SUPER+SHIFT+Q kill bind + wallpaper-sync script
   ];
 }

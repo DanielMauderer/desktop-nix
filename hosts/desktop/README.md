@@ -12,7 +12,7 @@ Gaming + development workstation (at home). Install guide: [INSTALL.md](INSTALL.
 - **Disk:** **LUKS2 + ext4** full-disk encryption (passphrase at boot, like the
   laptops); disko GPT + ESP + LUKS root. Steam library is a fresh re-download.
 - **Monitors:** kanshi `desktop` profile — `DP-3` 2560x1440@144 @ 0,0 and `DP-2`
-  1920x1080@60 @ 2560,0.
+  1920x1080@60 @ 2560,0. Workspaces 1-5 are pinned to `DP-3`, 6-10 to `DP-2`.
 
 `hardware.nix` carries the AMD enablement (`amdgpu` early KMS, `radeonsi` VAAPI,
 zram). `hardware/` holds the generated `hardware-configuration.nix` (added at

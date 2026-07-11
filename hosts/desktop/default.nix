@@ -46,4 +46,19 @@
       };
     }
   ];
+
+  # Pin workspaces 1-5 to DP-3 and 6-10 to DP-2 (single-output laptops share the
+  # module but never set this, so they're unaffected).
+  home-manager.users.maudi.wayland.windowManager.hyprland.settings.workspace = [
+    "1, monitor:DP-3, default:true"
+    "2, monitor:DP-3"
+    "3, monitor:DP-3"
+    "4, monitor:DP-3"
+    "5, monitor:DP-3"
+    "6, monitor:DP-2, default:true"
+    "7, monitor:DP-2"
+    "8, monitor:DP-2"
+    "9, monitor:DP-2"
+    "10, monitor:DP-2"
+  ];
 }
