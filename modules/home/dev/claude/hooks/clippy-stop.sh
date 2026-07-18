@@ -20,14 +20,24 @@ session=$(printf '%s' "$input" | python3 -c \
 counter="/tmp/claude-clippy-stop-${session:-default}.count"
 attempts=$(cat "$counter" 2>/dev/null || echo 0)
 
-out=$(cargo clippy --workspace --all-targets -- -W clippy::pedantic 2>&1)
+# Run clippy inside the project's declared dev environment when one exists, so
+# per-project toolchains (e.g. an embedded cross target from a Nix flake
+# devShell) are on PATH. `direnv exec .` loads an allowed .envrc without needing
+# an interactive shell hook; the `direnv exec . true` probe skips it when the
+# .envrc isn't allowed (falling back to the ambient toolchain).
+run=(env)
+if [ -f .envrc ] && command -v direnv >/dev/null 2>&1 && direnv exec . true >/dev/null 2>&1; then
+	run=(direnv exec .)
+fi
+
+out=$("${run[@]}" cargo clippy --workspace --all-targets -- -W clippy::pedantic 2>&1)
 status=$?
 
 # no_std targets (e.g. embedded) can't build the per-target test harness, so
 # `--all-targets` fails with E0463 "can't find crate for `test`". That's an
 # environment limitation, not a lint — fall back to checking just the binaries.
 if [ "$status" -ne 0 ] && printf '%s' "$out" | grep -q "can't find crate for \`test\`"; then
-	out=$(cargo clippy --workspace --bins -- -W clippy::pedantic 2>&1)
+	out=$("${run[@]}" cargo clippy --workspace --bins -- -W clippy::pedantic 2>&1)
 	status=$?
 fi
 

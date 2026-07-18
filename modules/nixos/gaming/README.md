@@ -8,3 +8,4 @@ from `base`, so the Intel laptops never pull the CachyOS kernel or AMD GPU stack
 | `kernel.nix` | CachyOS kernel (`linuxPackages_cachyos`) + `scx` sched-ext scheduler, via chaotic-cx/nyx + its binary cache. |
 | `steam.nix`  | Steam, gamemode, gamescope, GE-Proton (declarative `extraCompatPackages`). |
 | `gpu.nix`    | AMD GPU: RADV/mesa, LACT (`lactd`), MangoHud overlay.            |
+| `controller.nix` | Xbox One/Series controller over Bluetooth: `xpadneo` driver + `disable_ertm` modprobe fix. |
