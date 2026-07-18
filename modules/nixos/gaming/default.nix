@@ -3,5 +3,6 @@ _: {
     ./kernel.nix
     ./steam.nix
     ./gpu.nix
+    ./controller.nix
   ];
 }
