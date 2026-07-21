@@ -29,7 +29,7 @@ The secrets-first work is done and in git:
 - **OS SSD device** in `hosts/home-server/disk.nix` (`lsblk` on the target —
   usually `/dev/nvme0n1`). **Must NOT be the RAID LUN that holds the ZFS pool.**
 - **ZFS `hostId`** in `hardware.nix` is unique; ZFS pool name (`zfs.extraPools`,
-  default `tank`) and the LAN subnet in `modules/nixos/server/nfs.nix`.
+  `hdd_pool_1`) and the LAN subnet in `modules/nixos/server/nfs.nix`.
 - **`nfsHost`/LAN IP** for the desktop client in `hosts/desktop/default.nix`.
 - **sops master age key** is in the password manager.
 - **DNS:** `vpn.mauderer.work` must be a **DNS-only (grey-cloud)** Cloudflare
