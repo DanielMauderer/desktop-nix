@@ -299,6 +299,44 @@
               && builtins.elem 443 cfg.networking.firewall.allowedTCPPorts;
           }
           {
+            name = "reverse-proxy runs the Nginx Proxy Manager container";
+            assertion = cfg.virtualisation.oci-containers.containers ? npm;
+          }
+          {
+            name = "NPM admin UI (81) never exposed on the WAN";
+            assertion = !(builtins.elem 81 cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            name = "NPM admin port published on the VPN address only, never all interfaces";
+            assertion =
+              let
+                ports = cfg.virtualisation.oci-containers.containers.npm.ports or [ ];
+              in
+              builtins.elem "10.100.0.1:81:81" ports && !(builtins.elem "81:81" ports);
+          }
+          {
+            name = "NPM publishes the public 80/443 proxy ports";
+            assertion =
+              let
+                ports = cfg.virtualisation.oci-containers.containers.npm.ports or [ ];
+              in
+              builtins.elem "80:80" ports && builtins.elem "443:443" ports;
+          }
+          {
+            name = "no service container mounts the management socket (escape guard)";
+            assertion =
+              let
+                mounts = lib.concatMap (c: c.volumes) (lib.attrValues cfg.virtualisation.oci-containers.containers);
+              in
+              !(lib.any (v: lib.hasInfix "docker.sock" v || lib.hasInfix "podman.sock" v) mounts);
+          }
+          {
+            name = "NPM container runs with no-new-privileges hardening";
+            assertion = builtins.elem "--security-opt=no-new-privileges" (
+              cfg.virtualisation.oci-containers.containers.npm.extraOptions or [ ]
+            );
+          }
+          {
             name = "ZFS filesystem support enabled";
             assertion = cfg.boot.supportedFilesystems.zfs or false;
           }

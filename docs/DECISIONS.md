@@ -68,6 +68,12 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **gaming** (CachyOS, Steam, AMD GPU) — desktop only.
 - **waydroid** (Android container) — private-laptop + desktop; never work-laptop.
 - **server** (WireGuard server, SSH-over-VPN, ZFS, NFS) — home-server only.
+- **Reverse proxy = Nginx Proxy Manager container** (UI-driven LE certs), not
+  native `services.nginx`/`security.acme` — home-server only. Admin UI is
+  published on the VPN address (`10.100.0.1:81`), not merely firewalled, because
+  podman's port-publish DNAT bypasses the input-chain firewall. Containers run
+  rootful-but-hardened (`no-new-privileges`); no service container ever mounts
+  the podman/docker management socket.
 - **net / home-server client** (`services.homeServerClient`) — desktop +
   private-laptop. WireGuard client of the server (split-tunnel, so `ssh
   home-server` works — server SSH is wg0-only) + `x-systemd.automount` NFS share.
