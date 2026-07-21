@@ -29,7 +29,7 @@ The secrets-first work is done and in git:
 - **OS SSD device** in `hosts/home-server/disk.nix` (`lsblk` on the target —
   usually `/dev/nvme0n1`). **Must NOT be the RAID LUN that holds the ZFS pool.**
 - **ZFS `hostId`** in `hardware.nix` is unique; ZFS pool name (`zfs.extraPools`,
-  default `tank`) and the LAN subnet in `modules/nixos/server/nfs.nix`.
+  `hdd_pool_1`) and the LAN subnet in `modules/nixos/server/nfs.nix`.
 - **`nfsHost`/LAN IP** for the desktop client in `hosts/desktop/default.nix`.
 - **sops master age key** is in the password manager.
 - **DNS:** `vpn.mauderer.work` must be a **DNS-only (grey-cloud)** Cloudflare
@@ -84,9 +84,15 @@ Enable the clients **last**, once the server is reachable: uncomment
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
-- SSH reachable **only over the VPN** (port 22 closed on the WAN); from an
-  enabled client `ssh home-server` has no TOFU prompt (host key pinned).
+- SSH reachable **only over the VPN** (port 22 closed on the WAN — there is no
+  LAN fallback); from an enabled client `ssh home-server` has no TOFU prompt
+  (host key pinned).
 - `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
-  the export; `nft list ruleset` shows only UDP 51820 open on the WAN.
+  the export; `nft list ruleset` shows only UDP 51820 + TCP 80/443 open on the
+  WAN (SSH 22, the NPM admin UI 81 and NFS 2049 stay off the WAN).
+- **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
+  `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
+  it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
+  needs the proxied domain's A record to be **DNS-only (grey-cloud)** → WAN IP.
 - Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.
