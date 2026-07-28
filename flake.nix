@@ -841,12 +841,14 @@
                 "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
                 "test -f \"$loc/plugin.toml\" && test -f \"$loc/main.luau\""
             )
-            # The probe the widget runs reports 'offline' (never stale) with no
-            # network available — the test VM is isolated, so this is the offline path.
+            # The probe the widget runs always prints a well-formed status line and
+            # exits 0 — whatever the VM's outbound network does (offline -> 'offline',
+            # reachable -> 'ok'). Asserting the shape (not a fixed value) keeps the
+            # test deterministic while still catching a probe that aborts silently.
             machine.succeed(
                 "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
                 "check=$(sed -n 's/.*local CHECK = \"\\([^\"]*\\)\".*/\\1/p' \"$loc/main.luau\"); "
-                "test \"$($check)\" = 'status=offline'"
+                "out=$(\"$check\"); case \"$out\" in status=*) ;; *) echo \"unexpected probe output: [$out]\"; exit 1;; esac"
             )
 
             # stylix still themes the apps from the wallpaper: kitty config rendered.

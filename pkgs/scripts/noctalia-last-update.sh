@@ -29,8 +29,11 @@ offline() {
 resp="$(curl -sf --max-time 5 \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/${owner}/${repo}/commits/${branch}")" || offline
+# curl can exit 0 with an empty or non-JSON body (proxies, rate-limit pages); the
+# `|| offline` guards below keep `set -euo pipefail` from aborting with no output.
+[ -n "$resp" ] || offline
 
-date_iso="$(printf '%s' "$resp" | jq -r '.commit.committer.date // empty' 2>/dev/null)"
+date_iso="$(printf '%s' "$resp" | jq -r '.commit.committer.date // empty' 2>/dev/null)" || offline
 [ -n "$date_iso" ] || offline
 
 commit_epoch="$(date -d "$date_iso" +%s 2>/dev/null)" || offline
