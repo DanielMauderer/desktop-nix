@@ -37,7 +37,9 @@
         # matching the stylix palette that themes the apps.
         theme = {
           mode = "dark";
-          source = "wallpaper";
+          # Force our value over the upstream module's default (newer noctalia
+          # revisions set theme.source = "custom"); we want wallpaper-derived UI.
+          source = lib.mkForce "wallpaper";
           wallpaper_scheme = "m3-content";
         };
 
