@@ -848,7 +848,7 @@
             machine.succeed(
                 "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
                 "check=$(sed -n 's/.*local CHECK = \"\\([^\"]*\\)\".*/\\1/p' \"$loc/main.luau\"); "
-                "out=$(\"$check\"); case \"$out\" in status=*) ;; *) echo \"unexpected probe output: [$out]\"; exit 1;; esac"
+                "out=$(\"$check\"); echo \"$out\" | grep -Eq '^(status=offline|status=ok stale=[01] days=[0-9]+ date=[^[:space:]]+)$' || { echo \"unexpected probe output: [$out]\"; exit 1; }"
             )
 
             # stylix still themes the apps from the wallpaper: kitty config rendered.

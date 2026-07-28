@@ -108,8 +108,10 @@ in
 
         # Local "last auto-update" plugin (pkgs/noctalia-plugins/last-update),
         # scanned straight from its store path — no registry, no auto-update.
+        # `enabled` is the opt-in list of active plugin ids (author/plugin), not a
+        # boolean; the source must also be enabled to be scanned.
         plugins = {
-          enabled = true;
+          enabled = [ "danielmauderer/last-update" ];
           source = [
             {
               kind = "path";
