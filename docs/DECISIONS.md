@@ -61,6 +61,10 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **All hosts track the CI-gated `release` branch**, which only advances to a
   `main` commit whose full CI is green. Promotion model:
   `modules/nixos/core/README.md`.
+- **A Noctalia bar widget surfaces update-source staleness** — it asks GitHub for
+  the last commit on the tracked branch and turns red past `local.updateStaleDays`
+  (3), so a stalled pipeline is visible. Remote check on purpose: a failed query
+  is "offline", never "stale", so no network never looks like a broken pipeline.
 - **First-login password**: hosts ship a hashed throwaway password, force-expired
   once at first activation so `maudi` must set a real one.
 

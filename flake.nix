@@ -830,6 +830,25 @@
             machine.succeed("grep -q 'source = \"wallpaper\"' /home/maudi/.config/noctalia/config.toml")
             machine.succeed("grep -q 'systemctl suspend' /home/maudi/.config/noctalia/config.toml")
 
+            # "Last auto-update" freshness widget: local plugin source wired and the
+            # widget placed in the bar.
+            machine.succeed(
+                "grep -q 'danielmauderer/last-update:last-update' /home/maudi/.config/noctalia/config.toml"
+            )
+            machine.succeed("grep -q 'noctalia-plugin-last-update' /home/maudi/.config/noctalia/config.toml")
+            # The plugin dir it points at is present with its manifest + entry script.
+            machine.succeed(
+                "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
+                "test -f \"$loc/plugin.toml\" && test -f \"$loc/main.luau\""
+            )
+            # The probe the widget runs reports 'offline' (never stale) with no
+            # network available — the test VM is isolated, so this is the offline path.
+            machine.succeed(
+                "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
+                "check=$(sed -n 's/.*local CHECK = \"\\([^\"]*\\)\".*/\\1/p' \"$loc/main.luau\"); "
+                "test \"$($check)\" = 'status=offline'"
+            )
+
             # stylix still themes the apps from the wallpaper: kitty config rendered.
             machine.succeed("test -e /home/maudi/.config/kitty/kitty.conf")
 
