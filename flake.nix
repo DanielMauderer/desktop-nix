@@ -31,6 +31,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Noctalia's community plugin repo, pinned here instead of letting Noctalia
+    # clone + auto-update it at runtime: plugin code then lands through the same
+    # reviewed flake.lock bump as everything else. Not a flake.
+    noctalia-community-plugins = {
+      url = "github:noctalia-dev/community-plugins";
+      flake = false;
+    };
+
     # twilight channel for reproducibility (release artifacts may be deleted).
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
@@ -830,25 +838,21 @@
             machine.succeed("grep -q 'source = \"wallpaper\"' /home/maudi/.config/noctalia/config.toml")
             machine.succeed("grep -q 'systemctl suspend' /home/maudi/.config/noctalia/config.toml")
 
-            # "Last auto-update" freshness widget: local plugin source wired and the
-            # widget placed in the bar.
+            # Plugins: the declarative path source is wired (no runtime git clone)
+            # and the Nix Monitor widget is placed in the bar.
             machine.succeed(
-                "grep -q 'danielmauderer/last-update:last-update' /home/maudi/.config/noctalia/config.toml"
+                "grep -q 'avivbintangaringga/nix-monitor:nix-monitor' /home/maudi/.config/noctalia/config.toml"
             )
-            machine.succeed("grep -q 'noctalia-plugin-last-update' /home/maudi/.config/noctalia/config.toml")
-            # The plugin dir it points at is present with its manifest + entry script.
+            machine.succeed("grep -q 'noctalia-plugins' /home/maudi/.config/noctalia/config.toml")
+            machine.succeed("grep -q 'auto_update = false' /home/maudi/.config/noctalia/config.toml")
+            # Noctalia scans the SUBDIRS of the source location for plugin.toml, so
+            # each plugin must sit in its own dir under it, manifest + entry present.
+            # The manifest must also declare `plugin_api` — without it current
+            # Noctalia silently skips the plugin at scan time.
             machine.succeed(
                 "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
-                "test -f \"$loc/plugin.toml\" && test -f \"$loc/main.luau\""
-            )
-            # The probe the widget runs always prints a well-formed status line and
-            # exits 0 — whatever the VM's outbound network does (offline -> 'offline',
-            # reachable -> 'ok'). Asserting the shape (not a fixed value) keeps the
-            # test deterministic while still catching a probe that aborts silently.
-            machine.succeed(
-                "loc=$(sed -n 's/.*location = \"\\([^\"]*\\)\".*/\\1/p' /home/maudi/.config/noctalia/config.toml); "
-                "check=$(sed -n 's/.*local CHECK = \"\\([^\"]*\\)\".*/\\1/p' \"$loc/main.luau\"); "
-                "out=$(\"$check\"); echo \"$out\" | grep -Eq '^(status=offline|status=ok stale=[01] days=[0-9]+ date=[^[:space:]]+)$' || { echo \"unexpected probe output: [$out]\"; exit 1; }"
+                "test -f \"$loc/nix-monitor/plugin.toml\" && test -f \"$loc/nix-monitor/nix_monitor.luau\" && "
+                "grep -q '^plugin_api' \"$loc/nix-monitor/plugin.toml\""
             )
 
             # stylix still themes the apps from the wallpaper: kitty config rendered.

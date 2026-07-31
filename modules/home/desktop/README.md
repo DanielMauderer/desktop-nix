@@ -8,7 +8,7 @@ gradient borders read from `config.lib.stylix.colors`.
 | File            | Configures                                                     |
 |-----------------|---------------------------------------------------------------|
 | `hyprland.nix`  | Hyprland settings: keybinds (Noctalia IPC), window rules, workspaces. |
-| `noctalia.nix`  | Noctalia shell: bar, launcher, notifications, control center, OSD, lock screen, wallpaper, session menu, idle → auto-lock/suspend, and a local "last auto-update" bar widget (red when the update source is stale). Replaces waybar/rofi/swaync/swaylock/swayidle/swaybg/wlogout. |
+| `noctalia.nix`  | Noctalia shell: bar, launcher, notifications, control center, OSD, lock screen, wallpaper, session menu, idle → auto-lock/suspend, and the pinned Nix Monitor community plugin (bar widget + panel: nixpkgs revision, generations, store size). Replaces waybar/rofi/swaync/swaylock/swayidle/swaybg/wlogout. |
 | `kanshi.nix`    | Monitor profiles; the `laptop-internal` fallback (host profiles prepend). |
 | `packages.nix`  | Desktop user packages.                                        |
 

@@ -61,10 +61,14 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **All hosts track the CI-gated `release` branch**, which only advances to a
   `main` commit whose full CI is green. Promotion model:
   `modules/nixos/core/README.md`.
-- **A Noctalia bar widget surfaces update-source staleness** — it asks GitHub for
-  the last commit on the tracked branch and turns red past `local.updateStaleDays`
-  (3), so a stalled pipeline is visible. Remote check on purpose: a failed query
-  is "offline", never "stale", so no network never looks like a broken pipeline.
+- **Update staleness is surfaced by the Nix Monitor bar widget** (community
+  plugin), which compares the system's nixpkgs revision against the tracked
+  branch. It replaced a hand-written widget that watched the repo's own release
+  branch — one less thing to maintain for roughly the same signal.
+- **Noctalia plugins come from one Nix store path**, never from Noctalia's own
+  git sources: community plugins are pinned as the `noctalia-community-plugins`
+  flake input and copied into a single `kind = "path"` source (auto-update off),
+  so plugin code changes only via a reviewed lock bump.
 - **First-login password**: hosts ship a hashed throwaway password, force-expired
   once at first activation so `maudi` must set a real one.
 

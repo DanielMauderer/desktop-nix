@@ -14,40 +14,16 @@
   lib,
   pkgs,
   inputs,
-  osConfig,
-  desktopScripts,
   ...
 }:
 let
-  # "Last auto update" tracks the branch `system.autoUpgrade` actually pulls, so
-  # the freshness widget always follows the real update source (single source of
-  # truth). autoUpgrade.flake is a "github:owner/repo/branch" ref (enforced by
-  # the flake assertions); split it into its parts, defaulting the branch.
-  flakeParts = lib.splitString "/" (lib.removePrefix "github:" osConfig.system.autoUpgrade.flake);
-  owner = builtins.elemAt flakeParts 0;
-  repo = builtins.elemAt flakeParts 1;
-  branch = if builtins.length flakeParts >= 3 then builtins.elemAt flakeParts 2 else "release";
-
-  staleDays = config.local.updateStaleDays;
-
-  # Thin wrapper baking the repo/branch/threshold into the packaged probe, so
-  # the Luau widget just calls one argument-free path.
-  checkScript = pkgs.writeShellScript "noctalia-last-update-check" ''
-    export OWNER=${lib.escapeShellArg owner}
-    export REPO=${lib.escapeShellArg repo}
-    export BRANCH=${lib.escapeShellArg branch}
-    export THRESHOLD_DAYS=${toString staleDays}
-    exec ${desktopScripts.noctalia-last-update}/bin/noctalia-last-update
-  '';
-
-  # The plugin dir Noctalia scans (kind = "path" source below), with the wrapper
-  # path substituted into main.luau's @CHECK_SCRIPT@ placeholder.
-  pluginSrc = ../../../pkgs/noctalia-plugins/last-update;
-  lastUpdatePlugin = pkgs.runCommand "noctalia-plugin-last-update" { } ''
+  # The root Noctalia scans (kind = "path" source below). It scans the
+  # SUBDIRECTORIES of a source location for plugin.toml, so every plugin gets
+  # its own dir in here — pointing the source straight at a plugin dir finds
+  # nothing.
+  pluginRoot = pkgs.runCommand "noctalia-plugins" { } ''
     mkdir -p "$out"
-    cp ${pluginSrc}/plugin.toml "$out/plugin.toml"
-    substitute ${pluginSrc}/main.luau "$out/main.luau" \
-      --replace-fail '@CHECK_SCRIPT@' '${checkScript}'
+    cp -r ${inputs.noctalia-community-plugins}/nix-monitor "$out/nix-monitor"
   '';
 in
 {
@@ -59,14 +35,6 @@ in
     type = lib.types.ints.positive;
     default = 600;
     description = "Seconds of inactivity before Noctalia suspends the machine.";
-  };
-
-  # Days without a new commit on the auto-update branch before the bar widget
-  # goes red (the pipeline has likely stopped feeding the fleet).
-  options.local.updateStaleDays = lib.mkOption {
-    type = lib.types.ints.positive;
-    default = 3;
-    description = "Age (days) of the auto-update source before the bar widget turns red.";
   };
 
   config = {
@@ -108,25 +76,36 @@ in
           };
         };
 
-        # Local "last auto-update" plugin (pkgs/noctalia-plugins/last-update),
-        # scanned straight from its store path — no registry, no auto-update.
+        # Plugins are scanned straight from one store path — declaring any source
+        # replaces Noctalia's built-in official/community git sources, so nothing
+        # is cloned or auto-updated at runtime.
         # `enabled` is the opt-in list of active plugin ids (author/plugin), not a
         # boolean; the source must also be enabled to be scanned.
         plugins = {
-          enabled = [ "danielmauderer/last-update" ];
+          auto_update = false;
+          enabled = [ "avivbintangaringga/nix-monitor" ];
           source = [
             {
               kind = "path";
-              name = "last-update";
-              location = "${lastUpdatePlugin}";
+              name = "declarative";
+              location = "${pluginRoot}";
               enabled = true;
             }
           ];
         };
 
-        # Place the widget in the bar's right group, just before control-center.
-        # Setting `end` replaces the default list, so the built-ins are repeated
-        # here verbatim with our widget inserted.
+        # Plugin-level settings (own top-level table, keyed by plugin id). Nix
+        # Monitor compares the system's nixpkgs revision against a remote branch:
+        # point it at the branch this flake tracks, and wire its panel's Update
+        # button to the same rebuild command as the `update` shell alias.
+        plugin_settings."avivbintangaringga/nix-monitor" = {
+          branch = "nixos-unstable";
+          update_command = "sudo nixos-rebuild switch --flake ${config.home.homeDirectory}/desktop-nix";
+        };
+
+        # Place the plugin widget in the bar's right group, just before
+        # control-center. Setting `end` replaces the default list, so the
+        # built-ins are repeated here verbatim with our widget inserted.
         bar.main.end = [
           "media"
           "tray"
@@ -137,7 +116,7 @@ in
           "volume"
           "brightness"
           "battery"
-          "danielmauderer/last-update:last-update"
+          "avivbintangaringga/nix-monitor:nix-monitor"
           "control-center"
           "session"
         ];

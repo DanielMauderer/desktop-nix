@@ -32,15 +32,4 @@ in
       coreutils
     ]
   );
-
-  # Freshness probe for the Noctalia "last auto-update" bar widget. Queries the
-  # GitHub API, so it bundles curl + jq (nothing is assumed on the ambient PATH).
-  noctalia-last-update = app "noctalia-last-update" (
-    with pkgs;
-    [
-      curl
-      jq
-      coreutils
-    ]
-  );
 }
