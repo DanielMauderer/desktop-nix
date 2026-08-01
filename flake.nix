@@ -666,6 +666,18 @@
                     cfg.programs.steam.enable && cfg.hardware.graphics.enable32Bit && cfg.programs.gamemode.enable;
                 }
                 {
+                  # The host's performance mode: PPD has no driver on this CPU
+                  # (no CPPC/EPP), so gamemode is what raises the governor.
+                  name = "gamemode raises the CPU governor and AMD perf level";
+                  assertion =
+                    cfg.programs.gamemode.settings.general.desiredgov == "performance"
+                    && cfg.programs.gamemode.settings.gpu.amd_performance_level == "high";
+                }
+                {
+                  name = "amdgpu overdrive unlocked for LACT";
+                  assertion = builtins.elem "amdgpu.ppfeaturemask=0xffffffff" cfg.boot.kernelParams;
+                }
+                {
                   name = "MangoHud enabled in maudi's home";
                   assertion = cfg.home-manager.users.maudi.programs.mangohud.enable;
                 }
@@ -1016,6 +1028,14 @@
             machine.succeed("test -x /run/current-system/sw/bin/steam")
             machine.succeed("test -x /run/current-system/sw/bin/gamescope")
             machine.succeed("test -x /run/current-system/sw/bin/gamemoderun")
+
+            # gamemode is this host's performance mode (PPD has no driver on a
+            # CPU without CPPC/EPP), so its config must actually raise the
+            # governor and the AMD perf level.
+            machine.succeed("grep -q '^desiredgov=performance$' /etc/gamemode.ini")
+            machine.succeed("grep -q '^amd_performance_level=high$' /etc/gamemode.ini")
+            # Raising the governor needs root; the module routes it via pkexec.
+            machine.succeed("test -u /run/wrappers/bin/pkexec")
 
             # 32-bit graphics support is wired (Steam/Proton need it): NixOS
             # exposes the 32-bit driver tree at /run/opengl-driver-32.

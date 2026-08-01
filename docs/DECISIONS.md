@@ -74,6 +74,10 @@ matters lives here; the rest is in the Nix code and `git log`.
 
 ## Per-host opt-ins
 - **gaming** (CachyOS, Steam, AMD GPU) — desktop only.
+- **Performance mode is gamemode, not power-profiles-daemon** (desktop) — the Zen 2
+  CPU has no CPPC/EPP, so `amd_pstate` fails to init and PPD runs with a placeholder
+  driver: its balanced/power-saver profiles are no-ops and it can never show
+  `performance`. `programs.gamemode` flips the governor per game session instead.
 - **waydroid** (Android container) — private-laptop + desktop; never work-laptop.
 - **server** (WireGuard server, SSH-over-VPN, ZFS, NFS) — home-server only.
 - **Reverse proxy = Nginx Proxy Manager container** (UI-driven LE certs), not

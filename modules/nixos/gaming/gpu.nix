@@ -1,4 +1,8 @@
 _: {
+  # Unlock the amdgpu overdrive bits the stock mask (0xfff7bfff) clears, so LACT
+  # can offer undervolt/clock control — the largest real gain available on Vega.
+  boot.kernelParams = [ "amdgpu.ppfeaturemask=0xffffffff" ];
+
   # 32-bit support is required for 32-bit Steam/Proton titles.
   hardware.graphics = {
     enable = true;

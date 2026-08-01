@@ -10,7 +10,7 @@
       extraCompatPackages = [ pkgs.proton-ge-bin ];
     };
 
+    # gamemode lives in ./gamemode.nix.
     gamescope.enable = true;
-    gamemode.enable = true;
   };
 }
