@@ -169,6 +169,24 @@
       kanshiConfig =
         host: hosts.${host}.config.home-manager.users.maudi.xdg.configFile."kanshi/config".source;
 
+      # Hyprland 0.56+ is Lua-only, so the rendered config is a program, not a
+      # key/value file: a bad `hl.*` call or a module still emitting hyprlang
+      # syntax produces a file that builds fine and only fails at login. Parse it
+      # in CI. This catches syntax, not API misuse — a nested Hyprland with
+      # HYPRLAND_CONFIG set and `hyprctl configerrors` is the check for that, and
+      # it needs a compositor, so it stays a manual pre-rebuild step.
+      hyprlandLuaCheck =
+        host:
+        let
+          luaConfig = hosts.${host}.config.home-manager.users.maudi.xdg.configFile."hypr/hyprland.lua".source;
+        in
+        ''
+          ${pkgs.luajit}/bin/luajit -bl ${luaConfig} /dev/null
+          # Guard against a module reverting to hyprlang block syntax, which is
+          # valid-looking config that Hyprland will never read.
+          ! grep -qE '^\s*(windowrule|layerrule|workspace|bind[emd]?)\s*[={]' ${luaConfig}
+        '';
+
       kanshiProfileNames =
         cfg: map (p: p.profile.name) cfg.home-manager.users.maudi.services.kanshi.settings;
 
@@ -573,6 +591,7 @@
               ]
             )
             ''
+              ${hyprlandLuaCheck "private-laptop"}
               grep -q 'output "eDP-1" enable' ${kanshiConfig "private-laptop"}
             '';
 
@@ -611,6 +630,7 @@
               ]
             )
             ''
+              ${hyprlandLuaCheck "work-laptop"}
               conf=${kanshiConfig "work-laptop"}
               grep -q 'output "DP-5" position 0,0' "$conf"
               grep -q 'output "DP-6" position 2560,0' "$conf"
@@ -665,6 +685,7 @@
               ]
             )
             ''
+              ${hyprlandLuaCheck "desktop"}
               conf=${kanshiConfig "desktop"}
               grep -q 'output "DP-3" mode 2560x1440@144 position 0,0' "$conf"
               grep -q 'output "DP-2" mode 1920x1080@60 position 2560,0' "$conf"
@@ -816,9 +837,17 @@
 
             # The Hyprland user config was rendered by home-manager.
             machine.wait_for_unit("home-manager-maudi.service")
-            machine.succeed("test -e /home/maudi/.config/hypr/hyprland.conf")
+            # Hyprland 0.56+ reads hyprland.lua only; hyprland.conf is never loaded.
+            machine.succeed("test -e /home/maudi/.config/hypr/hyprland.lua")
+            machine.fail("test -e /home/maudi/.config/hypr/hyprland.conf")
             # Hyprland binds drive Noctalia over IPC (launcher toggle).
-            machine.succeed("grep -q 'panel-toggle launcher' /home/maudi/.config/hypr/hyprland.conf")
+            machine.succeed("grep -q 'panel-toggle launcher' /home/maudi/.config/hypr/hyprland.lua")
+            # The session target must be started from the config, or nothing
+            # wired to it (noctalia, kanshi) ever comes up.
+            machine.succeed(
+                "grep -q 'systemctl --user start hyprland-session.target' "
+                "/home/maudi/.config/hypr/hyprland.lua"
+            )
 
             # kanshi: config rendered, service wired to hyprland-session.target.
             machine.succeed("test -e /home/maudi/.config/kanshi/config")
@@ -946,21 +975,21 @@
             machine.succeed("systemctl cat waydroid-container.service")
 
             # Hyprland integration: the opt-in window rules for the Android
-            # toplevels were merged into maudi's rendered hyprland.conf. The
-            # rules use Hyprland 0.47+ block syntax, so each assertion matches a
-            # whole `windowrule { … }` block (multiline grep, scoped by [^}]*).
+            # toplevels were merged into maudi's rendered hyprland.lua. They are
+            # hl.window_rule calls now, so each assertion matches a whole
+            # `hl.window_rule({ … })` call (multiline grep, scoped by [^)]*).
             machine.wait_for_unit("home-manager-maudi.service")
             machine.succeed(
-                r"grep -Pzoq 'windowrule \{[^}]*match:class = \^\(waydroid\.\*\)\$[^}]*float = true' "
-                "/home/maudi/.config/hypr/hyprland.conf"
+                r"grep -Pzoq 'hl\.window_rule\(\{[^)]*class = \"\^\(waydroid\.\*\)\$\"[^)]*float = true' "
+                "/home/maudi/.config/hypr/hyprland.lua"
             )
             machine.succeed(
-                r"grep -Pzoq 'windowrule \{[^}]*match:title = \^\(Waydroid\)\$[^}]*float = true' "
-                "/home/maudi/.config/hypr/hyprland.conf"
+                r"grep -Pzoq 'hl\.window_rule\(\{[^)]*title = \"\^\(Waydroid\)\$\"[^)]*float = true' "
+                "/home/maudi/.config/hypr/hyprland.lua"
             )
             machine.succeed(
-                r"grep -Pzoq 'windowrule \{[^}]*match:class = \^\(waydroid\.\*\)\$[^}]*idle_inhibit = focus' "
-                "/home/maudi/.config/hypr/hyprland.conf"
+                r"grep -Pzoq 'hl\.window_rule\(\{[^)]*class = \"\^\(waydroid\.\*\)\$\"[^)]*idle_inhibit = \"focus\"' "
+                "/home/maudi/.config/hypr/hyprland.lua"
             )
           '';
         };
