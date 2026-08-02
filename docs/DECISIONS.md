@@ -93,3 +93,9 @@ matters lives here; the rest is in the Nix code and `git log`.
   `enable`-gated so an un-enrolled host (and keyless CI) still builds.
 - **work-laptop hardening** — longer auto-suspend (30 min), WireGuard client +
   sops; no gaming, no waydroid (policy-bound machine).
+- **Public DNS = proxied wildcard AAAA (`*.mauderer.work`), IPv6-only, kept
+  current by `services.cloudflare-dyndns`** — home-server only. The ISP prefix is
+  dynamic, so the record is refreshed every 5 min using a sops-held Cloudflare
+  token scoped to the zone. Requires IPv6 privacy
+  extensions off (`networking.tempAddresses = "disabled"`), otherwise the
+  discovered address is a rotating temporary one.

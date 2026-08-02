@@ -14,8 +14,12 @@
 # publish to 10.100.0.1 is what actually keeps it VPN-only; the wg0 firewall rule
 # below is kept as defence-in-depth / intent.
 #
-# For HTTP-01 to succeed the proxied domain's DNS A record must be DNS-only
-# (grey-cloud in Cloudflare) pointing at the WAN IP, with :80 reachable.
+# DNS: `*.mauderer.work` is a *proxied* (orange-cloud) AAAA record kept current by
+# cloudflare-ddns.nix, so HTTP-01 challenges traverse the Cloudflare edge rather
+# than hitting :80 directly. Cloudflare passes /.well-known/acme-challenge
+# through, so this works — but DNS-01 is the robust path for a proxied wildcard.
+# For any host you do want to validate directly, set that record DNS-only
+# (grey-cloud) pointing at the WAN address with :80 reachable.
 _: {
   # Public HTTP/HTTPS for the reverse proxy (and HTTP-01 challenges on :80).
   networking.firewall.allowedTCPPorts = [
