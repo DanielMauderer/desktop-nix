@@ -44,9 +44,19 @@ _: {
     extraOptions = [ "--security-opt=no-new-privileges" ];
   };
 
+  # Bind-mount sources. Podman does not create them, and a missing path makes it
+  # exit 125 ("statfs ...: no such file or directory"), which in turn fails the
+  # whole nixos-rebuild switch. zfs-mount.service is ordered before
+  # systemd-tmpfiles-setup, so these land on the pool, not under its mountpoint.
+  systemd.tmpfiles.rules = [
+    "d /hdd_pool_1/services 0750 root root -"
+    "d /hdd_pool_1/services/npm 0750 root root -"
+    "d /hdd_pool_1/services/npm/data 0750 root root -"
+    "d /hdd_pool_1/services/npm/letsencrypt 0750 root root -"
+  ];
+
   # The admin port binds to the wg0 address and the data lives on the ZFS pool, so
-  # start the container only once the VPN interface is up and the pool is mounted
-  # (podman creates the bind-mount source dirs, which must land on the pool).
+  # start the container only once the VPN interface is up and the pool is mounted.
   systemd.services.podman-npm = {
     after = [
       "wireguard-wg0.service"
