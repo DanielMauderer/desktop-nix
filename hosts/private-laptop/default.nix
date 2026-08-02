@@ -23,8 +23,8 @@ _: {
   # in secrets/private-laptop/vpn.yaml; fill the three fields from the .conf.
   services.vpnClient = {
     # enable = true;                     # ← flip on after the sops step
-    address = [ "FILL-ME/32" ]; # Address =
-    endpoint = "FILL-ME:51820"; # Endpoint =
-    publicKey = "FILL-ME="; # PublicKey =
+    address = [ "192.168.178.208/24,fde5:32d8:78dc::208/64" ]; # Address =
+    endpoint = "9m2lqds859vjlh5k.myfritz.net:52641"; # Endpoint =
+    publicKey = "2vaNA56VJJW4MU4zMaQffBCt9Eac5p7lum80988/Nhc="; # PublicKey =
   };
 }
