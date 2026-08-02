@@ -3,6 +3,7 @@
   imports = [
     ../../modules/nixos/base
     ../../modules/nixos/desktop
+    ../../modules/nixos/net
     ./hardware.nix
     # Uncomment after running `nixos-generate-config --no-filesystems` at install:
     # ./hardware/hardware-configuration.nix
@@ -10,6 +11,16 @@
 
   networking.hostName = "work-laptop";
   system.stateVersion = "25.05";
+
+  # Second tunnel (wg1) from the provider wg.conf. Stays off longer than the
+  # other hosts: &work_laptop in .sops.yaml is still a placeholder, so this box
+  # can't decrypt a per-host secret until it's age-enrolled (INSTALL.md §2).
+  services.vpnClient = {
+    # enable = true;                     # ← flip on after age + sops enrollment
+    address = [ "FILL-ME/32" ]; # Address =
+    endpoint = "FILL-ME:51820"; # Endpoint =
+    publicKey = "FILL-ME="; # PublicKey =
+  };
 
   # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
   home-manager.users.maudi.local.idleSuspendSeconds = 1800;

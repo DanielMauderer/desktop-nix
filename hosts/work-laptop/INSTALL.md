@@ -60,6 +60,38 @@ sudo nixos-rebuild switch --flake ~/desktop-nix#work-laptop
 sudo wg show          # interface + peer should appear
 ```
 
+## 3b. Second WireGuard tunnel (`wg1`, from the provider wg.conf)
+
+Independent of the home-server tunnel: `wg1` carries a full tunnel, `wg0` keeps
+`10.100.0.0/24` (more specific, so it wins). Each device needs its **own**
+keypair — the far end tracks one endpoint per public key, so a key shared
+between machines means the last one to handshake steals the session.
+
+```sh
+cd ~/desktop-nix
+# 1. Private key out of the provider config, into a per-host sops secret.
+#    (The creation rule secrets/work-laptop/*.yaml already covers this filename.)
+sops edit secrets/work-laptop/vpn.yaml       # vpn-wg-key: <the PrivateKey line of wg.conf>
+sops updatekeys secrets/work-laptop/vpn.yaml
+shred -u /path/to/wg.conf             # once its non-secret fields are copied over
+```
+
+Then in `hosts/work-laptop/default.nix`, fill `services.vpnClient` from the same
+`wg.conf` — `address` = `Address`, `endpoint` = `Endpoint`, `publicKey` =
+the peer's `PublicKey` — and uncomment `enable = true`. Non-defaults if the conf
+disagrees: `allowedIPs` (defaults to a full tunnel) and `dns` (left empty on
+purpose — setting it lets wg-quick rewrite `resolv.conf` and fight
+systemd-resolved). Then:
+
+```sh
+sudo nixos-rebuild switch --flake ~/desktop-nix#work-laptop
+sudo systemctl start wg-quick-wg1     # autostart is off by default
+sudo wg show wg1                      # handshake within ~25 s
+curl -s https://ifconfig.me           # exits via the tunnel
+sudo systemctl stop wg-quick-wg1      # back to normal routing
+ping 10.100.0.1                       # wg0 still up alongside it
+```
+
 ## 4. Verify — "ready for Monday" gates (⛔ before wiping the old SSD)
 
 - ⛔ Dual-external dock (DP-5 + DP-6, internal off) and single HDMI dock both work.

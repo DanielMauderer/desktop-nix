@@ -18,4 +18,13 @@ _: {
     # enable = true;                     # ← flip on last, once the server is up
     address = "10.100.0.3/32";
   };
+
+  # Second tunnel (wg1) from the provider wg.conf. Off until this host's key is
+  # in secrets/private-laptop/vpn.yaml; fill the three fields from the .conf.
+  services.vpnClient = {
+    # enable = true;                     # ← flip on after the sops step
+    address = [ "FILL-ME/32" ]; # Address =
+    endpoint = "FILL-ME:51820"; # Endpoint =
+    publicKey = "FILL-ME="; # PublicKey =
+  };
 }

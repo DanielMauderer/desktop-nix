@@ -26,6 +26,15 @@
     endpoint = "192.168.178.96:51820";
   };
 
+  # Second tunnel (wg1) from the provider wg.conf. Off until this host's key is
+  # in secrets/desktop/vpn.yaml; fill the three fields from the .conf.
+  services.vpnClient = {
+    # enable = true;                     # ← flip on after the sops step
+    address = [ "FILL-ME/32" ]; # Address =
+    endpoint = "FILL-ME:51820"; # Endpoint =
+    publicKey = "FILL-ME="; # PublicKey =
+  };
+
   # Dual-head desktop; mkBefore so it matches ahead of the laptop-internal fallback.
   home-manager.users.maudi.services.kanshi.settings = lib.mkBefore [
     {
