@@ -26,13 +26,14 @@
     endpoint = "192.168.178.96:51820";
   };
 
-  # Second tunnel (wg1) from the provider wg.conf. Off until this host's key is
-  # in secrets/desktop/vpn.yaml; fill the three fields from the .conf.
+  # Second tunnel (wg1) from the Fritz!Box wg.conf; key lives in
+  # secrets/desktop/vpn.yaml.
   services.vpnClient = {
-    enable = true;                     # ← flip on after the sops step
+    enable = true;
     address = [ "192.168.178.208/24,fde5:32d8:78dc::208/64" ]; # Address =
     endpoint = "9m2lqds859vjlh5k.myfritz.net:52641"; # Endpoint =
     publicKey = "2vaNA56VJJW4MU4zMaQffBCt9Eac5p7lum80988/Nhc="; # PublicKey =
+    presharedKey = true; # PresharedKey = → secrets/desktop/vpn.yaml, vpn-wg-psk
   };
 
   # Dual-head desktop; mkBefore so it matches ahead of the laptop-internal fallback.

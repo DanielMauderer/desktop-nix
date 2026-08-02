@@ -8,7 +8,7 @@ the hosts that need it.
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `home-server-client.nix` | `services.homeServerClient`: WireGuard **client** of the home-server (`wg0`, split-tunnel to `10.100.0.0/24`), `known_hosts` pin for `home-server`, and an `x-systemd.automount` NFS mount of the share at `/mnt/home-server`. Gated by `enable` — off until the host is enrolled (per-host private key via sops), so importing it keeps keyless CI green. |
 
-| `vpn-client.nix` | `services.vpnClient`: a **second** WireGuard tunnel on `wg1` from a provider-issued `wg.conf` — full tunnel by default, `autostart = false`, private key from `secrets/<host>/vpn.yaml`. Also `enable`-gated. |
+| `vpn-client.nix` | `services.vpnClient`: a **second** WireGuard tunnel on `wg1` from a provider-issued `wg.conf` — full tunnel by default, `autostart = false`, private key from `secrets/<host>/vpn.yaml` (`vpn-wg-key`). Set `presharedKey = true` when the `wg.conf` has a `PresharedKey` line; the value is read from `vpn-wg-psk` in that same file. Also `enable`-gated. |
 
 The `serverPublicKey` / `serverHostKey` / `endpoint` options default to
 placeholders and are the same for every client, so fill them once here. Per host

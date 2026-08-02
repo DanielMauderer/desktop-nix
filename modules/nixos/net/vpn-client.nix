@@ -51,6 +51,17 @@ in
       '';
     };
 
+    presharedKey = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        The wg.conf has a `PresharedKey` line. The value itself is a secret, so
+        it lives in `secrets/<host>/vpn.yaml` under `vpn-wg-psk` rather than in
+        this option — set this to true once that key is enrolled. A PSK
+        configured on only one side makes the handshake fail outright.
+      '';
+    };
+
     autostart = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -64,18 +75,30 @@ in
   config = lib.mkIf cfg.enable {
     # sopsFile derived from the hostname so the module needs no per-host wiring.
     # Kept out of wireguard.yaml so a fumbled `sops edit` can't break wg0.
-    sops.secrets.vpn-wg-key = {
-      sopsFile = ../../../secrets + "/${config.networking.hostName}/vpn.yaml";
+    sops.secrets = {
+      vpn-wg-key = {
+        sopsFile = ../../../secrets + "/${config.networking.hostName}/vpn.yaml";
+      };
+    }
+    // lib.optionalAttrs cfg.presharedKey {
+      vpn-wg-psk = {
+        sopsFile = ../../../secrets + "/${config.networking.hostName}/vpn.yaml";
+      };
     };
 
     networking.wg-quick.interfaces.wg1 = {
       inherit (cfg) address autostart dns;
       privateKeyFile = config.sops.secrets.vpn-wg-key.path;
       peers = [
-        {
-          inherit (cfg) endpoint publicKey allowedIPs;
-          persistentKeepalive = 25;
-        }
+        (
+          {
+            inherit (cfg) endpoint publicKey allowedIPs;
+            persistentKeepalive = 25;
+          }
+          // lib.optionalAttrs cfg.presharedKey {
+            presharedKeyFile = config.sops.secrets.vpn-wg-psk.path;
+          }
+        )
       ];
     };
   };
