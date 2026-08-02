@@ -44,16 +44,29 @@ _: {
     extraOptions = [ "--security-opt=no-new-privileges" ];
   };
 
-  # Bind-mount sources. Podman does not create them, and a missing path makes it
-  # exit 125 ("statfs ...: no such file or directory"), which in turn fails the
-  # whole nixos-rebuild switch. zfs-mount.service is ordered before
-  # systemd-tmpfiles-setup, so these land on the pool, not under its mountpoint.
-  systemd.tmpfiles.rules = [
-    "d /hdd_pool_1/services 0750 root root -"
-    "d /hdd_pool_1/services/npm 0750 root root -"
-    "d /hdd_pool_1/services/npm/data 0750 root root -"
-    "d /hdd_pool_1/services/npm/letsencrypt 0750 root root -"
-  ];
+  # Bind-mount sources for the container. Podman does not create them: a missing
+  # path makes it exit 125 ("statfs ...: no such file or directory"), which in
+  # turn fails the whole nixos-rebuild switch.
+  #
+  # systemd.tmpfiles did not do the job: with the rules present in
+  # /etc/tmpfiles.d/00-nixos.conf and the pool mounted, a switch still left
+  # data/ and letsencrypt/ absent. This unit sits inside podman-npm's own
+  # dependency chain, which already requires zfs-mount.service, so it cannot run
+  # before the pool is mounted or after the container is started.
+  systemd.services.npm-data-dirs = {
+    requires = [ "zfs-mount.service" ];
+    after = [ "zfs-mount.service" ];
+    before = [ "podman-npm.service" ];
+    requiredBy = [ "podman-npm.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      mkdir -p /hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/letsencrypt
+      chmod 0750 /hdd_pool_1/services /hdd_pool_1/services/npm
+    '';
+  };
 
   # The admin port binds to the wg0 address and the data lives on the ZFS pool, so
   # start the container only once the VPN interface is up and the pool is mounted.
