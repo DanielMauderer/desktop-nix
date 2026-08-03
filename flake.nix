@@ -410,7 +410,7 @@
               && lib.hasPrefix "/hdd_pool_1/" cfg.services.forgejo.dump.backupDir;
           }
           {
-            # The real guard on the whole design: Forgejo's :3000 and :2222 are
+            # The real guard on the whole design: Forgejo's :4000 and :2222 are
             # admitted by source-restricted nftables rules, so neither may ever
             # appear in the globally-open set. Stated as an exact match rather
             # than two absence checks, so any future port has to be argued for.
@@ -431,7 +431,7 @@
                 rules = cfg.networking.firewall.extraInputRules;
               in
               cfg.networking.nftables.enable
-              && lib.hasInfix "ip saddr { 10.88.0.0/16, 10.100.0.0/24 } tcp dport 3000 accept" rules
+              && lib.hasInfix "ip saddr { 10.88.0.0/16, 10.100.0.0/24 } tcp dport 4000 accept" rules
               && lib.hasInfix "tcp dport 2222 accept" rules;
           }
           {
@@ -1031,14 +1031,14 @@
           nodes.machine = forgejoTestNode;
           testScript = ''
             machine.wait_for_unit("forgejo.service")
-            machine.wait_for_open_port(3000)
+            machine.wait_for_open_port(4000)
 
-            machine.succeed("curl -fsS http://localhost:3000/api/healthz")
-            machine.succeed("curl -fsS http://localhost:3000/api/v1/version | grep -q version")
+            machine.succeed("curl -fsS http://localhost:4000/api/healthz")
+            machine.succeed("curl -fsS http://localhost:4000/api/v1/version | grep -q version")
             # The web UI answers. LANDING_PAGE=explore redirects, so follow it
             # rather than grepping the (empty) redirect body.
             machine.succeed(
-                "test $(curl -fsSL -o /dev/null -w '%{http_code}' http://localhost:3000/) = 200"
+                "test $(curl -fsSL -o /dev/null -w '%{http_code}' http://localhost:4000/) = 200"
             )
 
             # Built-in SSH server, not host sshd (which is off here).

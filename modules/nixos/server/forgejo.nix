@@ -4,7 +4,7 @@
 # box — not GitHub — is the source of truth for the repositories it hosts.
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
-#   3000  HTTP, admitted only from the podman bridge subnet, because the NPM
+#   4000  HTTP, admitted only from the podman bridge subnet, because the NPM
 #         container is what proxies it. TLS terminates in NPM, so this speaks
 #         plain HTTP and must never reach the WAN.
 #   2222  Forgejo's built-in Go SSH server for git clone/push, admitted only from
@@ -32,7 +32,7 @@ let
   podmanSubnet = "10.88.0.0/16";
 
   domain = "git.mauderer.work";
-  httpPort = 3000;
+  httpPort = 4000;
   sshPort = 2222;
 in
 {
@@ -102,9 +102,9 @@ in
   # it) without overriding a host that sets it explicitly.
   networking.nftables.enable = lib.mkDefault true;
 
-  # Neither port is ever globally open. :3000 is admitted from the podman bridge
+  # Neither port is ever globally open. :4000 is admitted from the podman bridge
   # (that's the reverse proxy, the normal path) and from the VPN, so the admin UI
-  # is reachable at http://10.100.0.1:3000 for the bootstrap steps that need it —
+  # is reachable at http://10.100.0.1:4000 for the bootstrap steps that need it —
   # creating the first admin and minting the runner token — and stays usable if
   # DNS or the cert ever breaks. That path is plain HTTP over WireGuard, the same
   # posture as NPM's own admin UI on :81. :2222 is git-over-SSH, LAN and VPN only.

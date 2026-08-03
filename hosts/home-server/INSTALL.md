@@ -85,10 +85,10 @@ Enable the clients **last**, once the server is reachable: uncomment
 Forgejo comes up with the rest of the system; the runner is opt-in because its
 registration token can only be minted once the forge is running.
 
-1. **First admin user.** Over the VPN, browse `http://10.100.0.1:3000` and create
+1. **First admin user.** Over the VPN, browse `http://10.100.0.1:4000` and create
    the first account — it becomes the instance admin. Self-registration is off,
    so every later account is admin-created. (Plain HTTP over WireGuard, same as
-   the NPM admin UI; `:3000` is not reachable from the WAN or the LAN.) From a
+   the NPM admin UI; `:4000` is not reachable from the WAN or the LAN.) From a
    console instead of the VPN, the equivalent is:
    ```sh
    sudo -u forgejo forgejo admin user create --admin \
@@ -96,7 +96,7 @@ registration token can only be minted once the forge is running.
      --config /var/lib/forgejo/custom/conf/app.ini
    ```
 2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
-   domain `git.mauderer.work`, forward to `http://10.88.0.1:3000` (the podman
+   domain `git.mauderer.work`, forward to `http://10.88.0.1:4000` (the podman
    bridge gateway — i.e. this host, as seen from the NPM container), websockets
    on, then request a Let's Encrypt cert. No DNS change is needed: the proxied
    wildcard AAAA from `cloudflare-ddns.nix` already covers it. In the host's
@@ -145,7 +145,7 @@ Two limits worth knowing:
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
   needs the proxied domain's A record to be **DNS-only (grey-cloud)** → WAN IP.
 - **Forgejo:** `systemctl status forgejo` and `curl -fsS
-  http://10.100.0.1:3000/api/healthz`; `systemctl list-timers forgejo-dump` shows
+  http://10.100.0.1:4000/api/healthz`; `systemctl list-timers forgejo-dump` shows
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
   runner is enabled, `systemctl status gitea-runner-forgejo` plus a trivial
   `.forgejo/workflows/hello.yml` in a scratch repo proves the podman job path.
