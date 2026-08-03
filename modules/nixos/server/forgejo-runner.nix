@@ -91,9 +91,13 @@ in
         settings = {
           runner.capacity = cfg.capacity;
           container = {
-            # Put job containers on podman's default network so they can reach
-            # the runner's cache server and the forge itself.
-            network = "podman";
+            # `network` is deliberately unset. Leaving it empty is what makes the
+            # runner build a throwaway network per job, which is both how service
+            # containers are supported and what keeps concurrent jobs (capacity
+            # > 1) isolated from each other. Pinning every job to one shared
+            # network would trade that away for nothing: jobs reach the forge
+            # over its public URL, and the runner's cache server advertises a
+            # host address the per-job bridge can route to anyway.
             privileged = false;
             options = "--security-opt=no-new-privileges";
           };

@@ -87,7 +87,14 @@ registration token can only be minted once the forge is running.
 
 1. **First admin user.** Over the VPN, browse `http://10.100.0.1:3000` and create
    the first account — it becomes the instance admin. Self-registration is off,
-   so every later account is admin-created.
+   so every later account is admin-created. (Plain HTTP over WireGuard, same as
+   the NPM admin UI; `:3000` is not reachable from the WAN or the LAN.) From a
+   console instead of the VPN, the equivalent is:
+   ```sh
+   sudo -u forgejo forgejo admin user create --admin \
+     --username maudi --email you@example.com --random-password \
+     --config /var/lib/forgejo/custom/conf/app.ini
+   ```
 2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
    domain `git.mauderer.work`, forward to `http://10.88.0.1:3000` (the podman
    bridge gateway — i.e. this host, as seen from the NPM container), websockets

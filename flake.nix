@@ -422,12 +422,16 @@
               ];
           }
           {
-            name = "Forgejo HTTP admitted only from the podman bridge; git-SSH only from LAN/VPN";
+            # extraInputRules is an nftables-only option: under the iptables
+            # backend these rules are silently dropped, so checking their text
+            # without checking the backend would assert nothing.
+            name = "Forgejo HTTP and git-SSH admitted only from named source ranges (nftables backend)";
             assertion =
               let
                 rules = cfg.networking.firewall.extraInputRules;
               in
-              lib.hasInfix "ip saddr 10.88.0.0/16 tcp dport 3000 accept" rules
+              cfg.networking.nftables.enable
+              && lib.hasInfix "ip saddr { 10.88.0.0/16, 10.100.0.0/24 } tcp dport 3000 accept" rules
               && lib.hasInfix "tcp dport 2222 accept" rules;
           }
           {
@@ -484,8 +488,9 @@
       forgejoTestNode = {
         imports = [ ./modules/nixos/server/forgejo.nix ];
         services.forgejo.dump.enable = lib.mkForce false;
-        # forgejo.nix admits its ports with source-restricted nftables rules.
-        networking.nftables.enable = true;
+        # No nftables line here on purpose: forgejo.nix defaults it on itself,
+        # since its source-restricted rules need that backend. This node is the
+        # check that the module really is self-contained.
         environment.systemPackages = [ pkgs.curl ];
         virtualisation = {
           memorySize = 2048;

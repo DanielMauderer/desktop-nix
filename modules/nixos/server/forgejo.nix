@@ -95,10 +95,21 @@ in
     };
   };
 
-  # Neither port is ever globally open: :3000 only from the proxy's bridge, :2222
-  # only from the LAN and the VPN.
+  # `extraInputRules` exists only on the nftables backend and is silently ignored
+  # under iptables — which would leave both ports unreachable rather than merely
+  # unrestricted. core/hardening.nix already turns nftables on for every host;
+  # this default keeps the module honest on its own (the VM test node relies on
+  # it) without overriding a host that sets it explicitly.
+  networking.nftables.enable = lib.mkDefault true;
+
+  # Neither port is ever globally open. :3000 is admitted from the podman bridge
+  # (that's the reverse proxy, the normal path) and from the VPN, so the admin UI
+  # is reachable at http://10.100.0.1:3000 for the bootstrap steps that need it —
+  # creating the first admin and minting the runner token — and stays usable if
+  # DNS or the cert ever breaks. That path is plain HTTP over WireGuard, the same
+  # posture as NPM's own admin UI on :81. :2222 is git-over-SSH, LAN and VPN only.
   networking.firewall.extraInputRules = ''
-    ip saddr ${podmanSubnet} tcp dport ${toString httpPort} accept
+    ip saddr { ${podmanSubnet}, ${vpnSubnet} } tcp dport ${toString httpPort} accept
     ip saddr { ${lanSubnet}, ${vpnSubnet} } tcp dport ${toString sshPort} accept
   '';
 
@@ -120,10 +131,17 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
     };
+    # Unlike NPM — a rootful container, which ignores these bits — forgejo runs
+    # unprivileged, so it needs search (x) on *every* parent to reach the dump
+    # directory. `mkdir -p` would leave the parents root:root 0750, which locks
+    # it out. Group-ownership is the durable fix: npm-data-dirs also chmods the
+    # shared `services` dir and the two units have no ordering between them, so
+    # a mode tweak there could be undone, whereas nothing chowns it.
     script = ''
       mkdir -p /hdd_pool_1/services/forgejo/dump
+      chown root:forgejo /hdd_pool_1/services /hdd_pool_1/services/forgejo
       chown forgejo:forgejo /hdd_pool_1/services/forgejo/dump
-      chmod 0750 /hdd_pool_1/services /hdd_pool_1/services/forgejo
+      chmod 0750 /hdd_pool_1/services /hdd_pool_1/services/forgejo /hdd_pool_1/services/forgejo/dump
     '';
   };
 }
