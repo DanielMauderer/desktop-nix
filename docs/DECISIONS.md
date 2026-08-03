@@ -86,6 +86,19 @@ matters lives here; the rest is in the Nix code and `git log`.
   podman's port-publish DNAT bypasses the input-chain firewall. Containers run
   rootful-but-hardened (`no-new-privileges`); no service container ever mounts
   the podman/docker management socket.
+- **Self-hosted forge = native `services.forgejo`** (SQLite, state on the SSD,
+  nightly `forgejo dump` to the ZFS pool) behind the NPM proxy — the first native
+  web service on the box; everything else there is a container. GitHub is demoted
+  to a per-repo push-mirror target, not the source of truth. Forgejo's built-in
+  git-SSH server on 2222 (LAN/VPN only) rather than host sshd, so keys live in
+  Forgejo's database and `:22` stays admin-only. Neither port is globally open:
+  both are admitted by source-restricted `extraInputRules`, as with NFS.
+- **Actions run on a native `gitea-actions-runner`** (`forgejo-runner` package)
+  driving the *rootful* podman socket via `DOCKER_HOST` — a host service, not a
+  container with the socket mounted, so the escape guard still holds. That access
+  is root-equivalent, so it is only acceptable on a single-user instance
+  (`DISABLE_REGISTRATION`); `enable`-gated because its registration token can
+  only be minted after the forge is running.
 - **net / home-server client** (`services.homeServerClient`) — desktop +
   private-laptop. WireGuard client of the server (split-tunnel, so `ssh
   home-server` works — server SSH is wg0-only) + `x-systemd.automount` NFS share.
