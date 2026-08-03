@@ -117,16 +117,34 @@ in
   # systemd.tmpfiles, which runs too early to see the mount. Same fix as
   # npm-data-dirs: a oneshot inside the consumer's own dependency chain, so it
   # cannot run before the pool is mounted or after the dump has started. The
-  # requiredBy/before pair also orders forgejo-dump.service itself after the
-  # mount, so no extra ordering on that unit is needed.
+  # requiredBy/before pair also orders the consumers themselves after the mount,
+  # so no extra ordering on those units is needed.
+  #
+  # forgejo.service is a consumer too, not just forgejo-dump.service: upstream
+  # lists `dump.backupDir` in the *web* unit's ReadWritePaths, so with
+  # ProtectSystem=strict systemd cannot even build its mount namespace while the
+  # directory is missing — it fails 226/NAMESPACE in ExecStartPre, long before
+  # any dump would run. Hooking only the dump unit left the directory uncreated
+  # until the first nightly dump, so the forge never started at all.
+  #
+  # The cost is that forgejo now hard-requires the pool, which reads oddly next
+  # to the "state stays on the SSD" note above. That is upstream's coupling, not
+  # ours, and mkForce-ing its ReadWritePaths to break it would silently drop
+  # future entries from that list.
   #
   # Gated on dump.enable so a node that turns dumps off (the VM test) doesn't
   # end up referencing a unit that isn't there.
   systemd.services.forgejo-dump-dirs = lib.mkIf config.services.forgejo.dump.enable {
     requires = [ "zfs-mount.service" ];
     after = [ "zfs-mount.service" ];
-    before = [ "forgejo-dump.service" ];
-    requiredBy = [ "forgejo-dump.service" ];
+    before = [
+      "forgejo-dump.service"
+      "forgejo.service"
+    ];
+    requiredBy = [
+      "forgejo-dump.service"
+      "forgejo.service"
+    ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
