@@ -80,7 +80,57 @@ Enable the clients **last**, once the server is reachable: uncomment
 `services.homeServerClient.enable = true;` in `hosts/desktop/default.nix` and
 `hosts/private-laptop/default.nix`, then `update` on each.
 
-## 5. Verify
+## 5. Forgejo (the forge + its Actions runner)
+
+Forgejo comes up with the rest of the system; the runner is opt-in because its
+registration token can only be minted once the forge is running.
+
+1. **First admin user.** Over the VPN, browse `http://10.100.0.1:3000` and create
+   the first account — it becomes the instance admin. Self-registration is off,
+   so every later account is admin-created. (Plain HTTP over WireGuard, same as
+   the NPM admin UI; `:3000` is not reachable from the WAN or the LAN.) From a
+   console instead of the VPN, the equivalent is:
+   ```sh
+   sudo -u forgejo forgejo admin user create --admin \
+     --username maudi --email you@example.com --random-password \
+     --config /var/lib/forgejo/custom/conf/app.ini
+   ```
+2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
+   domain `git.mauderer.work`, forward to `http://10.88.0.1:3000` (the podman
+   bridge gateway — i.e. this host, as seen from the NPM container), websockets
+   on, then request a Let's Encrypt cert. No DNS change is needed: the proxied
+   wildcard AAAA from `cloudflare-ddns.nix` already covers it. In the host's
+   *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
+3. **Runner token.** In Forgejo: Site Administration → Actions → Runners →
+   *Create new runner* → copy the registration token. Then, in the repo:
+   ```sh
+   nix develop
+   sops secrets/home-server/forgejo.yaml
+   ```
+   with the content — note the `TOKEN=` prefix, this is an *environment* file,
+   unlike the bare Cloudflare token:
+   ```yaml
+   forgejo-runner-token: TOKEN=<registration token>
+   ```
+   Uncomment `services.forgejoRunner.enable = true;` in
+   `hosts/home-server/default.nix`, commit, and `switch`. The runner should show
+   as idle in the admin panel.
+4. **GitHub backup mirror**, per repository: Settings → Mirror Settings → *Push
+   Mirror*, target
+   `https://<github-user>:<PAT>@github.com/<user>/<repo>.git`, interval `8h`.
+   The PAT needs only `repo` scope and lives in Forgejo's database — never in
+   this repo. Use *Synchronize now* once to confirm.
+
+Two limits worth knowing:
+
+- Git over **HTTPS** goes through Cloudflare, which caps request bodies at 100 MB
+  on the free plan. A very large push can fail there.
+- Git over **SSH** (port 2222) is LAN/VPN-only by design — Cloudflare's proxy
+  can't carry an arbitrary SSH port anyway, and opening one would break the
+  "WAN surface is exactly 80/443/51820" assertion. It has no size limit, so it's
+  the escape hatch for big pushes.
+
+## 6. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -94,5 +144,10 @@ Enable the clients **last**, once the server is reachable: uncomment
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
   needs the proxied domain's A record to be **DNS-only (grey-cloud)** → WAN IP.
+- **Forgejo:** `systemctl status forgejo` and `curl -fsS
+  http://10.100.0.1:3000/api/healthz`; `systemctl list-timers forgejo-dump` shows
+  the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
+  runner is enabled, `systemctl status gitea-runner-forgejo` plus a trivial
+  `.forgejo/workflows/hello.yml` in a scratch repo proves the podman job path.
 - Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.

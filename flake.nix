@@ -349,6 +349,10 @@
               builtins.elem "80:80" ports && builtins.elem "443:443" ports;
           }
           {
+            # The Actions runner deliberately holds this socket, but it does so
+            # as a host systemd service (DOCKER_HOST + the podman group), never
+            # as a container with the socket bind-mounted in. This guard stays
+            # exact: no container, runner-related or not, gets the socket.
             name = "no service container mounts the management socket (escape guard)";
             assertion =
               let
@@ -381,6 +385,61 @@
           {
             name = "oci-containers backend is podman";
             assertion = cfg.virtualisation.oci-containers.backend == "podman";
+          }
+          {
+            name = "Forgejo enabled on the SQLite backend";
+            assertion = cfg.services.forgejo.enable && cfg.services.forgejo.database.type == "sqlite3";
+          }
+          {
+            name = "Forgejo public URL is HTTPS (TLS terminates at the reverse proxy)";
+            assertion = lib.hasPrefix "https://" cfg.services.forgejo.settings.server.ROOT_URL;
+          }
+          {
+            name = "Forgejo self-registration disabled (single-user forge)";
+            assertion = cfg.services.forgejo.settings.service.DISABLE_REGISTRATION;
+          }
+          {
+            name = "Forgejo Actions and push mirroring enabled";
+            assertion =
+              cfg.services.forgejo.settings.actions.ENABLED && cfg.services.forgejo.settings.mirror.ENABLED;
+          }
+          {
+            name = "Forgejo dumps land on the redundant ZFS pool";
+            assertion =
+              cfg.services.forgejo.dump.enable
+              && lib.hasPrefix "/hdd_pool_1/" cfg.services.forgejo.dump.backupDir;
+          }
+          {
+            # The real guard on the whole design: Forgejo's :3000 and :2222 are
+            # admitted by source-restricted nftables rules, so neither may ever
+            # appear in the globally-open set. Stated as an exact match rather
+            # than two absence checks, so any future port has to be argued for.
+            name = "WAN TCP surface is exactly 80/443";
+            assertion =
+              lib.unique (builtins.sort (a: b: a < b) cfg.networking.firewall.allowedTCPPorts) == [
+                80
+                443
+              ];
+          }
+          {
+            # extraInputRules is an nftables-only option: under the iptables
+            # backend these rules are silently dropped, so checking their text
+            # without checking the backend would assert nothing.
+            name = "Forgejo HTTP and git-SSH admitted only from named source ranges (nftables backend)";
+            assertion =
+              let
+                rules = cfg.networking.firewall.extraInputRules;
+              in
+              cfg.networking.nftables.enable
+              && lib.hasInfix "ip saddr { 10.88.0.0/16, 10.100.0.0/24 } tcp dport 3000 accept" rules
+              && lib.hasInfix "tcp dport 2222 accept" rules;
+          }
+          {
+            # Vacuously true while the runner is opt-in, but it pins the shape:
+            # if it is ever enabled it must be the native unit, which reaches
+            # podman via DOCKER_HOST rather than a mounted socket.
+            name = "Actions runner (when enabled) runs as a host service";
+            assertion = cfg.services.forgejoRunner.enable -> (cfg.systemd.services ? gitea-runner-forgejo);
           }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
@@ -419,6 +478,23 @@
           useGlobalPkgs = true;
           useUserPackages = true;
           extraSpecialArgs = { inherit inputs; };
+        };
+      };
+
+      # Forgejo test node: the forgejo module on its own, not the home-server
+      # host — that host is untestable in QEMU (ZFS pool, VPN-only SSH, NFS),
+      # which is why it has assertions but no VM test. Dumps are forced off
+      # because their target lives on the ZFS pool.
+      forgejoTestNode = {
+        imports = [ ./modules/nixos/server/forgejo.nix ];
+        services.forgejo.dump.enable = lib.mkForce false;
+        # No nftables line here on purpose: forgejo.nix defaults it on itself,
+        # since its source-restricted rules need that backend. This node is the
+        # check that the module really is self-contained.
+        environment.systemPackages = [ pkgs.curl ];
+        virtualisation = {
+          memorySize = 2048;
+          diskSize = 4096;
         };
       };
     in
@@ -945,6 +1021,36 @@
               machine.succeed("podman run --rm --network=none hello:test")
             '';
           };
+
+        # Forgejo: the service comes up, serves the web UI and the API, runs its
+        # built-in git SSH server on 2222, and the generated app.ini carries the
+        # settings the design depends on (single-user forge, Actions on, GitHub
+        # as the action namespace, HTTPS public URL).
+        test-forgejo = testLib.makeTest {
+          name = "forgejo";
+          nodes.machine = forgejoTestNode;
+          testScript = ''
+            machine.wait_for_unit("forgejo.service")
+            machine.wait_for_open_port(3000)
+
+            machine.succeed("curl -fsS http://localhost:3000/api/healthz")
+            machine.succeed("curl -fsS http://localhost:3000/api/v1/version | grep -q version")
+            # The web UI answers. LANDING_PAGE=explore redirects, so follow it
+            # rather than grepping the (empty) redirect body.
+            machine.succeed(
+                "test $(curl -fsSL -o /dev/null -w '%{http_code}' http://localhost:3000/) = 200"
+            )
+
+            # Built-in SSH server, not host sshd (which is off here).
+            machine.wait_for_open_port(2222)
+
+            conf = "/var/lib/forgejo/custom/conf/app.ini"
+            machine.succeed(f"grep -qE '^DISABLE_REGISTRATION *= *true' {conf}")
+            machine.succeed(f"grep -qE '^DEFAULT_ACTIONS_URL *= *github' {conf}")
+            machine.succeed(f"grep -qE '^ROOT_URL *= *https://' {conf}")
+            machine.succeed(f"grep -qE '^START_SSH_SERVER *= *true' {conf}")
+          '';
+        };
 
         # Virtualisation: libvirtd up, maudi reaches qemu:///system via group
         # socket access, default NAT network defined+autostarting, clients
