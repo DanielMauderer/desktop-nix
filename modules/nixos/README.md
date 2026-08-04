@@ -11,6 +11,6 @@ System-level (NixOS) modules. Each group has its own README.
 | `virtualisation` | libvirt/KVM + virt-manager, OVMF, TPM.                         |
 | `gaming`         | CachyOS kernel, `scx`, Steam, gamemode, gamescope, AMD GPU/LACT. Desktop only. |
 | `waydroid`       | Android container (opt-in: private-laptop + desktop).         |
-| `server`         | home-server services: WireGuard server, SSH-over-VPN, reverse-proxy, ZFS, NFS. |
+| `server`         | home-server services: WireGuard server, SSH-over-VPN, reverse-proxy, internal DNS, ZFS, NFS. |
 
 `apps.nix` (GUI app allowlist) lives directly under `modules/nixos/`.

@@ -29,7 +29,9 @@ The secrets-first work is done and in git:
 - **OS SSD device** in `hosts/home-server/disk.nix` (`lsblk` on the target —
   usually `/dev/nvme0n1`). **Must NOT be the RAID LUN that holds the ZFS pool.**
 - **ZFS `hostId`** in `hardware.nix` is unique; ZFS pool name (`zfs.extraPools`,
-  `hdd_pool_1`) and the LAN subnet in `modules/nixos/server/nfs.nix`.
+  `hdd_pool_1`) and the LAN subnet in `modules/nixos/server/nfs.nix` — which
+  `modules/nixos/server/dns.nix` repeats, along with the router and the server's
+  own LAN address.
 - **`nfsHost`/LAN IP** for the desktop client in `hosts/desktop/default.nix`.
 - **sops master age key** is in the password manager.
 - **DNS:** `vpn.mauderer.work` must be a **DNS-only (grey-cloud)** Cloudflare
@@ -168,7 +170,51 @@ Worth knowing:
 - `paperless-manage` is on `PATH` on the server for admin tasks
   (`paperless-manage createsuperuser`, `document_exporter`, …).
 
-## 7. Verify
+## 7. Internal DNS (blocky)
+
+Blocky comes up with the rest of the system and is immediately the *server's*
+resolver. Making it the *house's* resolver takes two settings on the FRITZ!Box
+and one decision about IPv6.
+
+1. **Pin the server's address.** `modules/nixos/server/dns.nix` binds
+   `192.168.178.96` by name (plus `10.100.0.1` and loopback), so a lease that
+   moves leaves clients pointed at nothing. In the FRITZ!Box: *Home Network →
+   Network → `home-server` → Edit →* "Always assign the same IPv4 address to
+   this network device". A different address means editing `serverLanAddress`
+   in `dns.nix` — and `nfsHost`/`endpoint` in `hosts/desktop/default.nix`.
+2. **Hand it to the clients.** *Home Network → Network → Network Settings →
+   IPv4 Settings →* "Local DNS server" = `192.168.178.96`. Clients pick it up on
+   their next DHCP renewal (or a reconnect).
+3. **Close the IPv6 bypass.** A dual-stack client is *also* offered the
+   FRITZ!Box as a DNSv6 resolver over router advertisement, and those queries
+   never reach blocky. Either point the FRITZ!Box's own upstream resolvers at
+   the server (*Internet → Account Information → DNS Server*, DNSv4 =
+   `192.168.178.96`), so everything it forwards is filtered as well, or turn
+   DNSv6 off for the home network. Blocky binds IPv4 only, deliberately: this
+   box has no *stable* IPv6 address to publish — that is the whole reason
+   `cloudflare-ddns.nix` exists.
+
+Note the trade-off in that last step. Step 2 alone leaves the FRITZ!Box's own
+upstream resolvers intact, so a blocky that is down degrades to *unfiltered* DNS.
+Pointing the box's upstream at the server as well closes the IPv6 gap but makes
+this box a single point of failure for the whole house — including for its own
+recovery, since the server's fallback resolver is then the router, which forwards
+straight back. Prefer the RA/DNSv6 switch if the box offers it.
+
+Day-to-day, from an SSH session on the server (the API is loopback-only):
+
+```sh
+blocky --apiPort 4001 query git.mauderer.work       # which resolver answered, and why
+blocky --apiPort 4001 blocking disable --duration 10m   # unblock everything, briefly
+blocky --apiPort 4001 lists refresh                # after editing the lists/allowlist
+```
+
+A domain that is blocked but shouldn't be goes in `blocking.allowlists.ads` in
+`dns.nix` — a commit, not a click. A new local name goes in `customDNS.mapping`;
+names the router already knows (`*.fritz.box`) need nothing, they are forwarded
+back to it.
+
+## 8. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -177,8 +223,8 @@ Worth knowing:
   (host key pinned).
 - `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
   the export; `nft list ruleset` shows only UDP 51820 + TCP 80/443 open on the
-  WAN (SSH 22, the NPM admin UI 81, Paperless 28981 and NFS 2049 stay off the
-  WAN).
+  WAN (SSH 22, the NPM admin UI 81, Paperless 28981, DNS 53 and NFS 2049 stay off
+  the WAN).
 - **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
@@ -188,6 +234,15 @@ Worth knowing:
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
   runner is enabled, `systemctl status gitea-runner-forgejo` plus a trivial
   `.forgejo/workflows/hello.yml` in a scratch repo proves the podman job path.
+- **Internal DNS:** `systemctl status blocky`; `ss -lunp | grep :53` lists
+  `127.0.0.1`, `192.168.178.96` and `10.100.0.1` — and **not** `0.0.0.0`, which
+  is what leaves `10.88.0.1:53` to podman's aardvark-dns (`podman ps` still has
+  to work). From a LAN client: `dig +short @192.168.178.96 git.mauderer.work`
+  answers `192.168.178.96` (split horizon), and a tracker domain such as
+  `dig +short @192.168.178.96 googlesyndication.com` answers `0.0.0.0`.
+  `journalctl -u blocky | grep 'group import finished'` shows both lists loaded
+  (~200k + ~380k entries); they download after start, so a fresh boot blocks
+  nothing for a few seconds — by design, the resolver never waits on them.
 - **Paperless:** `systemctl status paperless-web` and `curl -fsS -o /dev/null -w
   '%{http_code}\n' http://10.100.0.1:28981/accounts/login/` (expect `200`); the
   port must answer over the VPN and **not** from the LAN or the WAN. Copy a PDF

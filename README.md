@@ -11,7 +11,7 @@ a NixOS module, so one `nixos-rebuild switch` updates system and home together.
 | `private-laptop` | Media + light dev            | Intel iGPU     | default            | pilot; LUKS; waydroid                  |
 | `work-laptop`    | Heavy dev                    | Intel iGPU     | default            | LUKS; wireguard; CI-gated `release` channel |
 | `desktop`        | Gaming + dev                 | AMD dGPU       | **CachyOS** (chaotic-nyx) | gaming stack; LUKS; waydroid |
-| `home-server`    | Headless services            | —              | LTS                | ZFS, NFS, WireGuard server, no GUI     |
+| `home-server`    | Headless services            | —              | LTS                | ZFS, NFS, WireGuard + DNS server, no GUI |
 
 Each host has its own docs: `hosts/<name>/README.md` (what the machine is) and
 `hosts/<name>/INSTALL.md` (how to install it).

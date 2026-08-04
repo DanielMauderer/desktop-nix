@@ -123,3 +123,17 @@ matters lives here; the rest is in the Nix code and `git log`.
   drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: three
   service oneshots create siblings there with no ordering between them, so a
   group-owned `0750` parent can only work for one of them.
+- **Internal DNS = native `services.blocky`, blocklists at runtime, no wildcard
+  bind** — home-server. Chosen over Pi-hole / AdGuard Home / Technitium because
+  it is the only one whose entire configuration is this Nix file: the others keep
+  theirs in a mutable store behind a web UI, and the NixOS module additionally
+  runs `blocky validate` at build time, so a broken resolver fails
+  `nix flake check` instead of the LAN. `:53` is bound on the loopback, LAN and
+  VPN addresses **by name, never `0.0.0.0`** — podman's aardvark-dns owns `:53`
+  on every container bridge gateway, and a wildcard bind takes those and breaks
+  container networking; `ports.freeBind` is what lets it bind the DHCP and wg0
+  addresses before they exist, so the resolver needs no ordering against the
+  network. Upstream is DNS-over-TLS (Cloudflare + Quad9) with `bootstrapDns` for
+  the two resolver names; blocklists are fetched at runtime, not pinned as a
+  flake input, and both loading strategies are `fast` so DNS for the whole house
+  never waits on the WAN.
