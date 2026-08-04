@@ -532,13 +532,19 @@
             # Load-bearing, not cosmetic: podman's aardvark-dns binds :53 on the
             # gateway of every DNS-enabled container network, so a wildcard bind
             # here means container networks fail to come up with EADDRINUSE.
-            name = "blocky binds named addresses, never the :53 wildcard";
+            # Blocky spells a wildcard four ways — `53`, `:53`, `0.0.0.0:53` and
+            # `[::]:53` — so this is an exact match on the intended addresses
+            # rather than a pattern that has to anticipate all of them.
+            name = "blocky binds exactly the loopback, LAN and VPN addresses on :53";
             assertion =
               let
                 binds = lib.splitString "," (toString cfg.services.blocky.settings.ports.dns);
               in
-              binds != [ ]
-              && lib.all (b: lib.hasSuffix ":53" b && !(lib.hasPrefix "0.0.0.0" b)) binds
+              binds == [
+                "127.0.0.1:53"
+                "192.168.178.96:53"
+                "10.100.0.1:53"
+              ]
               # Two of those addresses appear after blocky does (DHCP lease, wg0).
               && cfg.services.blocky.settings.ports.freeBind;
           }
@@ -570,13 +576,18 @@
           }
           {
             # DNS for the whole house is on this unit's critical path: it must
-            # come up whether or not the WAN and the list sources answer.
+            # come up whether or not the WAN and the list sources answer — and,
+            # because the lists are cached on disk, it comes up *blocking*
+            # rather than empty. Without the cache the two `fast` strategies
+            # would mean a WAN-less boot serves everything, ads included.
             name = "blocky starts without waiting on upstreams or list downloads";
             assertion =
               let
                 s = cfg.services.blocky.settings;
               in
-              s.upstreams.init.strategy == "fast" && s.blocking.loading.strategy == "fast";
+              s.upstreams.init.strategy == "fast"
+              && s.blocking.loading.strategy == "fast"
+              && lib.hasPrefix "/var/lib/blocky/" s.blocking.loading.downloads.cachePath;
           }
           {
             name = "the box itself resolves through blocky";
@@ -725,6 +736,12 @@
       # `ports.freeBind` is there for, so leaving them makes the test prove it.
       # Entries are wildcards because a bare domain in a blocky list matches only
       # itself — the real lists are HaGeZi's wildcard flavour for that reason.
+      #
+      # `ads` also keeps one *downloaded* source, served by the VM to itself, so
+      # the test covers the path the real lists take: fetch, then cache under the
+      # StateDirectory. That the download fails at boot (the server starts later)
+      # is deliberate — it is the WAN-less boot, and the inline entries still
+      # have to work.
       blockyTestNode = {
         imports = [ ./modules/nixos/server/dns.nix ];
         services.blocky.settings.blocking.denylists = lib.mkForce {
@@ -732,6 +749,7 @@
             ''
               *.blocked-ad.example
             ''
+            "http://127.0.0.1:8080/extra.txt"
           ];
           threats = [
             ''
@@ -742,6 +760,7 @@
         environment.systemPackages = [
           pkgs.curl
           pkgs.dnsutils
+          pkgs.python3
         ];
       };
     in
@@ -1353,12 +1372,16 @@
             machine.wait_for_open_port(53, "127.0.0.1")
 
             # freeBind: the DHCP lease and wg0 are both absent here, yet the
-            # listeners exist. The wildcard must not be among them — podman's
-            # aardvark-dns needs :53 free on the container bridge gateways.
-            listeners = machine.succeed("ss -lun")
-            for addr in ["127.0.0.1:53", "192.168.178.96:53", "10.100.0.1:53"]:
-                assert addr in listeners, f"{addr} not listening:\n{listeners}"
-            assert "0.0.0.0:53" not in listeners, listeners
+            # listeners exist — on UDP and on TCP, which real resolvers need for
+            # answers too long for a datagram. No wildcard, in any of its
+            # spellings: podman's aardvark-dns needs :53 free on the container
+            # bridge gateways, and `[::]` would take the v4 ones too.
+            for proto in ["-lun", "-ltn"]:
+                listeners = machine.succeed(f"ss {proto}")
+                for addr in ["127.0.0.1:53", "192.168.178.96:53", "10.100.0.1:53"]:
+                    assert addr in listeners, f"{addr} not listening ({proto}):\n{listeners}"
+                for wildcard in ["0.0.0.0:53", "[::]:53", "*:53"]:
+                    assert wildcard not in listeners, f"{wildcard} bound ({proto}):\n{listeners}"
 
             # Local names, answered without an upstream to ask.
             assert machine.succeed("dig +short @127.0.0.1 home-server.lan").strip() == "192.168.178.96"
@@ -1379,6 +1402,23 @@
             api = machine.succeed("ss -ltn")
             assert "127.0.0.1:4001" in api, api
             assert "0.0.0.0:4001" not in api, api
+
+            # A downloaded source, from a server that was not up at boot — so
+            # this is also the `blocky lists refresh` path from INSTALL.md. The
+            # list has to end up cached under the StateDirectory, which is the
+            # only writable path the unit has (DynamicUser + ProtectSystem
+            # strict) and what makes a WAN-less boot still block.
+            machine.succeed("mkdir -p /tmp/lists && echo '*.cached-ad.example' > /tmp/lists/extra.txt")
+            machine.succeed(
+                "cd /tmp/lists && (setsid python3 -m http.server 8080 >/dev/null 2>&1 &)"
+            )
+            machine.wait_for_open_port(8080)
+            machine.succeed("blocky --apiPort 4001 lists refresh")
+
+            assert machine.succeed("dig +short @127.0.0.1 cached-ad.example").strip() == "0.0.0.0"
+            # The inline entries survived a source that failed at boot.
+            assert machine.succeed("dig +short @127.0.0.1 blocked-ad.example").strip() == "0.0.0.0"
+            machine.succeed("test -n \"$(ls -A /var/lib/blocky/lists)\"")
           '';
         };
 

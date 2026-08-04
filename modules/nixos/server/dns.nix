@@ -27,10 +27,11 @@
 # of every name this house looks up. `bootstrapDns` carries those two resolvers'
 # IPs, which is what keeps that from being circular.
 #
-# The blocklists are fetched at runtime — into memory, with a cached copy under
-# the unit's StateDirectory — never into the Nix store. That keeps a multi-megabyte
-# moving target out of the flake and lets a refresh happen without a rebuild,
-# at the cost of the lists being the one part of this file that is not pinned.
+# The blocklists are fetched at runtime and cached under the unit's
+# StateDirectory (see `loading.downloads.cachePath`), never into the Nix store.
+# That keeps a multi-megabyte moving target out of the flake and lets a refresh
+# happen without a rebuild, at the cost of the lists being the one part of this
+# file that is not pinned.
 { config, lib, ... }:
 let
   # EDIT to match your network. Same LAN as nfs.nix/forgejo.nix, same VPN subnet
@@ -53,6 +54,10 @@ let
 
   dnsPort = 53;
   apiPort = 4001;
+
+  # `StateDirectory = "blocky"` in the upstream unit; the only writable path the
+  # service has (it runs DynamicUser under ProtectSystem = strict).
+  stateDir = "/var/lib/blocky";
 in
 {
   services.blocky = {
@@ -163,6 +168,15 @@ in
           strategy = "fast";
           maxErrorsPerSource = 5;
           downloads = {
+            # Keep a copy of every downloaded list under the unit's
+            # StateDirectory. Without it blocky is stateless and `strategy =
+            # fast` means a boot with no WAN comes up blocking *nothing* until
+            # the downloads land; with it the lists are already there, and a
+            # refresh that finds a source unreachable falls back to the copy on
+            # disk instead of dropping the group. It also makes the daily
+            # refresh conditional (If-None-Match), so an unchanged list is not
+            # re-fetched.
+            cachePath = "${stateDir}/lists";
             timeout = "60s";
             attempts = 5;
             cooldown = "10s";

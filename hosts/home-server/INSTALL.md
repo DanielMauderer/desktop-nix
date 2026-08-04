@@ -241,8 +241,9 @@ back to it.
   answers `192.168.178.96` (split horizon), and a tracker domain such as
   `dig +short @192.168.178.96 googlesyndication.com` answers `0.0.0.0`.
   `journalctl -u blocky | grep 'group import finished'` shows both lists loaded
-  (~200k + ~380k entries); they download after start, so a fresh boot blocks
-  nothing for a few seconds — by design, the resolver never waits on them.
+  (~200k + ~380k entries). They load in the background rather than delaying
+  start-up, seeded from the on-disk cache in `/var/lib/blocky/lists` — so only
+  the very first boot, before that cache exists, serves briefly without them.
 - **Paperless:** `systemctl status paperless-web` and `curl -fsS -o /dev/null -w
   '%{http_code}\n' http://10.100.0.1:28981/accounts/login/` (expect `200`); the
   port must answer over the VPN and **not** from the LAN or the WAN. Copy a PDF
