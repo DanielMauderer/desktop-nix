@@ -441,6 +441,66 @@
             name = "Actions runner (when enabled) runs as a host service";
             assertion = cfg.services.forgejoRunner.enable -> (cfg.systemd.services ? gitea-runner-forgejo);
           }
+          {
+            name = "Paperless enabled on the SQLite backend";
+            assertion = cfg.services.paperless.enable && !cfg.services.paperless.database.createLocally;
+          }
+          {
+            # The whole point of the archive's exposure design: it is admitted on
+            # the VPN interface only. The "WAN TCP surface is exactly 80/443"
+            # assertion above is the other half — it keeps :28981 out of the
+            # globally-open set.
+            name = "Paperless admitted only on the wg0 VPN interface, never the WAN";
+            assertion =
+              let
+                inherit (cfg.services.paperless) port;
+              in
+              builtins.elem port cfg.networking.firewall.interfaces.wg0.allowedTCPPorts
+              && !(builtins.elem port cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            # Unlike Forgejo there is no public hostname for the archive: no
+            # nginx vhost, no NPM proxy host, nothing for TLS to terminate on.
+            # Adding one would silently undo the VPN-only property.
+            name = "Paperless is not published through a reverse proxy";
+            assertion = !cfg.services.paperless.configureNginx && cfg.services.paperless.domain == null;
+          }
+          {
+            # The user's stated constraint: the 3000 range is already taken.
+            name = "Paperless avoids the reserved 3000-3010 port range";
+            assertion =
+              let
+                inherit (cfg.services.paperless) port;
+              in
+              port < 3000 || port > 3010;
+          }
+          {
+            name = "Paperless state, media and exports live on the redundant ZFS pool";
+            assertion =
+              let
+                p = cfg.services.paperless;
+              in
+              lib.hasPrefix "/hdd_pool_1/" p.dataDir
+              && lib.hasPrefix "/hdd_pool_1/" p.mediaDir
+              && p.exporter.enable
+              && lib.hasPrefix "/hdd_pool_1/" p.exporter.directory;
+          }
+          {
+            # The drop folder has to sit inside the NFS export from nfs.nix, or
+            # clients have no way to put documents in.
+            name = "Paperless consumption dir is inside the NFS-exported share";
+            assertion = lib.hasPrefix "/hdd_pool_1/share/" cfg.services.paperless.consumptionDir;
+          }
+          {
+            # Guards the ordering fix: without this oneshot the paperless units
+            # race zfs-mount.service and fail 226/NAMESPACE on a missing dir.
+            name = "Paperless directories are created after the ZFS pool is mounted";
+            assertion =
+              let
+                unit = cfg.systemd.services.paperless-data-dirs or null;
+              in
+              unit != null && builtins.elem "zfs-mount.service" unit.after;
+          }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -495,6 +555,72 @@
         virtualisation = {
           memorySize = 2048;
           diskSize = 4096;
+        };
+      };
+
+      # Private half of the &test_fixture recipient in .sops.yaml. It guards
+      # nothing real — it decrypts only secrets/fixtures/*, which hold a known
+      # sentinel — so committing it is deliberate. Shared by test-secrets and
+      # test-paperless.
+      testAgeKey = "AGE-SECRET-KEY-1ZTVVG7CHXYCL2JLJ6ADJ3JDMQ32AQPEWHHYNZ3E9MVM7KA6QZQFQC2JGGK";
+
+      # Paperless test node: the paperless module on its own, for the same reason
+      # forgejoTestNode exists. The pool paths can't be had in a VM, so they are
+      # redirected to /var/lib and the ZFS oneshot is dropped — its ordering is
+      # what the host assertions cover.
+      #
+      # The sops secret is redirected to the test fixture rather than forced away:
+      # `services.paperless.passwordFile` reads it, and `lib.mkForce null` cannot
+      # rescue that — the module system evaluates every definition's value to read
+      # its priority, so a missing `sops.secrets` attr throws before the override
+      # is ever applied. Pointing it at the fixture keeps the admin-creation path
+      # exercised for real instead of stubbed out.
+      paperlessTestNode = {
+        imports = [
+          inputs.sops-nix.nixosModules.sops
+          ./modules/nixos/server/paperless.nix
+        ];
+
+        environment.etc."test-age-key.txt" = {
+          text = testAgeKey + "\n";
+          mode = "0400";
+        };
+
+        sops = {
+          # The VM's fresh host key is not a fixture recipient; use the injected
+          # test identity instead (same override as test-secrets).
+          age = {
+            sshKeyPaths = lib.mkForce [ ];
+            keyFile = "/etc/test-age-key.txt";
+          };
+          gnupg.sshKeyPaths = lib.mkForce [ ];
+          secrets.paperless-admin-password = {
+            sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+            key = "fixture_secret";
+          };
+        };
+
+        services.paperless = {
+          dataDir = lib.mkForce "/var/lib/paperless";
+          mediaDir = lib.mkForce "/var/lib/paperless/media";
+          consumptionDir = lib.mkForce "/var/lib/paperless/consume";
+          exporter.directory = lib.mkForce "/var/lib/paperless/export";
+        };
+        # Not `enable = false`: a disabled unit is *masked* (symlinked to
+        # /dev/null) while its requiredBy symlinks are still emitted, so all six
+        # paperless units would Require a masked unit and refuse to start.
+        # Clearing the edges leaves it defined but unreferenced, and upstream's
+        # tmpfiles rules create the /var/lib paths this node uses instead.
+        systemd.services.paperless-data-dirs = {
+          requires = lib.mkForce [ ];
+          after = lib.mkForce [ ];
+          before = lib.mkForce [ ];
+          requiredBy = lib.mkForce [ ];
+        };
+        environment.systemPackages = [ pkgs.curl ];
+        virtualisation = {
+          memorySize = 4096;
+          diskSize = 8192;
         };
       };
     in
@@ -1052,6 +1178,48 @@
           '';
         };
 
+        # Paperless: the stack comes up (redis, scheduler, workers, web), the UI
+        # answers on :28981, and the generated environment carries the settings
+        # the design depends on (German+English OCR, the VPN URL that populates
+        # CSRF_TRUSTED_ORIGINS, and no local postgres).
+        test-paperless = testLib.makeTest {
+          name = "paperless";
+          nodes.machine = paperlessTestNode;
+          testScript = ''
+            machine.wait_for_unit("redis-paperless.service")
+            machine.wait_for_unit("paperless-scheduler.service")
+            machine.wait_for_unit("paperless-web.service")
+            machine.wait_for_open_port(28981)
+
+            # The login page renders. ALLOWED_HOSTS stays ["*"], so reaching it
+            # over localhost works even though PAPERLESS_URL names the VPN
+            # address — the URL only feeds CSRF/CORS.
+            machine.succeed(
+                "test $(curl -fsSL -o /dev/null -w '%{http_code}' http://localhost:28981/accounts/login/) = 200"
+            )
+
+            # Consumer and task queue are part of the stack, not optional extras.
+            machine.wait_for_unit("paperless-consumer.service")
+            machine.wait_for_unit("paperless-task-queue.service")
+
+            # Settings that the archive's behaviour depends on.
+            env = machine.succeed("systemctl show -p Environment paperless-web.service")
+            assert "PAPERLESS_OCR_LANGUAGE=deu+eng" in env, env
+            assert "PAPERLESS_URL=http://10.100.0.1:28981" in env, env
+            # SQLite, not postgres: no DBENGINE override is emitted.
+            assert "PAPERLESS_DBENGINE" not in env, env
+
+            # The exporter is wired as a timer-driven unit.
+            machine.succeed("systemctl cat paperless-exporter.service")
+            machine.succeed("systemctl list-timers --all | grep -q paperless-exporter")
+
+            # passwordFile reached the scheduler as a credential and the admin
+            # account was created from it — the sops path, exercised end to end.
+            machine.succeed("test -e /run/secrets/paperless-admin-password")
+            machine.succeed("grep -q '^admin:' /var/lib/paperless/superuser-state")
+          '';
+        };
+
         # Virtualisation: libvirtd up, maudi reaches qemu:///system via group
         # socket access, default NAT network defined+autostarting, clients
         # installed. Starting a guest needs nested KVM and is left to manual testing.
@@ -1161,86 +1329,82 @@
         # identity (its private half only decrypts secrets/fixtures/test.yaml).
         # Asserts the secret lands in /run/secrets with the right owner/mode and
         # that the plaintext is absent from the store.
-        test-secrets =
-          let
-            testAgeKey = "AGE-SECRET-KEY-1ZTVVG7CHXYCL2JLJ6ADJ3JDMQ32AQPEWHHYNZ3E9MVM7KA6QZQFQC2JGGK";
-          in
-          testLib.makeTest {
-            name = "secrets";
-            nodes.machine = {
-              imports = [
-                home-manager.nixosModules.home-manager
-                inputs.stylix.nixosModules.stylix
-                inputs.sops-nix.nixosModules.sops
-                ./hosts/private-laptop/default.nix
-              ];
-              _module.args.inputs = inputs;
-              home-manager = {
-                useGlobalPkgs = true;
-                useUserPackages = true;
-                extraSpecialArgs = { inherit inputs; };
-              };
+        test-secrets = testLib.makeTest {
+          name = "secrets";
+          nodes.machine = {
+            imports = [
+              home-manager.nixosModules.home-manager
+              inputs.stylix.nixosModules.stylix
+              inputs.sops-nix.nixosModules.sops
+              ./hosts/private-laptop/default.nix
+            ];
+            _module.args.inputs = inputs;
+            home-manager = {
+              useGlobalPkgs = true;
+              useUserPackages = true;
+              extraSpecialArgs = { inherit inputs; };
+            };
 
-              environment.etc."test-age-key.txt" = {
-                text = testAgeKey + "\n";
-                mode = "0400";
-              };
+            environment.etc."test-age-key.txt" = {
+              text = testAgeKey + "\n";
+              mode = "0400";
+            };
 
-              sops = {
-                # Override the production key source: the VM's fresh host key is
-                # not a fixture recipient. Use the injected test identity.
-                age = {
-                  sshKeyPaths = lib.mkForce [ ];
-                  keyFile = "/etc/test-age-key.txt";
+            sops = {
+              # Override the production key source: the VM's fresh host key is
+              # not a fixture recipient. Use the injected test identity.
+              age = {
+                sshKeyPaths = lib.mkForce [ ];
+                keyFile = "/etc/test-age-key.txt";
+              };
+              gnupg.sshKeyPaths = lib.mkForce [ ];
+
+              # Two secrets from the same fixture key: one root-owned, one
+              # user-owned, both 0400 so neither is world-readable.
+              secrets = {
+                fixture_secret = {
+                  sopsFile = ./secrets/fixtures/test.yaml;
+                  owner = "root";
+                  mode = "0400";
                 };
-                gnupg.sshKeyPaths = lib.mkForce [ ];
-
-                # Two secrets from the same fixture key: one root-owned, one
-                # user-owned, both 0400 so neither is world-readable.
-                secrets = {
-                  fixture_secret = {
-                    sopsFile = ./secrets/fixtures/test.yaml;
-                    owner = "root";
-                    mode = "0400";
-                  };
-                  fixture_user_secret = {
-                    sopsFile = ./secrets/fixtures/test.yaml;
-                    key = "fixture_secret";
-                    owner = "maudi";
-                    mode = "0400";
-                  };
+                fixture_user_secret = {
+                  sopsFile = ./secrets/fixtures/test.yaml;
+                  key = "fixture_secret";
+                  owner = "maudi";
+                  mode = "0400";
                 };
               };
             };
-            testScript = ''
-              machine.wait_for_unit("multi-user.target")
-
-              # Both secrets materialized at the canonical /run/secrets path and
-              # decrypt to the known sentinel.
-              machine.succeed("test -e /run/secrets/fixture_secret")
-              machine.succeed("grep -q 'sops-fixture-canary-7a3f' /run/secrets/fixture_secret")
-              machine.succeed("grep -q 'sops-fixture-canary-7a3f' /run/secrets/fixture_user_secret")
-
-              # Correct owner + mode (0400), so not world-readable.
-              machine.succeed("stat -c '%U %a' /run/secrets/fixture_secret | grep -qx 'root 400'")
-              machine.succeed("stat -c '%U %a' /run/secrets/fixture_user_secret | grep -qx 'maudi 400'")
-
-              # A non-owner, non-root user cannot read it (root bypasses mode, so
-              # assert via an unprivileged read attempt).
-              machine.fail("su nobody -s /bin/sh -c 'cat /run/secrets/fixture_secret'")
-
-              # Encrypted at rest: the only copy of the secret that lands in the
-              # store is the sops fixture, and it must be ciphertext — the
-              # plaintext sentinel must not appear in it. (We can't `grep -r` all
-              # of /nix/store: a nixosTest shares the host store with the guest,
-              # and the test-driver script itself contains this sentinel.)
-              machine.fail("grep -q 'sops-fixture-canary-7a3f' ${./secrets/fixtures/test.yaml}")
-
-              # Decrypted only onto tmpfs at activation: the secret resolves
-              # under /run (sops-nix's tmpfs), never to a persistent store path.
-              machine.succeed("readlink -f /run/secrets/fixture_secret | grep -q '^/run/'")
-            '';
           };
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+
+            # Both secrets materialized at the canonical /run/secrets path and
+            # decrypt to the known sentinel.
+            machine.succeed("test -e /run/secrets/fixture_secret")
+            machine.succeed("grep -q 'sops-fixture-canary-7a3f' /run/secrets/fixture_secret")
+            machine.succeed("grep -q 'sops-fixture-canary-7a3f' /run/secrets/fixture_user_secret")
+
+            # Correct owner + mode (0400), so not world-readable.
+            machine.succeed("stat -c '%U %a' /run/secrets/fixture_secret | grep -qx 'root 400'")
+            machine.succeed("stat -c '%U %a' /run/secrets/fixture_user_secret | grep -qx 'maudi 400'")
+
+            # A non-owner, non-root user cannot read it (root bypasses mode, so
+            # assert via an unprivileged read attempt).
+            machine.fail("su nobody -s /bin/sh -c 'cat /run/secrets/fixture_secret'")
+
+            # Encrypted at rest: the only copy of the secret that lands in the
+            # store is the sops fixture, and it must be ciphertext — the
+            # plaintext sentinel must not appear in it. (We can't `grep -r` all
+            # of /nix/store: a nixosTest shares the host store with the guest,
+            # and the test-driver script itself contains this sentinel.)
+            machine.fail("grep -q 'sops-fixture-canary-7a3f' ${./secrets/fixtures/test.yaml}")
+
+            # Decrypted only onto tmpfs at activation: the secret resolves
+            # under /run (sops-nix's tmpfs), never to a persistent store path.
+            machine.succeed("readlink -f /run/secrets/fixture_secret | grep -q '^/run/'")
+          '';
+        };
       };
 
       nixosConfigurations = hosts;

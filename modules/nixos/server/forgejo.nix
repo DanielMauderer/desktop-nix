@@ -152,14 +152,21 @@ in
     # Unlike NPM — a rootful container, which ignores these bits — forgejo runs
     # unprivileged, so it needs search (x) on *every* parent to reach the dump
     # directory. `mkdir -p` would leave the parents root:root 0750, which locks
-    # it out. Group-ownership is the durable fix: npm-data-dirs also chmods the
-    # shared `services` dir and the two units have no ordering between them, so
-    # a mode tweak there could be undone, whereas nothing chowns it.
+    # it out.
+    #
+    # /hdd_pool_1/services is shared with npm and paperless, whose oneshots also
+    # touch it with no ordering between the three, so they must agree on the
+    # result or the last one to run locks the others out. The agreed state is
+    # root:root 0755 — world-*traversable* so each unprivileged service can reach
+    # its own directory, while the subtrees stay 0750 and owned by their service.
+    # Claiming the shared dir for one group (it used to be root:forgejo 0750)
+    # cannot work once a second unprivileged service wants the same parent.
     script = ''
       mkdir -p /hdd_pool_1/services/forgejo/dump
-      chown root:forgejo /hdd_pool_1/services /hdd_pool_1/services/forgejo
+      chmod 0755 /hdd_pool_1/services
+      chown root:forgejo /hdd_pool_1/services/forgejo
       chown forgejo:forgejo /hdd_pool_1/services/forgejo/dump
-      chmod 0750 /hdd_pool_1/services /hdd_pool_1/services/forgejo /hdd_pool_1/services/forgejo/dump
+      chmod 0750 /hdd_pool_1/services/forgejo /hdd_pool_1/services/forgejo/dump
     '';
   };
 }
