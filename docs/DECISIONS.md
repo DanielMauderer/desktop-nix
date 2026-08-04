@@ -112,3 +112,14 @@ matters lives here; the rest is in the Nix code and `git log`.
   token scoped to the zone. Requires IPv6 privacy
   extensions off (`networking.tempAddresses = "disabled"`), otherwise the
   discovered address is a rotating temporary one.
+- **Document archive = native `services.paperless`, SQLite, VPN-only** —
+  home-server. `:28981` is admitted on `wg0` only and deliberately *not* given an
+  NPM proxy host, so unlike Forgejo it has no WAN surface: a paper archive is the
+  one service here with no reason to be public. All of it — database, search
+  index, media and the nightly `document_exporter` — lives on the ZFS pool, not
+  split SSD/pool like Forgejo, because the documents are irreplaceable and the
+  workload isn't latency-bound. The consumption folder sits inside the NFS export
+  (`/hdd_pool_1/share/paperless-inbox`) so any client that mounts the share has a
+  drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: three
+  service oneshots create siblings there with no ordering between them, so a
+  group-owned `0750` parent can only work for one of them.

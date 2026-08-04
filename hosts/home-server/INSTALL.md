@@ -130,7 +130,45 @@ Two limits worth knowing:
   "WAN surface is exactly 80/443/51820" assertion. It has no size limit, so it's
   the escape hatch for big pushes.
 
-## 6. Verify
+## 6. Paperless (the document archive)
+
+Paperless comes up with the rest of the system — there is no bootstrap step and
+nothing to publish. Unlike Forgejo it is **VPN-only by design**: do *not* add a
+proxy host for it in NPM, that is what would give it a WAN surface.
+
+1. **Log in.** With the VPN up, browse `http://10.100.0.1:28981`. The user is
+   `admin`; the password is the sops secret created with the repo:
+   ```sh
+   nix develop
+   sops -d secrets/home-server/paperless.yaml   # read it
+   sops secrets/home-server/paperless.yaml      # change it
+   ```
+   The password is applied on every start, so a `switch` after editing is enough
+   to rotate it — the key is `paperless-admin-password`, a **bare** password (no
+   `KEY=` prefix, unlike the Forgejo runner token).
+2. **Drop documents in.** The consumption folder is `/hdd_pool_1/share/
+   paperless-inbox`, inside the NFS export — so on a client that mounts the
+   share it is `/mnt/home-server/paperless-inbox`. Anything copied there is
+   OCR'd and filed within a minute, then removed from the inbox. Scanners that
+   can write to an NFS/SMB share can target it directly.
+3. **Filed documents** land under `/hdd_pool_1/services/paperless/media` as
+   `{created_year}/{correspondent}/{title}`, so the archive stays navigable
+   without the database. OCR runs in German and English.
+
+Worth knowing:
+
+- **Backups.** `systemctl list-timers paperless-exporter` shows the nightly
+  01:30 export into `/hdd_pool_1/services/paperless/export` — documents plus
+  metadata as files and JSON, restorable with `paperless-manage
+  document_importer`, and independent of the SQLite schema. It stops the
+  paperless services while it runs and restarts them after.
+- **The inbox is world-writable** (mode 0777, no sticky bit) so NFS clients can
+  write to it and paperless can delete what it has consumed. It is a transient
+  drop folder — nothing should be stored there.
+- `paperless-manage` is on `PATH` on the server for admin tasks
+  (`paperless-manage createsuperuser`, `document_exporter`, …).
+
+## 7. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -139,7 +177,8 @@ Two limits worth knowing:
   (host key pinned).
 - `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
   the export; `nft list ruleset` shows only UDP 51820 + TCP 80/443 open on the
-  WAN (SSH 22, the NPM admin UI 81 and NFS 2049 stay off the WAN).
+  WAN (SSH 22, the NPM admin UI 81, Paperless 28981 and NFS 2049 stay off the
+  WAN).
 - **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
@@ -149,5 +188,10 @@ Two limits worth knowing:
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
   runner is enabled, `systemctl status gitea-runner-forgejo` plus a trivial
   `.forgejo/workflows/hello.yml` in a scratch repo proves the podman job path.
+- **Paperless:** `systemctl status paperless-web` and `curl -fsS -o /dev/null -w
+  '%{http_code}\n' http://10.100.0.1:28981/accounts/login/` (expect `200`); the
+  port must answer over the VPN and **not** from the LAN or the WAN. Copy a PDF
+  into `/hdd_pool_1/share/paperless-inbox` and watch `journalctl -u
+  paperless-consumer -f` ingest it.
 - Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.

@@ -12,8 +12,15 @@ Everything here is deliberately absent from the workstation `base`.
 | `containers.nix`   | Container-host groundwork for docker-compose / Ansible services. |
 | `forgejo.nix`      | **Self-hosted forge** (`services.forgejo`, SQLite, LFS), served as `https://git.mauderer.work` through NPM. HTTP `:4000` admitted only from the podman bridge (the proxy) and the VPN (admin access at `http://10.100.0.1:4000`), built-in git-SSH `:2222` only from LAN/VPN — no new WAN ports. Self-registration off, Actions on, `DEFAULT_ACTIONS_URL = github`, push mirroring on (GitHub is the backup target). State on the SSD; nightly `forgejo dump` to `/hdd_pool_1/services/forgejo/dump`. |
 | `forgejo-runner.nix`| **Forgejo Actions runner** (`services.forgejoRunner`, **opt-in**, default off). Jobs run as podman containers via `forgejo-runner`. Registration token is a sops secret (`secrets/home-server/forgejo.yaml`, key `forgejo-runner-token`, **`TOKEN=…` env-file format**). Runs as a host service holding the rootful podman socket — root-equivalent, hence single-user-forge only. |
+| `paperless.nix`    | **Document archive** (`services.paperless`, SQLite, OCR `deu+eng`). HTTP `:28981` admitted **only on `wg0`** — deliberately *not* published through NPM, so it has no WAN surface at all (`http://10.100.0.1:28981`). All state, media and the nightly `document_exporter` run live on the ZFS pool under `/hdd_pool_1/services/paperless`; the drop folder is `/hdd_pool_1/share/paperless-inbox`, inside the NFS export. Admin password is a sops secret (`secrets/home-server/paperless.yaml`, key `paperless-admin-password`, **bare password**). |
 | `zfs.nix`          | Imports the pre-existing **ZFS data pool** (`extraPools`, `hdd_pool_1`) on the RAID LUN; monthly scrub. OS lives on a separate ext4 SSD. |
 | `nfs.nix`          | NFSv4 export of `/hdd_pool_1/share` to the LAN + VPN subnets only (edit `lanSubnet`). |
 
 The OS-disk layout is in `hosts/home-server/disk.nix`; the ZFS `hostId` is in
 `hosts/home-server/hardware.nix`.
+
+`/hdd_pool_1/services` is shared by `reverse-proxy.nix`, `forgejo.nix` and
+`paperless.nix`. Their three directory-creating oneshots have no ordering between
+them, so they all leave that parent as `root:root 0755` — traversable, so each
+unprivileged service reaches its own subtree, which stays `0750`. Changing that
+mode in one module without the others locks a service out of its own data.

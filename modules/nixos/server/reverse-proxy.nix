@@ -66,9 +66,15 @@ _: {
       Type = "oneshot";
       RemainAfterExit = true;
     };
+    # 0755 on the shared `services` parent, not 0750: forgejo-dump-dirs and
+    # paperless-data-dirs create sibling directories there with no ordering
+    # between the three units, so all of them must leave the parent in the same
+    # state. Traversable-but-not-writable lets each unprivileged service reach
+    # its own subtree; the subtrees themselves stay 0750.
     script = ''
       mkdir -p /hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/letsencrypt
-      chmod 0750 /hdd_pool_1/services /hdd_pool_1/services/npm
+      chmod 0755 /hdd_pool_1/services
+      chmod 0750 /hdd_pool_1/services/npm
     '';
   };
 

@@ -7,6 +7,7 @@ _: {
     ./containers.nix
     ./forgejo.nix
     ./forgejo-runner.nix
+    ./paperless.nix
     ./zfs.nix
     ./nfs.nix
   ];
