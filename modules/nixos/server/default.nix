@@ -4,6 +4,7 @@ _: {
     ./wireguard.nix
     ./reverse-proxy.nix
     ./cloudflare-ddns.nix
+    ./dns.nix
     ./containers.nix
     ./forgejo.nix
     ./forgejo-runner.nix

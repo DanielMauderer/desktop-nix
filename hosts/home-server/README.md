@@ -17,6 +17,8 @@ Headless services host — the only non-desktop machine. Install guide:
   git-SSH on 2222, LAN/VPN only) with an opt-in **Actions runner** that executes
   jobs as podman containers, a **Paperless-ngx document archive** (VPN-only on
   `10.100.0.1:28981`, never proxied; data on the pool, inbox on the NFS share),
+  the **internal DNS** (blocky — network-wide ad/tracker blocking, the LAN's
+  local names, DNS-over-TLS upstreams; `:53` on the LAN and VPN addresses only),
   and the container groundwork for docker-compose / Ansible-managed services.
   WAN surface is exactly UDP 51820 + TCP 80/443.
 - **Disk:** disko SSD root; ZFS data pool on the HBA drives.

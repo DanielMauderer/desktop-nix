@@ -501,6 +501,109 @@
               in
               unit != null && builtins.elem "zfs-mount.service" unit.after;
           }
+          {
+            name = "Blocky is the LAN's DNS resolver";
+            assertion = cfg.services.blocky.enable;
+          }
+          {
+            # The other half of the "WAN TCP surface is exactly 80/443" guard,
+            # for the protocol DNS actually runs on: a resolver reachable from
+            # the WAN is an amplification reflector, so :53 is admitted by
+            # source-restricted rules and never globally.
+            name = "DNS (:53) admitted only from the LAN and the VPN, never the WAN";
+            assertion =
+              let
+                rules = cfg.networking.firewall.extraInputRules;
+                admitted = proto: "ip saddr { 192.168.178.0/24, 10.100.0.0/24 } ${proto} dport 53 accept";
+              in
+              !(builtins.elem 53 cfg.networking.firewall.allowedUDPPorts)
+              && !(builtins.elem 53 cfg.networking.firewall.allowedTCPPorts)
+              && lib.hasInfix (admitted "udp") rules
+              && lib.hasInfix (admitted "tcp") rules;
+          }
+          {
+            # Stated as an exact match for the same reason as the TCP one: UDP
+            # 51820 is the WireGuard endpoint and nothing else belongs here.
+            name = "WAN UDP surface is exactly 51820";
+            assertion =
+              lib.unique (builtins.sort (a: b: a < b) cfg.networking.firewall.allowedUDPPorts) == [ 51820 ];
+          }
+          {
+            # Load-bearing, not cosmetic: podman's aardvark-dns binds :53 on the
+            # gateway of every DNS-enabled container network, so a wildcard bind
+            # here means container networks fail to come up with EADDRINUSE.
+            # Blocky spells a wildcard four ways — `53`, `:53`, `0.0.0.0:53` and
+            # `[::]:53` — so this is an exact match on the intended addresses
+            # rather than a pattern that has to anticipate all of them.
+            name = "blocky binds exactly the loopback, LAN and VPN addresses on :53";
+            assertion =
+              let
+                binds = lib.splitString "," (toString cfg.services.blocky.settings.ports.dns);
+              in
+              binds == [
+                "127.0.0.1:53"
+                "192.168.178.96:53"
+                "10.100.0.1:53"
+              ]
+              # Two of those addresses appear after blocky does (DHCP lease, wg0).
+              && cfg.services.blocky.settings.ports.freeBind;
+          }
+          {
+            # No authentication of its own, and it can turn blocking off.
+            name = "blocky's REST API is loopback-only";
+            assertion = lib.hasPrefix "127.0.0.1:" (toString cfg.services.blocky.settings.ports.http);
+          }
+          {
+            name = "upstream queries leave over DNS-over-TLS, with bootstrap IPs";
+            assertion =
+              let
+                s = cfg.services.blocky.settings;
+              in
+              lib.all (u: lib.hasPrefix "tcp-tls:" u) s.upstreams.groups.default && s.bootstrapDns != [ ];
+          }
+          {
+            # A denylist group nothing references blocks nothing — an easy way to
+            # add a list and silently have it do no work.
+            name = "every blocklist is applied to the default client group";
+            assertion =
+              let
+                b = cfg.services.blocky.settings.blocking;
+              in
+              b.denylists != { }
+              && lib.all (group: builtins.elem group b.clientGroupsBlock.default) (
+                builtins.attrNames b.denylists
+              );
+          }
+          {
+            # DNS for the whole house is on this unit's critical path: it must
+            # come up whether or not the WAN and the list sources answer — and,
+            # because the lists are cached on disk, it comes up *blocking*
+            # rather than empty. Without the cache the two `fast` strategies
+            # would mean a WAN-less boot serves everything, ads included.
+            name = "blocky starts without waiting on upstreams or list downloads";
+            assertion =
+              let
+                s = cfg.services.blocky.settings;
+              in
+              s.upstreams.init.strategy == "fast"
+              && s.blocking.loading.strategy == "fast"
+              && lib.hasPrefix "/var/lib/blocky/" s.blocking.loading.downloads.cachePath;
+          }
+          {
+            name = "the box itself resolves through blocky";
+            assertion = cfg.networking.resolvconf.useLocalResolver;
+          }
+          {
+            # Split horizon: the forge's public name answers with the LAN address
+            # inside the house, and filterUnmappedTypes is what stops a
+            # dual-stack client from taking the public AAAA instead.
+            name = "the forge's public name resolves to the LAN address on the LAN";
+            assertion =
+              let
+                c = cfg.services.blocky.settings.customDNS;
+              in
+              (c.mapping."git.mauderer.work" or null) == "192.168.178.96" && c.filterUnmappedTypes;
+          }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -622,6 +725,43 @@
           memorySize = 4096;
           diskSize = 8192;
         };
+      };
+
+      # Blocky test node: the dns module on its own, for the same reason
+      # forgejoTestNode exists. Only the blocklists are redirected — to inline
+      # literals, so the VM blocks a known name without reaching the internet.
+      #
+      # The listener addresses are deliberately *not* redirected: 192.168.178.96
+      # and 10.100.0.1 don't exist in the VM either, which is exactly the case
+      # `ports.freeBind` is there for, so leaving them makes the test prove it.
+      # Entries are wildcards because a bare domain in a blocky list matches only
+      # itself — the real lists are HaGeZi's wildcard flavour for that reason.
+      #
+      # `ads` also keeps one *downloaded* source, served by the VM to itself, so
+      # the test covers the path the real lists take: fetch, then cache under the
+      # StateDirectory. That the download fails at boot (the server starts later)
+      # is deliberate — it is the WAN-less boot, and the inline entries still
+      # have to work.
+      blockyTestNode = {
+        imports = [ ./modules/nixos/server/dns.nix ];
+        services.blocky.settings.blocking.denylists = lib.mkForce {
+          ads = [
+            ''
+              *.blocked-ad.example
+            ''
+            "http://127.0.0.1:8080/extra.txt"
+          ];
+          threats = [
+            ''
+              *.blocked-threat.example
+            ''
+          ];
+        };
+        environment.systemPackages = [
+          pkgs.curl
+          pkgs.dnsutils
+          pkgs.python3
+        ];
       };
     in
     {
@@ -1217,6 +1357,68 @@
             # account was created from it — the sops path, exercised end to end.
             machine.succeed("test -e /run/secrets/paperless-admin-password")
             machine.succeed("grep -q '^admin:' /var/lib/paperless/superuser-state")
+          '';
+        };
+
+        # Internal DNS: blocky comes up with no internet at all (the VM has
+        # none), binds the LAN and VPN addresses it does not have, answers the
+        # local names, blocks a denied name with 0.0.0.0 — and leaves both the
+        # :53 wildcard and every non-loopback API address alone.
+        test-dns = testLib.makeTest {
+          name = "dns";
+          nodes.machine = blockyTestNode;
+          testScript = ''
+            machine.wait_for_unit("blocky.service")
+            machine.wait_for_open_port(53, "127.0.0.1")
+
+            # freeBind: the DHCP lease and wg0 are both absent here, yet the
+            # listeners exist — on UDP and on TCP, which real resolvers need for
+            # answers too long for a datagram. No wildcard, in any of its
+            # spellings: podman's aardvark-dns needs :53 free on the container
+            # bridge gateways, and `[::]` would take the v4 ones too.
+            for proto in ["-lun", "-ltn"]:
+                listeners = machine.succeed(f"ss {proto}")
+                for addr in ["127.0.0.1:53", "192.168.178.96:53", "10.100.0.1:53"]:
+                    assert addr in listeners, f"{addr} not listening ({proto}):\n{listeners}"
+                for wildcard in ["0.0.0.0:53", "[::]:53", "*:53"]:
+                    assert wildcard not in listeners, f"{wildcard} bound ({proto}):\n{listeners}"
+
+            # Local names, answered without an upstream to ask.
+            assert machine.succeed("dig +short @127.0.0.1 home-server.lan").strip() == "192.168.178.96"
+            # Split horizon: the forge's public name resolves inward on the LAN,
+            # and its AAAA is suppressed so a dual-stack client cannot take the
+            # public address instead (filterUnmappedTypes).
+            assert machine.succeed("dig +short @127.0.0.1 git.mauderer.work").strip() == "192.168.178.96"
+            assert machine.succeed("dig +short AAAA @127.0.0.1 git.mauderer.work").strip() == ""
+
+            # Blocking, both groups, over UDP and TCP, apex and subdomain.
+            assert machine.succeed("dig +short @127.0.0.1 blocked-ad.example").strip() == "0.0.0.0"
+            assert machine.succeed("dig +short @127.0.0.1 sub.blocked-threat.example").strip() == "0.0.0.0"
+            assert machine.succeed("dig +tcp +short @127.0.0.1 blocked-ad.example").strip() == "0.0.0.0"
+            assert "BLOCKED" in machine.succeed("blocky --apiPort 4001 query blocked-ad.example")
+
+            # The API answers on loopback and is bound nowhere else.
+            machine.succeed("curl -fsS http://127.0.0.1:4001/api/blocking/status | grep -q enabled")
+            api = machine.succeed("ss -ltn")
+            assert "127.0.0.1:4001" in api, api
+            assert "0.0.0.0:4001" not in api, api
+
+            # A downloaded source, from a server that was not up at boot — so
+            # this is also the `blocky lists refresh` path from INSTALL.md. The
+            # list has to end up cached under the StateDirectory, which is the
+            # only writable path the unit has (DynamicUser + ProtectSystem
+            # strict) and what makes a WAN-less boot still block.
+            machine.succeed("mkdir -p /tmp/lists && echo '*.cached-ad.example' > /tmp/lists/extra.txt")
+            machine.succeed(
+                "cd /tmp/lists && (setsid python3 -m http.server 8080 >/dev/null 2>&1 &)"
+            )
+            machine.wait_for_open_port(8080)
+            machine.succeed("blocky --apiPort 4001 lists refresh")
+
+            assert machine.succeed("dig +short @127.0.0.1 cached-ad.example").strip() == "0.0.0.0"
+            # The inline entries survived a source that failed at boot.
+            assert machine.succeed("dig +short @127.0.0.1 blocked-ad.example").strip() == "0.0.0.0"
+            machine.succeed("test -n \"$(ls -A /var/lib/blocky/lists)\"")
           '';
         };
 
