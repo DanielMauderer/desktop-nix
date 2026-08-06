@@ -10,6 +10,9 @@ _: {
     ./paperless.nix
     ./ntfy.nix
     ./postgresql.nix
+    ./metrics.nix
+    ./logs.nix
+    ./grafana.nix
     ./zfs.nix
     ./nfs.nix
   ];

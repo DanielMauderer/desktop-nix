@@ -23,6 +23,9 @@ The secrets-first work is done and in git:
 - The matching **plaintext** SSH host key + WireGuard keys are in the gitignored
   `secrets-seed/` on the desktop (used for `--extra-files` below). Keep it until
   the install succeeds.
+- Service credentials that must exist at eval time are committed encrypted:
+  `secrets/home-server/{cloudflare,paperless,grafana}.yaml`. The Grafana one
+  ships with a random password nobody has seen — replace it in step 8.
 
 ## 1. Check before you install
 
@@ -100,7 +103,7 @@ registration token can only be minted once the forge is running.
    bridge gateway — i.e. this host, as seen from the NPM container), websockets
    on, then request a Let's Encrypt cert. No *new* DNS record is needed — the
    wildcard AAAA from `cloudflare-ddns.nix` already covers the name — but see
-   the HTTP-01 note in §8: the wildcard has to be grey-clouded while the cert is
+   the HTTP-01 note in §9: the wildcard has to be grey-clouded while the cert is
    issued, then switched back to proxied. In the host's
    *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
 3. **Runner token.** In Forgejo: Site Administration → Actions → Runners →
@@ -184,7 +187,7 @@ one *is* published, so it has to be shut the moment it becomes reachable.
    then request a Let's Encrypt cert. As with Forgejo, no *new* DNS record is
    needed — the wildcard AAAA from `cloudflare-ddns.nix` already covers the name
    — but the cert still has to be issued against a **grey-clouded** wildcard
-   (§8), and the wildcard is shared, so that toggle briefly takes every
+   (§9), and the wildcard is shared, so that toggle briefly takes every
    `*.mauderer.work` host off the Cloudflare proxy. Do it once, issue both
    certs, switch back.
 2. **Create the accounts**, on the server, **as root**. `ntfy` reads
@@ -238,8 +241,59 @@ Worth knowing:
   `auth-tokens` via `services.ntfy-sh.environmentFile`), but each entry is a
   bcrypt hash or a live token, so it would need a sops secret — see the comment
   in `ntfy.nix` before going that way.
+## 8. Observability (metrics, logs, dashboards)
 
-## 8. Verify
+Prometheus, Loki, Grafana Alloy and Grafana come up with the rest of the system.
+Like Paperless, Grafana is **VPN-only by design** — do *not* add a proxy host for
+it in NPM.
+
+1. **Set the Grafana admin password.** The repo ships a random one that nobody
+   has seen; replace it with your own before the first login:
+   ```sh
+   nix develop
+   sops secrets/home-server/grafana.yaml   # key: grafana-admin-password
+   ```
+   It is a **bare** password (no `KEY=` prefix, like the Paperless one). Commit,
+   then `switch` — Grafana re-reads the file on every start, so a rebuild is all
+   a rotation needs.
+
+   The same file holds `grafana-secret-key`, which encrypts secrets *inside*
+   Grafana's database. **Leave it alone.** It also ships random, which is what
+   you want, and unlike the admin password it cannot be rotated: the database is
+   encrypted under it and there is no official re-key path, so changing it
+   orphans anything already stored. Harmless before first use, not after.
+2. **Log in.** With the VPN up, browse `http://10.100.0.1:3030` as `admin`. The
+   port is 3030, not Grafana's default 3000, because 3000-3010 is already spoken
+   for on this box.
+3. **Datasources are already there.** `Prometheus` and `Loki` are provisioned
+   from Nix (`modules/nixos/server/grafana.nix`) and are read-only in the UI —
+   edit them in that file, not in the browser.
+4. **Import dashboards.** Nothing is provisioned: use *Dashboards → New →
+   Import* and paste a grafana.com dashboard ID. `1860` (Node Exporter Full) is
+   the one to start with; `13639` gives a Loki log view. Imported dashboards live
+   in the SQLite database on the pool, so they survive an SSD rebuild.
+
+Worth knowing:
+
+- **What is scraped:** the host's node exporter (CPU, memory, disks,
+  filesystems, network, hwmon temperatures, ZFS ARC, systemd unit state), the
+  smartctl exporter (per-drive SMART health for the pool disks and the NVMe
+  root), and Prometheus, Loki, Alloy and Grafana themselves.
+- **Retention** is 90 days on both sides. Prometheus additionally caps its TSDB
+  blocks at 20 GiB and trims on whichever limit trips first. That cap bounds
+  Prometheus, not the SSD as a whole — watch `node_filesystem_avail_bytes` for
+  the disk itself, which this stack scrapes for you.
+- **Pushing from your own deployments.** Loki's `:3100` is reachable from the
+  podman bridge (`10.88.0.0/16`), the LAN and the VPN, so a container on this box
+  can push to `http://10.88.0.1:3100/loki/api/v1/push`. There is **no
+  authentication** on that port — the source restriction is the access control,
+  so never add it to `allowedTCPPorts`. To have Prometheus scrape a deployment,
+  add a job to `scrapeConfigs` in `modules/nixos/server/metrics.nix`.
+- **No alerting yet.** Alertmanager is deliberately not configured — it needs a
+  notification route (SMTP or a webhook, plus a sops-held credential) that hasn't
+  been chosen.
+
+## 9. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -248,8 +302,8 @@ Worth knowing:
   (host key pinned).
 - `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
   the export; `nft list ruleset` shows only UDP 51820 + TCP 80/443 open on the
-  WAN (SSH 22, the NPM admin UI 81, Paperless 28981 and NFS 2049 stay off the
-  WAN).
+  WAN (SSH 22, the NPM admin UI 81, Paperless 28981, Grafana 3030, Loki 3100 and
+  NFS 2049 stay off the WAN).
 - **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
@@ -280,5 +334,16 @@ Worth knowing:
   ```
   The second one landing on the phone is the only check that covers the proxy
   host, the certificate and the app together.
+- **Observability:** `curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active'
+  | jq -r '.data.activeTargets[] | "\(.labels.job) \(.health)"'` should list six
+  jobs, all `up`. If `prometheus-smartctl-exporter` is failed, the drives are
+  hidden behind the RAID HBA — see the `devices` note in
+  `modules/nixos/server/metrics.nix`. Over the VPN, `http://10.100.0.1:3030`
+  serves Grafana and
+  `curl -fsS http://10.100.0.1:3100/ready` answers for Loki; neither must answer
+  from the WAN. Then check logs are flowing:
+  `logcli` isn't installed, so use Grafana's *Explore* on the Loki datasource
+  with `{job="systemd-journal"}` — journal lines should appear within a minute
+  of `systemctl status alloy` going green.
 - Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.

@@ -132,7 +132,7 @@ matters lives here; the rest is in the Nix code and `git log`.
   split SSD/pool like Forgejo, because the documents are irreplaceable and the
   workload isn't latency-bound. The consumption folder sits inside the NFS export
   (`/hdd_pool_1/share/paperless-inbox`) so any client that mounts the share has a
-  drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: three
+  drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: six
   service oneshots create siblings there with no ordering between them, so a
   group-owned `0750` parent can only work for one of them.
 - **Push notifications = native `services.ntfy-sh`, public through NPM, closed by
@@ -150,3 +150,29 @@ matters lives here; the rest is in the Nix code and `git log`.
   + a 12 h message cache) stays on the SSD with no ZFS-pool path and no backup:
   it is four commands to recreate, and anything worth keeping belongs in the
   service that sent the notification.
+- **Observability = native Prometheus + Loki + Grafana, Grafana VPN-only** —
+  home-server. Three modules (`metrics.nix`, `logs.nix`, `grafana.nix`), native
+  services rather than the usual container, and no new WAN ports. Grafana is on
+  `:3030` (3000-3010 is taken, as for Paperless), admitted on `wg0` only and
+  deliberately given no NPM proxy host — a dashboard of the whole box is the last
+  thing that should answer on the WAN. Prometheus and the node/smartctl exporters
+  bind `127.0.0.1` and are never firewalled open at all: Prometheus scrapes the
+  exporters over loopback and Grafana queries Prometheus, so the whole metrics
+  path stays on the box. Loki's `:3100` is the one exception: it is push *and* query with no
+  authentication, so it is admitted from the podman bridge, LAN and VPN by a
+  source-restricted rule (as with NFS and Forgejo) precisely so deployments can
+  ship to it — that restriction *is* the access control.
+- **Split storage for observability, for two different reasons** — Loki's chunks
+  and Grafana's SQLite live on the ZFS pool (bulky, and hand-built dashboards are
+  the one part that cannot be regenerated); Prometheus' TSDB stays on the SSD
+  because `services.prometheus.stateDir` is a name relative to `/var/lib`, not a
+  free path, and samples are derived data anyway. Loki retains 90 days;
+  Prometheus retains up to 90 days and at most 20 GiB of TSDB blocks, trimming on
+  whichever trips first. The size limit bounds Prometheus' own blocks rather than
+  guaranteeing free space on the root disk — `node_filesystem_avail_bytes`, which
+  the stack already scrapes, is what watches the SSD itself.
+- **Journal shipping is Grafana Alloy, not Promtail** — Promtail reached upstream
+  end of life in early 2026; Alloy's config is more verbose but is the component
+  that will still exist. Relabel rules promote only low-cardinality journal fields
+  (unit, host, priority, syslog identifier) to Loki labels, since one stream per
+  label combination is how a Loki instance is usually ruined.
