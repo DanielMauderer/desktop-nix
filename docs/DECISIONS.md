@@ -112,6 +112,18 @@ matters lives here; the rest is in the Nix code and `git log`.
   token scoped to the zone. Requires IPv6 privacy
   extensions off (`networking.tempAddresses = "disabled"`), otherwise the
   discovered address is a rotating temporary one.
+- **Shared database = native `services.postgresql`, socket-only, pinned major** —
+  home-server. One cluster for services added later rather than another embedded
+  SQLite per service; it ships empty, and a service claims a database from its own
+  module via `ensureDatabases`/`ensureUsers`. `listen_addresses` is forced to `""`
+  because `enableTCPIP = false` still binds loopback, so there is no TCP listener
+  and therefore no firewall rule — the WAN surface is untouched. Peer auth over
+  the socket means no database password exists to keep in sops. The package is
+  pinned (`postgresql_18`) rather than inherited from the `stateVersion` ladder:
+  an unpinned major that moves silently initialises a *new empty cluster* instead
+  of failing. Cluster on the SSD with a nightly `pg_dumpall` to the pool, the same
+  split as Forgejo. Forgejo and Paperless were deliberately **not** migrated —
+  they work, and a migration buys nothing until something needs concurrency.
 - **Document archive = native `services.paperless`, SQLite, VPN-only** —
   home-server. `:28981` is admitted on `wg0` only and deliberately *not* given an
   NPM proxy host, so unlike Forgejo it has no WAN surface: a paper archive is the
@@ -120,7 +132,7 @@ matters lives here; the rest is in the Nix code and `git log`.
   split SSD/pool like Forgejo, because the documents are irreplaceable and the
   workload isn't latency-bound. The consumption folder sits inside the NFS export
   (`/hdd_pool_1/share/paperless-inbox`) so any client that mounts the share has a
-  drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: five
+  drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: six
   service oneshots create siblings there with no ordering between them, so a
   group-owned `0750` parent can only work for one of them.
 - **Observability = native Prometheus + Loki + Grafana, Grafana VPN-only** —
