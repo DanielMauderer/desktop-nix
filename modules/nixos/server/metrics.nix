@@ -27,7 +27,11 @@
 # pointed at the ZFS pool; that would need a bind mount. It is also the right
 # place: samples are derived data that can be thrown away, which is the same
 # argument forgejo.nix makes for keeping its state off the pool. Both a time and
-# a size bound are set so a runaway cardinality cannot fill the root filesystem.
+# a size bound are set, and Prometheus trims on whichever trips first — but note
+# the size bound governs the TSDB's own on-disk blocks, not free space on the
+# filesystem as a whole. It is a cap on this service, not a guarantee about the
+# root disk; the node exporter's `node_filesystem_*` series, scraped below, are
+# what actually warn before the SSD runs out.
 { config, lib, ... }:
 let
   prometheusPort = 9090;
@@ -60,11 +64,11 @@ in
     # Loopback only — see the exposure note above.
     listenAddress = "127.0.0.1";
 
-    # 90 days of history, or 20 GiB, whichever comes first. Prometheus applies
-    # both bounds and deletes on the one that triggers earliest, which is what
-    # keeps this safe on the OS SSD: the time bound is the intent, the size
-    # bound is the backstop if a scraped target starts emitting high-cardinality
-    # series.
+    # Up to 90 days of history, and at most 20 GiB of TSDB blocks: Prometheus
+    # applies both and deletes on whichever triggers earliest. The time bound is
+    # the intent; the size bound is the backstop if a scraped target starts
+    # emitting high-cardinality series. See the header note on what the size
+    # bound does and does not promise about the root filesystem.
     retentionTime = "90d";
     extraFlags = [ "--storage.tsdb.retention.size=20GB" ];
 

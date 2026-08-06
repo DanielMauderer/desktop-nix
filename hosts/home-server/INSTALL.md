@@ -209,8 +209,10 @@ Worth knowing:
   filesystems, network, hwmon temperatures, ZFS ARC, systemd unit state), the
   smartctl exporter (per-drive SMART health for the pool disks and the NVMe
   root), and Prometheus, Loki, Alloy and Grafana themselves.
-- **Retention** is 90 days on both sides — Prometheus also stops at 20 GiB,
-  whichever comes first, so the OS SSD cannot fill.
+- **Retention** is 90 days on both sides. Prometheus additionally caps its TSDB
+  blocks at 20 GiB and trims on whichever limit trips first. That cap bounds
+  Prometheus, not the SSD as a whole — watch `node_filesystem_avail_bytes` for
+  the disk itself, which this stack scrapes for you.
 - **Pushing from your own deployments.** Loki's `:3100` is reachable from the
   podman bridge (`10.88.0.0/16`), the LAN and the VPN, so a container on this box
   can push to `http://10.88.0.1:3100/loki/api/v1/push`. There is **no

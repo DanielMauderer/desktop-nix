@@ -151,8 +151,11 @@ matters lives here; the rest is in the Nix code and `git log`.
   and Grafana's SQLite live on the ZFS pool (bulky, and hand-built dashboards are
   the one part that cannot be regenerated); Prometheus' TSDB stays on the SSD
   because `services.prometheus.stateDir` is a name relative to `/var/lib`, not a
-  free path, and samples are derived data anyway. Both sides retain 90 days, with
-  a 20 GiB backstop on the TSDB so the OS disk cannot fill.
+  free path, and samples are derived data anyway. Loki retains 90 days;
+  Prometheus retains up to 90 days and at most 20 GiB of TSDB blocks, trimming on
+  whichever trips first. The size limit bounds Prometheus' own blocks rather than
+  guaranteeing free space on the root disk — `node_filesystem_avail_bytes`, which
+  the stack already scrapes, is what watches the SSD itself.
 - **Journal shipping is Grafana Alloy, not Promtail** — Promtail reached upstream
   end of life in early 2026; Alloy's config is more verbose but is the component
   that will still exist. Relabel rules promote only low-cardinality journal fields
