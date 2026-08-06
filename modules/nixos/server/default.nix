@@ -9,6 +9,9 @@ _: {
     ./forgejo-runner.nix
     ./paperless.nix
     ./postgresql.nix
+    ./metrics.nix
+    ./logs.nix
+    ./grafana.nix
     ./zfs.nix
     ./nfs.nix
   ];

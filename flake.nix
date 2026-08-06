@@ -501,6 +501,169 @@
               in
               unit != null && builtins.elem "zfs-mount.service" unit.after;
           }
+
+          # --- Observability: metrics.nix + logs.nix + grafana.nix ---
+          {
+            # Loopback-bound and never firewalled open: the expression browser
+            # is an unauthenticated read of every metric on the box, and Grafana
+            # (the only intended reader) runs on this same host.
+            name = "Prometheus is loopback-only with bounded retention";
+            assertion =
+              let
+                p = cfg.services.prometheus;
+              in
+              p.enable
+              && p.listenAddress == "127.0.0.1"
+              && p.retentionTime != ""
+              && !(builtins.elem p.port cfg.networking.firewall.allowedTCPPorts)
+              && lib.any (lib.hasPrefix "--storage.tsdb.retention.size=") p.extraFlags;
+          }
+          {
+            name = "node and smartctl exporters enabled, both loopback-only";
+            assertion =
+              let
+                e = cfg.services.prometheus.exporters;
+              in
+              e.node.enable
+              && e.node.listenAddress == "127.0.0.1"
+              && e.smartctl.enable
+              && e.smartctl.listenAddress == "127.0.0.1";
+          }
+          {
+            # Off by default, and the reason a failed unit is visible on a
+            # dashboard instead of only in the journal.
+            name = "node exporter reports systemd unit state";
+            assertion = builtins.elem "systemd" cfg.services.prometheus.exporters.node.enabledCollectors;
+          }
+          {
+            name = "Loki log store lives on the redundant ZFS pool";
+            assertion =
+              let
+                c = cfg.services.loki.configuration;
+              in
+              cfg.services.loki.enable
+              && lib.hasPrefix "/hdd_pool_1/" c.common.path_prefix
+              && lib.hasPrefix "/hdd_pool_1/" c.common.storage.filesystem.chunks_directory
+              && lib.hasPrefix "/hdd_pool_1/" c.storage_config.tsdb_shipper.active_index_directory
+              && lib.hasPrefix "/hdd_pool_1/" c.compactor.working_directory;
+          }
+          {
+            # Logs grow without bound by nature; the compactor is what deletes
+            # them. Without retention the pool fills instead.
+            name = "Loki enforces retention";
+            assertion =
+              let
+                c = cfg.services.loki.configuration;
+              in
+              c.compactor.retention_enabled && c.limits_config.retention_period != null;
+          }
+          {
+            # :3100 is push AND query with no authentication (`auth_enabled =
+            # false` only switches off the tenant header), so the source
+            # restriction *is* the access control. Stated as an exact rule text
+            # so widening it has to be argued for, like the Forgejo rules above.
+            name = "Loki :3100 admitted only from the podman bridge, LAN and VPN";
+            assertion =
+              let
+                port = cfg.services.loki.configuration.server.http_listen_port;
+                rule = "ip saddr { 10.88.0.0/16, 192.168.178.0/24, 10.100.0.0/24 } tcp dport ${toString port} accept";
+              in
+              cfg.networking.nftables.enable
+              && !(builtins.elem port cfg.networking.firewall.allowedTCPPorts)
+              && lib.hasInfix rule cfg.networking.firewall.extraInputRules;
+          }
+          {
+            name = "the journal is shipped into Loki by Alloy";
+            assertion =
+              let
+                etc = cfg.environment.etc;
+              in
+              cfg.services.alloy.enable
+              && (etc ? "alloy/config.alloy")
+              && lib.hasInfix "loki.source.journal" etc."alloy/config.alloy".text;
+          }
+          {
+            # Alloy runs under DynamicUser, so without this group the journal
+            # source starts and reads nothing but Alloy's own messages.
+            name = "Alloy is in the systemd-journal group";
+            assertion = builtins.elem "systemd-journal" (
+              cfg.systemd.services.alloy.serviceConfig.SupplementaryGroups or [ ]
+            );
+          }
+          {
+            name = "Grafana state lives on the redundant ZFS pool";
+            assertion =
+              cfg.services.grafana.enable && lib.hasPrefix "/hdd_pool_1/" cfg.services.grafana.dataDir;
+          }
+          {
+            # The whole point of Grafana's exposure design, and the same shape
+            # as the Paperless assertion above: admitted on the VPN interface
+            # only, with "WAN TCP surface is exactly 80/443" as the other half.
+            name = "Grafana admitted only on the wg0 VPN interface, never the WAN";
+            assertion =
+              let
+                inherit (cfg.services.grafana.settings.server) http_port;
+              in
+              builtins.elem http_port cfg.networking.firewall.interfaces.wg0.allowedTCPPorts
+              && !(builtins.elem http_port cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            # The user's stated constraint, same as for Paperless: the 3000
+            # range is already taken — which is Grafana's own default port.
+            name = "Grafana avoids the reserved 3000-3010 port range";
+            assertion =
+              let
+                inherit (cfg.services.grafana.settings.server) http_port;
+              in
+              http_port < 3000 || http_port > 3010;
+          }
+          {
+            # `settings` is rendered into an ini file in the world-readable Nix
+            # store, so neither the admin password nor the database encryption
+            # key may ever be the value itself — only a reference to a runtime
+            # file. nixpkgs asserts that `secret_key` is set at all; this is the
+            # stricter half, that it is not set to a literal.
+            name = "Grafana admin password and secret key are read from files, not the Nix store";
+            assertion =
+              let
+                inherit (cfg.services.grafana.settings) security;
+              in
+              lib.hasPrefix "$__file{" security.admin_password && lib.hasPrefix "$__file{" security.secret_key;
+          }
+          {
+            name = "Grafana has no self-registration and no anonymous access";
+            assertion =
+              (!cfg.services.grafana.settings.users.allow_sign_up)
+              && (!cfg.services.grafana.settings."auth.anonymous".enabled);
+          }
+          {
+            # A Grafana with no datasources is a Grafana nobody finishes setting
+            # up; both are provisioned so a rebuilt server is immediately useful.
+            name = "Grafana is provisioned with the Prometheus and Loki datasources";
+            assertion =
+              let
+                p = cfg.services.grafana.provision;
+                # Sorted, so reordering the list in grafana.nix (which only
+                # affects display order in the UI) does not fail the check.
+                types = lib.sort lib.lessThan (map (d: d.type) p.datasources.settings.datasources);
+              in
+              p.enable && lib.concatStringsSep "," types == "loki,prometheus";
+          }
+          {
+            # Same guard as the Paperless one: without these oneshots loki and
+            # grafana race zfs-mount.service and start against a missing
+            # directory (or, worse, one shadowed by the unmounted pool).
+            name = "Loki and Grafana directories are created after the ZFS pool is mounted";
+            assertion =
+              let
+                loki = cfg.systemd.services.loki-data-dirs or null;
+                grafana = cfg.systemd.services.grafana-data-dirs or null;
+              in
+              loki != null
+              && builtins.elem "zfs-mount.service" loki.after
+              && grafana != null
+              && builtins.elem "zfs-mount.service" grafana.after;
+          }
           {
             # Pinned rather than inherited from upstream's stateVersion ladder.
             # An unpinned package that moves does not fail — dataDir is
@@ -691,6 +854,81 @@
           requiredBy = lib.mkForce [ ];
         };
         environment.systemPackages = [ pkgs.curl ];
+        virtualisation = {
+          memorySize = 4096;
+          diskSize = 8192;
+        };
+      };
+
+      # Observability test node: the three modules on their own, for the same
+      # reason forgejoTestNode and paperlessTestNode exist.
+      #
+      # Unlike those two the pool paths are NOT redirected. /hdd_pool_1 is just
+      # a directory on the VM's scratch root disk here, and the data-dirs
+      # oneshots create it — so the real paths, ownership and modes the server
+      # uses are exercised. Only their ordering against zfs-mount.service (a
+      # unit that does not exist in the VM) is cleared; the before/requiredBy
+      # edges stay, which is also why the units are edited rather than disabled:
+      # a disabled unit is *masked* while its requiredBy symlinks are still
+      # emitted, so loki and grafana would Require a masked unit and refuse to
+      # start.
+      observabilityTestNode = {
+        imports = [
+          inputs.sops-nix.nixosModules.sops
+          ./modules/nixos/server/metrics.nix
+          ./modules/nixos/server/logs.nix
+          ./modules/nixos/server/grafana.nix
+        ];
+
+        environment.etc."test-age-key.txt" = {
+          text = testAgeKey + "\n";
+          mode = "0400";
+        };
+
+        sops = {
+          # The VM's fresh host key is not a fixture recipient; use the injected
+          # test identity instead (same override as test-secrets).
+          age = {
+            sshKeyPaths = lib.mkForce [ ];
+            keyFile = "/etc/test-age-key.txt";
+          };
+          gnupg.sshKeyPaths = lib.mkForce [ ];
+          # Redirected to the fixture rather than forced away, so the sops path
+          # is exercised end to end: the test logs into Grafana with the
+          # fixture's plaintext. The secret key rides along on the same fixture
+          # value — it only has to be *a* key for Grafana to start.
+          secrets = {
+            grafana-admin-password = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
+            };
+            grafana-secret-key = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
+            };
+          };
+        };
+
+        # Virtio disks expose no SMART data, and smartctl_exporter exits when
+        # `smartctl --scan` finds nothing. metrics.nix drops its scrape config
+        # along with it, so this leaves no permanently-down target behind.
+        services.prometheus.exporters.smartctl.enable = lib.mkForce false;
+
+        systemd.services = {
+          loki-data-dirs = {
+            requires = lib.mkForce [ ];
+            after = lib.mkForce [ ];
+          };
+          grafana-data-dirs = {
+            requires = lib.mkForce [ ];
+            after = lib.mkForce [ ];
+          };
+        };
+
+        environment.systemPackages = [
+          pkgs.curl
+          pkgs.jq
+        ];
         virtualisation = {
           memorySize = 4096;
           diskSize = 8192;
@@ -1325,6 +1563,118 @@
             # account was created from it — the sops path, exercised end to end.
             machine.succeed("test -e /run/secrets/paperless-admin-password")
             machine.succeed("grep -q '^admin:' /var/lib/paperless/superuser-state")
+          '';
+        };
+
+        # Observability: the whole stack comes up, the pool layout is created
+        # with the ownership every service module has to agree on, Prometheus
+        # scrapes every target it declares, Grafana accepts the sops-held
+        # password and carries both provisioned datasources, and a log line
+        # makes the full journal -> Alloy -> Loki -> query round trip.
+        test-observability = testLib.makeTest {
+          name = "observability";
+          nodes.machine = observabilityTestNode;
+          testScript = ''
+            machine.wait_for_unit("prometheus.service")
+            machine.wait_for_unit("prometheus-node-exporter.service")
+            machine.wait_for_unit("loki.service")
+            machine.wait_for_unit("alloy.service")
+            machine.wait_for_unit("grafana.service")
+
+            machine.wait_for_open_port(9090)
+            machine.wait_for_open_port(3100)
+            machine.wait_for_open_port(3030)
+
+            # The data-dirs oneshots ran: the pool layout exists with the 0755
+            # on the shared parent that npm/forgejo/paperless/loki/grafana all
+            # have to leave behind, and 0750 service-owned subtrees.
+            machine.succeed("stat -c '%a' /hdd_pool_1/services | grep -qx 755")
+            machine.succeed("stat -c '%U %a' /hdd_pool_1/services/loki | grep -qx 'loki 750'")
+            machine.succeed("stat -c '%U %a' /hdd_pool_1/services/grafana | grep -qx 'grafana 750'")
+            machine.succeed("test -d /hdd_pool_1/services/loki/chunks")
+            machine.succeed("test -d /hdd_pool_1/services/loki/tsdb-index")
+
+            # Prometheus and the node exporter are loopback-bound, not 0.0.0.0 —
+            # the property the host assertions state, checked against a live
+            # listening socket.
+            machine.succeed("ss -ltn | grep -q '127.0.0.1:9090'")
+            machine.succeed("ss -ltn | grep -q '127.0.0.1:9100'")
+            machine.fail("ss -ltn | grep -q '0.0.0.0:9090'")
+
+            # Hardware metrics land, including the opt-in systemd collector that
+            # makes a failed unit visible on a dashboard.
+            metrics = machine.succeed("curl -fsS http://127.0.0.1:9100/metrics")
+            for name in [
+                "node_cpu_seconds_total",
+                "node_filesystem_size_bytes",
+                "node_memory_MemTotal_bytes",
+                "node_systemd_unit_state",
+            ]:
+                assert name in metrics, "missing " + name
+
+            # Every declared scrape target is healthy. The first scrape takes an
+            # interval, hence wait_until_succeeds.
+            machine.wait_until_succeeds(
+                "curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active' "
+                "| jq -e '[.data.activeTargets[] | select(.health != \"up\")] | length == 0'",
+                timeout=180,
+            )
+            jobs = machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active' "
+                "| jq -r '[.data.activeTargets[].labels.job] | sort | join(\",\")'"
+            ).strip()
+            # smartctl is absent by design on this node — see the comment on
+            # observabilityTestNode.
+            assert jobs == "alloy,grafana,loki,node,prometheus", jobs
+
+            # Grafana: the sops-decrypted password is what the instance actually
+            # accepts, and both datasources were provisioned from Nix.
+            machine.succeed("test -e /run/secrets/grafana-admin-password")
+            machine.succeed("test -e /run/secrets/grafana-secret-key")
+
+            # Credentials are read out of the decrypted file rather than written
+            # into the test, which is both a stronger assertion — it proves the
+            # file's *contents* are what Grafana accepts, not just that some
+            # known string works — and keeps a `curl -u user:literal` out of the
+            # tree, which the gitleaks check flags on sight.
+            machine.fail("curl -fsS -u admin:not-the-password http://127.0.0.1:3030/api/datasources")
+            types = machine.succeed(
+                "PW=$(cat /run/secrets/grafana-admin-password); "
+                'curl -fsS -u "admin:$PW" http://127.0.0.1:3030/api/datasources '
+                "| jq -r '[.[].type] | sort | join(\",\")'"
+            ).strip()
+            assert types == "loki,prometheus", types
+
+            # Loki accepts a push and serves it back: a real round trip through
+            # the on-pool store, not just a liveness probe.
+            machine.wait_until_succeeds("curl -fsS http://127.0.0.1:3100/ready")
+            ts = machine.succeed("date +%s%N").strip()
+            body = (
+                '{"streams":[{"stream":{"job":"nixos-test"},"values":[["'
+                + ts
+                + '","round-trip-canary"]]}]}'
+            )
+            machine.succeed(
+                "curl -fsS -XPOST -H 'Content-Type: application/json' "
+                "http://127.0.0.1:3100/loki/api/v1/push --data-raw '" + body + "'"
+            )
+            machine.wait_until_succeeds(
+                "curl -fsS -G http://127.0.0.1:3100/loki/api/v1/query_range "
+                "--data-urlencode 'query={job=\"nixos-test\"}' "
+                "| jq -e '.data.result[0].values[0][1] == \"round-trip-canary\"'",
+                timeout=60,
+            )
+
+            # Alloy ships the journal, and the relabel rules promote the syslog
+            # identifier to a real label — without them every line would land in
+            # one unfilterable stream, so querying by it proves both halves.
+            machine.succeed("systemd-cat -t alloy-canary echo journal-shipping-works")
+            machine.wait_until_succeeds(
+                "curl -fsS -G http://127.0.0.1:3100/loki/api/v1/query_range "
+                "--data-urlencode 'query={syslog_identifier=\"alloy-canary\"}' "
+                "| jq -e '.data.result | length > 0'",
+                timeout=180,
+            )
           '';
         };
 

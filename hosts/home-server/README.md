@@ -4,7 +4,7 @@ Headless services host — the only non-desktop machine. Install guide:
 [INSTALL.md](INSTALL.md).
 
 - **Role:** headless home server (containers + storage + VPN + the git forge +
-  the document archive + the shared database)
+  the document archive + the shared database + the observability stack)
 - **Kernel:** LTS (not CachyOS)
 - **Modules:** `core` (the machine-agnostic baseline — boot, nix, networking,
   users, secrets, updates, hardening) + `dev` (Podman) + `server`. No `base`, so
@@ -19,8 +19,11 @@ Headless services host — the only non-desktop machine. Install guide:
   `10.100.0.1:28981`, never proxied; data on the pool, inbox on the NFS share),
   a shared **PostgreSQL** server for future services (socket-only — no TCP
   listener at all — peer auth, cluster on the SSD, nightly `pg_dumpall` to the
-  pool), and the container groundwork for docker-compose / Ansible-managed
-  services. WAN surface is exactly UDP 51820 + TCP 80/443.
+  pool), an **observability stack** (Prometheus + node/smartctl exporters, Loki
+  fed by Grafana Alloy, and Grafana itself VPN-only on `10.100.0.1:3030`; Loki's
+  `:3100` is open to the podman bridge, LAN and VPN so deployments can push),
+  and the container groundwork for docker-compose / Ansible-managed services.
+  WAN surface is exactly UDP 51820 + TCP 80/443.
 - **Disk:** disko SSD root; ZFS data pool on the HBA drives.
 
 `hardware.nix` carries the ZFS `hostId`, the LTS kernel, HBA modules and zram.
