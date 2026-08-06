@@ -13,6 +13,7 @@ _: {
     ./metrics.nix
     ./logs.nix
     ./grafana.nix
+    ./alerts.nix
     ./zfs.nix
     ./nfs.nix
   ];

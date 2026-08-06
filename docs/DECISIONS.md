@@ -176,3 +176,42 @@ matters lives here; the rest is in the Nix code and `git log`.
   that will still exist. Relabel rules promote only low-cardinality journal fields
   (unit, host, priority, syslog identifier) to Loki labels, since one stream per
   label combination is how a Loki instance is usually ruined.
+- **Alloy stays on `DynamicUser`; sources it cannot read are brought to it** —
+  every service on this box is a native systemd unit, so the journal source
+  already covers all of them and a new service needs no change to `logs.nix`. The
+  two things outside the journal are handled without de-hardening the agent: NPM's
+  nginx log *files* get a dedicated `npm-logs` group (setgid on the directory, so
+  a new proxy host's log inherits it) rather than Alloy getting a static uid, and
+  auditd's events are fanned into syslog with `auditd.plugins.syslog` rather than
+  Alloy being given a path it can never be granted — `/var/log/audit` is 0700 and
+  recreated on rotation, which no ACL can follow for a uid that changes. Only
+  `status`, `method` and `vhost` become labels on access lines; the client IP
+  stays in the line, because one stream per visitor is the same trap as above.
+- **Dashboards are hand-written and provisioned from Nix, not vendored** — four
+  small boards (host, services, logs, HTTP) naming this box's actual units,
+  mountpoints and proxy hosts, instead of importing a grafana.com board where half
+  the panels are for hardware that is not here. They are read-only in the UI by
+  construction (the JSON is a store path), so the edit loop is "change the file,
+  rebuild"; dashboards built in the browser stay in the SQLite database and are
+  untouched, because provisioning adds and never cleans up.
+- **Alerting is Grafana's own, delivered to the ntfy already on the box** — not
+  Alertmanager, which would be a fourth daemon plus a format bridge and could not
+  evaluate the one Loki-based rule. Rules, contact point, notification policy and
+  the message template are all provisioned from Nix, so the alerting config is
+  reviewable in the repo rather than clicked into the database. The webhook posts
+  ntfy's JSON publishing format via a custom payload template — Grafana's stock
+  envelope would arrive on the phone as unreadable JSON — with every string built
+  through `printf "%q"` so a quote in an alert summary cannot silently produce a
+  400. The publish token lives in sops as an **env-file line** and is interpolated
+  by Grafana's provisioner, which is also the moment `grafana-secret-key` stopped
+  being safely rotatable in practice: the contact point's credential is now stored
+  encrypted under it.
+- **Uptime is probed from outside, not health-checked from inside** — a blackbox
+  probe of `git.mauderer.work` and `ntfy.mauderer.work` covers DNS, the dynamic
+  AAAA record, the Cloudflare edge, NPM and the backend in one `probe_success`,
+  which a loopback check cannot: the box's most likely public failure is a stale
+  DNS record or an expired certificate while every local unit is happily active.
+  Note the probed certificate is Cloudflare's edge one while the record is
+  proxied. The Postgres exporter is the mirror image — the one exporter with a
+  database behind it, and it still carries no credential, because it runs as the
+  `postgres` user over the Unix socket and peer auth does the rest.

@@ -23,11 +23,14 @@ Headless services host — the only non-desktop machine. Install guide:
   self-signup, services publish with a token), a shared **PostgreSQL** server
   for future services (socket-only — no TCP listener at all — peer auth, cluster
   on the SSD, nightly `pg_dumpall` to the pool), an **observability stack**
-  (Prometheus + node/smartctl exporters, Loki fed by Grafana Alloy, and Grafana
-  itself VPN-only on `10.100.0.1:3030`; Loki's `:3100` is open to the podman
-  bridge, LAN and VPN so deployments can push), and the container groundwork for
-  docker-compose / Ansible-managed services. WAN surface is exactly UDP 51820 +
-  TCP 80/443.
+  (Prometheus with node/smartctl/postgres/blackbox exporters; Loki fed by
+  Grafana Alloy from both the journal and NPM's nginx log files; Grafana itself
+  VPN-only on `10.100.0.1:3030` with datasources, four dashboards and the alert
+  rules all provisioned from Nix; alerts delivered to the ntfy server above, so
+  a full disk or a stopped backup reaches the phone. Loki's `:3100` is open to
+  the podman bridge, LAN and VPN so deployments can push), and the container
+  groundwork for docker-compose / Ansible-managed services. WAN surface is
+  exactly UDP 51820 + TCP 80/443.
 - **Disk:** disko SSD root; ZFS data pool on the HBA drives.
 
 `hardware.nix` carries the ZFS `hostId`, the LTS kernel, HBA modules and zram.

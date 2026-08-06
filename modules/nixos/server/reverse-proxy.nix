@@ -14,6 +14,13 @@
 # publish to 10.100.0.1 is what actually keeps it VPN-only; the wg0 firewall rule
 # below is kept as defence-in-depth / intent.
 #
+# Logs: nginx's access and error logs are written inside the container, into
+# `/data/logs` — i.e. onto the pool at /hdd_pool_1/services/npm/data/logs. They
+# are the only logs on this box that do not reach journald, so logs.nix tails
+# them into Loki; the `npm-data-dirs` script below is what makes them readable
+# by an Alloy running under DynamicUser, and logrotate at the bottom is what
+# stops them growing without bound.
+#
 # DNS: `*.mauderer.work` is a *proxied* (orange-cloud) AAAA record kept current by
 # cloudflare-ddns.nix, so HTTP-01 challenges traverse the Cloudflare edge rather
 # than hitting :80 directly. Cloudflare passes /.well-known/acme-challenge
@@ -71,11 +78,55 @@ _: {
     # between the three units, so all of them must leave the parent in the same
     # state. Traversable-but-not-writable lets each unprivileged service reach
     # its own subtree; the subtrees themselves stay 0750.
+    #
+    # `data/logs` is the exception, and it is created here rather than left to
+    # nginx so the mode is right *before* the container can write into it.
+    # Alloy (logs.nix) tails those files to get NPM's access logs into Loki, and
+    # it runs under DynamicUser — so group membership is the only access it can
+    # be given. Hence:
+    #   - the `npm-logs` group (declared in logs.nix, the reader) owns the
+    #     directory and the two levels above it, which stay group r-x: Alloy
+    #     traverses and reads, it never writes;
+    #   - the setgid bit on `data` and `data/logs`, so a log file nginx creates
+    #     for a *new* proxy host inherits the group instead of landing
+    #     root:root and staying invisible until the next switch.
     script = ''
-      mkdir -p /hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/letsencrypt
+      mkdir -p /hdd_pool_1/services/npm/data/logs /hdd_pool_1/services/npm/letsencrypt
       chmod 0755 /hdd_pool_1/services
+      chgrp npm-logs /hdd_pool_1/services/npm /hdd_pool_1/services/npm/data \
+        /hdd_pool_1/services/npm/data/logs
       chmod 0750 /hdd_pool_1/services/npm
+      chmod 2750 /hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/data/logs
+      # One-time repair for files nginx created before the setgid bit existed.
+      # Scoped to the log files themselves — never a `chown -R` on a pool path,
+      # which would re-walk every certificate and database on each boot.
+      chgrp npm-logs /hdd_pool_1/services/npm/data/logs/*.log 2>/dev/null || true
+      chmod g+r /hdd_pool_1/services/npm/data/logs/*.log 2>/dev/null || true
     '';
+  };
+
+  # Nothing rotates these files. They are written by nginx inside the container
+  # but live on the host's pool, and the jc21 image has shipped an internal
+  # logrotate only intermittently — so rotate them from here, where it is
+  # declared and visible. If it turns out the image already does it, this is
+  # harmless duplication; check with
+  #   podman exec npm ls /etc/logrotate.d /etc/periodic/daily
+  #
+  # `copytruncate` is not optional: nginx is not ours to signal, so a rename
+  # would leave it writing to a deleted inode until the container is restarted
+  # and the pool would keep growing invisibly. The trade is a narrow window
+  # where lines can be lost, and Alloy re-reading a truncated file from the
+  # start (a handful of duplicated lines in Loki). `delaycompress` keeps the
+  # most recent rotation uncompressed; Alloy's glob only matches `*.log`, so
+  # rotated files are ignored either way.
+  services.logrotate.settings."/hdd_pool_1/services/npm/data/logs/*.log" = {
+    frequency = "weekly";
+    rotate = 8;
+    compress = true;
+    delaycompress = true;
+    missingok = true;
+    notifempty = true;
+    copytruncate = true;
   };
 
   # The admin port binds to the wg0 address and the data lives on the ZFS pool, so

@@ -530,6 +530,51 @@
               && e.smartctl.listenAddress == "127.0.0.1";
           }
           {
+            # The exporter with a database behind it, and the point is that it
+            # still carries no credential: it runs as the `postgres` system user
+            # and connects over the Unix socket, where peer auth maps it onto
+            # the role of the same name. A `postgresql://` dataSourceName would
+            # mean a password in sops *and* a TCP listener that postgresql.nix
+            # forces off — hence checking the socket is still in there.
+            name = "postgres exporter reaches the cluster over the Unix socket, with no credential";
+            assertion =
+              let
+                e = cfg.services.prometheus.exporters.postgres;
+              in
+              e.enable
+              && e.listenAddress == "127.0.0.1"
+              && e.runAsLocalSuperUser
+              && lib.hasInfix "host=/run/postgresql" e.dataSourceName
+              && e.environmentFile == null
+              && !(builtins.elem e.port cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            name = "blackbox exporter is loopback-only and never firewalled open";
+            assertion =
+              let
+                e = cfg.services.prometheus.exporters.blackbox;
+              in
+              e.enable
+              && e.listenAddress == "127.0.0.1"
+              && !(builtins.elem e.port cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            # The relabel dance is the easy thing to get wrong, and it fails
+            # silently-ish: without the rule rewriting `__address__` back to the
+            # exporter, Prometheus tries to dial "https://git.mauderer.work" as
+            # if it were a host:port and every probe is down forever.
+            name = "blackbox probe job rewrites __address__ back to the local exporter";
+            assertion =
+              let
+                job = lib.findFirst (
+                  j: (j.job_name or "") == "blackbox-http"
+                ) null cfg.services.prometheus.scrapeConfigs;
+              in
+              job != null
+              && job.metrics_path == "/probe"
+              && lib.any (r: (r.replacement or "") == "127.0.0.1:9115") job.relabel_configs;
+          }
+          {
             # Off by default, and the reason a failed unit is visible on a
             # dashboard instead of only in the journal.
             name = "node exporter reports systemd unit state";
@@ -591,6 +636,49 @@
             );
           }
           {
+            # NPM's nginx writes its access and error logs into the container's
+            # volume, so they are the only logs on this box that never reach
+            # journald — and therefore the only ones needing a file source.
+            name = "Alloy also ships NPM's proxy logs, which never reach the journal";
+            assertion =
+              let
+                etc = cfg.environment.etc;
+              in
+              (etc ? "alloy/config.alloy")
+              && lib.hasInfix "loki.source.file" etc."alloy/config.alloy".text
+              && lib.hasInfix "/hdd_pool_1/services/npm/data/logs" etc."alloy/config.alloy".text;
+          }
+          {
+            # Same DynamicUser problem as the journal, same solution: a
+            # supplementary group is the only handle a service with no stable
+            # uid has on a file it does not own.
+            name = "Alloy is in the npm-logs group and that group exists";
+            assertion =
+              (cfg.users.groups ? npm-logs)
+              && builtins.elem "npm-logs" (cfg.systemd.services.alloy.serviceConfig.SupplementaryGroups or [ ]);
+          }
+          {
+            # The setgid bit is what makes a *new* proxy host's log file
+            # readable: without it nginx creates it root:root and Alloy cannot
+            # see it until the next switch re-runs the repair loop.
+            name = "NPM's log directory is group-readable, with setgid so new files inherit it";
+            assertion =
+              let
+                script = cfg.systemd.services.npm-data-dirs.script or "";
+              in
+              lib.hasInfix "chgrp npm-logs" script
+              && lib.hasInfix "chmod 2750 /hdd_pool_1/services/npm/data" script;
+          }
+          {
+            # core/audit.nix' rules land in /var/log/audit/audit.log — a 0600
+            # file in a 0700 directory, recreated on rotation, which a
+            # DynamicUser service can never be granted access to. The syslog
+            # plugin routes the events through journald instead, where the
+            # journal source already collects them.
+            name = "audit events are fanned out to syslog so they reach Loki";
+            assertion = cfg.security.auditd.plugins.syslog.active;
+          }
+          {
             name = "Grafana state lives on the redundant ZFS pool";
             assertion =
               cfg.services.grafana.enable && lib.hasPrefix "/hdd_pool_1/" cfg.services.grafana.dataDir;
@@ -648,6 +736,94 @@
                 types = lib.sort lib.lessThan (map (d: d.type) p.datasources.settings.datasources);
               in
               p.enable && lib.concatStringsSep "," types == "loki,prometheus";
+          }
+          {
+            # And a Grafana with no dashboards is a Grafana nobody opens twice.
+            # `allowUiUpdates = false` is the honest half: the JSON is a store
+            # path, so Grafana could not write an edit back even if it tried —
+            # stating it turns a confusing save failure into a greyed-out button.
+            name = "Grafana dashboards are provisioned from Nix and read-only in the UI";
+            assertion =
+              let
+                s = cfg.services.grafana.provision.dashboards.settings;
+              in
+              s != null && s.providers != [ ] && lib.all (p: !(p.allowUiUpdates or false)) s.providers;
+          }
+
+          # --- Alerting: alerts.nix ---
+          {
+            name = "Grafana alerting is provisioned and routes to ntfy over loopback";
+            assertion =
+              let
+                a = cfg.services.grafana.provision.alerting;
+                recv = builtins.head (builtins.head a.contactPoints.settings.contactPoints).receivers;
+              in
+              a.contactPoints.settings != null
+              && recv.type == "webhook"
+              && lib.hasPrefix "http://127.0.0.1:2586" recv.settings.url;
+          }
+          {
+            # Same rule as the Grafana admin password, enforced by a different
+            # mechanism: the provisioning YAML is generated into the
+            # world-readable store, so the publish token may only ever appear
+            # there as a reference to something resolved at runtime.
+            name = "the ntfy publish token is an environment reference, never a literal";
+            assertion =
+              let
+                recv = builtins.head (builtins.head cfg.services.grafana.provision.alerting.contactPoints.settings.contactPoints)
+                .receivers;
+              in
+              lib.hasPrefix "$" (recv.settings.authorization_credentials or "");
+          }
+          {
+            name = "Grafana reads the ntfy token from the sops-decrypted env file";
+            assertion =
+              cfg.systemd.services.grafana.serviceConfig.EnvironmentFile
+              == cfg.sops.secrets.ntfy-alert-token.path;
+          }
+          {
+            # A policy pointing at a receiver that does not exist is a policy
+            # that drops every notification on the floor.
+            name = "the notification policy routes to a contact point that exists";
+            assertion =
+              let
+                a = cfg.services.grafana.provision.alerting;
+                names = map (c: c.name) a.contactPoints.settings.contactPoints;
+              in
+              a.policies.settings != null
+              && a.policies.settings.policies != [ ]
+              && lib.all (p: builtins.elem p.receiver names) a.policies.settings.policies;
+          }
+          {
+            # A rule pointing at a datasource uid grafana.nix does not provision
+            # is a rule that silently never evaluates — which looks exactly like
+            # a rule that is never true.
+            name = "alert rules reference only the provisioned datasources";
+            assertion =
+              let
+                groups = cfg.services.grafana.provision.alerting.rules.settings.groups;
+                uids = lib.concatMap (g: lib.concatMap (r: map (d: d.datasourceUid) r.data) g.rules) groups;
+              in
+              groups != [ ]
+              && lib.all (
+                u:
+                builtins.elem u [
+                  "prometheus"
+                  "loki"
+                  "__expr__"
+                ]
+              ) uids;
+          }
+          {
+            # The summary is what actually reaches the phone (the ntfy payload
+            # template reads `.CommonAnnotations.summary`), so a rule without
+            # one notifies with an empty body.
+            name = "every alert rule carries a severity label and a summary";
+            assertion =
+              let
+                groups = cfg.services.grafana.provision.alerting.rules.settings.groups;
+              in
+              lib.all (g: lib.all (r: (r.labels ? severity) && (r.annotations ? summary)) g.rules) groups;
           }
           {
             # Same guard as the Paperless one: without these oneshots loki and
@@ -947,7 +1123,130 @@
           ./modules/nixos/server/metrics.nix
           ./modules/nixos/server/logs.nix
           ./modules/nixos/server/grafana.nix
+          ./modules/nixos/server/alerts.nix
+          # Not decoration: metrics.nix now runs the postgres exporter as the
+          # `postgres` system user, which does not exist without this module —
+          # the exporter would fail to start and take the "every target is
+          # healthy" assertion with it.
+          ./modules/nixos/server/postgresql.nix
+          # A real ntfy, so the contact point's payload is validated by the
+          # thing that has to accept it. Grafana's webhook body is the single
+          # riskiest unverified piece of alerts.nix; asserting a message comes
+          # out the other end is the only check that actually proves it.
+          ./modules/nixos/server/ntfy.nix
         ];
+
+        services = {
+          # The provisioned contact point authenticates with a token this VM
+          # cannot possibly hold, so let unauthenticated publishes through. The
+          # payload *format* is what is under test here, not the credential.
+          ntfy-sh.settings.auth-default-access = lib.mkForce "write-only";
+
+          # Same reasoning as postgresqlTestNode: put the dump somewhere on the
+          # VM's own disk rather than the pool.
+          postgresqlBackup.location = lib.mkForce "/var/lib/postgresql-dump";
+
+          # Virtio disks expose no SMART data, and smartctl_exporter exits when
+          # `smartctl --scan` finds nothing. metrics.nix drops its scrape config
+          # along with it, so this leaves no permanently-down target behind.
+          #
+          # Blackbox is deliberately left *enabled*, unlike smartctl: the VM has
+          # no route to the internet, but blackbox answers /probe with HTTP 200
+          # and `probe_success 0` rather than failing the request, so the scrape
+          # target stays healthy and the relabel_configs dance — the part that
+          # is actually easy to get wrong — is exercised for real.
+          prometheus.exporters.smartctl.enable = lib.mkForce false;
+
+          # A rule that is true the moment it is evaluated, so the test does not
+          # have to manufacture a real fault to see a notification. `groups` is
+          # a list option, so this merges with alerts.nix's real group rather
+          # than replacing it. Written out longhand because alerts.nix' `mkRule`
+          # helper is private to that module.
+          grafana.provision.alerting.rules.settings.groups = [
+            {
+              name = "nixos-test";
+              folder = "Home server";
+              interval = "10s";
+              rules = [
+                {
+                  uid = "always-firing";
+                  title = "always-firing";
+                  condition = "C";
+                  data = [
+                    {
+                      refId = "A";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      datasourceUid = "prometheus";
+                      model = {
+                        refId = "A";
+                        expr = "vector(1)";
+                        instant = true;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                        datasource = {
+                          type = "prometheus";
+                          uid = "prometheus";
+                        };
+                      };
+                    }
+                    {
+                      refId = "B";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      datasourceUid = "__expr__";
+                      model = {
+                        refId = "B";
+                        type = "reduce";
+                        expression = "A";
+                        reducer = "last";
+                        settings.mode = "dropNN";
+                        datasource = {
+                          type = "__expr__";
+                          uid = "__expr__";
+                        };
+                      };
+                    }
+                    {
+                      refId = "C";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      datasourceUid = "__expr__";
+                      model = {
+                        refId = "C";
+                        type = "threshold";
+                        expression = "B";
+                        conditions = [
+                          {
+                            evaluator = {
+                              type = "gt";
+                              params = [ 0 ];
+                            };
+                          }
+                        ];
+                        datasource = {
+                          type = "__expr__";
+                          uid = "__expr__";
+                        };
+                      };
+                    }
+                  ];
+                  noDataState = "OK";
+                  execErrState = "Alerting";
+                  for = "0s";
+                  labels.severity = "info";
+                  annotations.summary = "Synthetic rule that exists only to prove the ntfy delivery path works.";
+                }
+              ];
+            }
+          ];
+        };
 
         environment.etc."test-age-key.txt" = {
           text = testAgeKey + "\n";
@@ -975,13 +1274,17 @@
               sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
               key = "fixture_secret";
             };
+            # Redirected for the same reason, but never read: the real file is
+            # encrypted to the master and home-server keys, which this VM does
+            # not have, and grafana's EnvironmentFile is pointed elsewhere
+            # below. It has to resolve to *something* decryptable or sops-nix
+            # fails at activation and takes the boot with it.
+            ntfy-alert-token = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
+            };
           };
         };
-
-        # Virtio disks expose no SMART data, and smartctl_exporter exits when
-        # `smartctl --scan` finds nothing. metrics.nix drops its scrape config
-        # along with it, so this leaves no permanently-down target behind.
-        services.prometheus.exporters.smartctl.enable = lib.mkForce false;
 
         systemd.services = {
           loki-data-dirs = {
@@ -992,6 +1295,20 @@
             requires = lib.mkForce [ ];
             after = lib.mkForce [ ];
           };
+          postgresql-dump-dirs = {
+            requires = lib.mkForce [ ];
+            after = lib.mkForce [ ];
+            before = lib.mkForce [ ];
+            requiredBy = lib.mkForce [ ];
+          };
+          # The fixture below holds a bare sentinel, not a `KEY=value` line, so
+          # systemd would refuse to parse it as an EnvironmentFile and grafana
+          # would never start. Point at a well-formed one instead — the token's
+          # value is irrelevant once ntfy is set to accept unauthenticated
+          # publishes.
+          grafana.serviceConfig.EnvironmentFile = lib.mkForce (
+            pkgs.writeText "ntfy-alert-token-env" "NTFY_ALERT_TOKEN=tk_test\n"
+          );
         };
 
         environment.systemPackages = [
@@ -1328,24 +1645,44 @@
           let
             cfg = hosts.home-server.config;
           in
-          mkHostCheck "home-server" (
-            serverAssertions "home-server" cfg
-            ++ [
-              # No desktop/workstation stack leaked in via a stray import.
-              {
-                name = "no Hyprland / desktop session on the server";
-                assertion = !cfg.programs.hyprland.enable;
-              }
-              {
-                name = "stylix disabled (headless, no theming)";
-                assertion = !cfg.stylix.enable;
-              }
-              {
-                name = "chaotic module NOT loaded";
-                assertion = !(hosts.home-server.options ? chaotic);
-              }
-            ]
-          ) "";
+          mkHostCheck "home-server"
+            (
+              serverAssertions "home-server" cfg
+              ++ [
+                # No desktop/workstation stack leaked in via a stray import.
+                {
+                  name = "no Hyprland / desktop session on the server";
+                  assertion = !cfg.programs.hyprland.enable;
+                }
+                {
+                  name = "stylix disabled (headless, no theming)";
+                  assertion = !cfg.stylix.enable;
+                }
+                {
+                  name = "chaotic module NOT loaded";
+                  assertion = !(hosts.home-server.options ? chaotic);
+                }
+              ]
+            )
+            # The provisioned dashboards are the one part of the server config
+            # that is data rather than Nix, so the module system checks nothing
+            # about them. These two mistakes each cost an hour and are both
+            # trivially detectable: a leftover numeric `id` makes provisioning
+            # collide with an unrelated row already in Grafana's database, and a
+            # panel pointing at a datasource uid grafana.nix does not provision
+            # renders as an empty panel with no error anywhere.
+            ''
+              for f in ${./modules/nixos/server/dashboards}/*.json; do
+                ${pkgs.jq}/bin/jq -e '.uid and .title and (has("id") | not)' "$f" > /dev/null
+                ${pkgs.jq}/bin/jq -e '
+                  [ .. | objects
+                    | select(has("uid") and has("type"))
+                    | select(.type == "prometheus" or .type == "loki")
+                    | .uid ]
+                  | all(. == "prometheus" or . == "loki")
+                ' "$f" > /dev/null
+              done
+            '';
 
         # Boot private-laptop config, assert multi-user.target.
         test-boot-private-laptop = testLib.makeTest {
@@ -1707,6 +2044,12 @@
             machine.wait_for_unit("prometheus-node-exporter.service")
             machine.wait_for_unit("loki.service")
             machine.wait_for_unit("alloy.service")
+            machine.wait_for_unit("postgresql.service")
+            machine.wait_for_unit("prometheus-postgres-exporter.service")
+            machine.wait_for_unit("ntfy-sh.service")
+            # Reaching active is itself the assertion that every provisioning
+            # file parsed. Unlike datasources, a malformed alerting provision is
+            # fatal: Grafana refuses to start rather than skipping it.
             machine.wait_for_unit("grafana.service")
 
             machine.wait_for_open_port(9090)
@@ -1752,8 +2095,37 @@
                 "| jq -r '[.data.activeTargets[].labels.job] | sort | join(\",\")'"
             ).strip()
             # smartctl is absent by design on this node — see the comment on
-            # observabilityTestNode.
-            assert jobs == "alloy,grafana,loki,node,prometheus", jobs
+            # observabilityTestNode. blackbox is present, which also proves the
+            # relabel_configs rewrote __address__ back to the local exporter:
+            # without that Prometheus would be trying to dial the probe URL as a
+            # host:port and the target would be down.
+            assert jobs == "alloy,blackbox-http,grafana,loki,node,postgres,prometheus", jobs
+
+            # `instance` is the probed URL rather than 127.0.0.1:9115 — the
+            # second half of the relabel dance, and what makes the series read
+            # like a site on a dashboard.
+            machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active' "
+                "| jq -e '[.data.activeTargets[] "
+                '| select(.labels.job == "blackbox-http") '
+                "| .labels.instance] | index(\"https://git.mauderer.work\")'"
+            )
+
+            # The postgres exporter reached the cluster: `pg_up 1` is the proof
+            # that the socket + peer-auth path works with no password anywhere,
+            # which is the whole reason this exporter needs no sops secret.
+            machine.wait_until_succeeds(
+                "curl -fsS http://127.0.0.1:9187/metrics | grep -q '^pg_up 1'", timeout=120
+            )
+
+            # Blackbox answers a probe even when the probe itself cannot
+            # succeed. probe_success is 0 in a VM with no network — that is the
+            # point: a failing probe is a *value*, not a failed scrape, which is
+            # why the target above is healthy.
+            machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9115/probe"
+                "?module=http_2xx&target=https://example.invalid' | grep -q '^probe_success'"
+            )
 
             # Grafana: the sops-decrypted password is what the instance actually
             # accepts, and both datasources were provisioned from Nix.
@@ -1803,6 +2175,97 @@
                 "| jq -e '.data.result | length > 0'",
                 timeout=180,
             )
+
+            # The NPM path end to end, and the reason it needs its own check:
+            # a root-owned setgid directory on the pool, an Alloy running under
+            # DynamicUser that can reach it only through the npm-logs group, and
+            # a regex stage that turns an nginx line into a queryable label.
+            # reverse-proxy.nix is not imported here, so build the directory the
+            # way its oneshot would.
+            machine.succeed(
+                "mkdir -p /hdd_pool_1/services/npm/data/logs && "
+                "chgrp npm-logs /hdd_pool_1/services/npm "
+                "/hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/data/logs && "
+                "chmod 0750 /hdd_pool_1/services/npm && "
+                "chmod 2750 /hdd_pool_1/services/npm/data "
+                "/hdd_pool_1/services/npm/data/logs"
+            )
+            machine.succeed(
+                "printf '%s\\n' '[06/Aug/2026:12:00:00 +0000] - 200 200 - GET https "
+                'git.mauderer.work "/api/healthz" [Client 10.88.0.1] [Length 12] '
+                "[Gzip -] [Sent-to 127.0.0.1]' "
+                "> /hdd_pool_1/services/npm/data/logs/proxy-host-1_access.log"
+            )
+            # Queried by `status`, not just by `job`: matching on an extracted
+            # label proves the regex stage parsed the line rather than merely
+            # that the file was tailed. local.file_match re-globs every minute,
+            # hence the generous timeout.
+            machine.wait_until_succeeds(
+                "curl -fsS -G http://127.0.0.1:3100/loki/api/v1/query_range "
+                "--data-urlencode 'query={job=\"npm\",status=\"200\"}' "
+                "| jq -e '.data.result | length > 0'",
+                timeout=240,
+            )
+
+            # auditd fans its events into syslog, which is how they reach the
+            # journal source above — the file it writes is unreadable to a
+            # DynamicUser service.
+            machine.succeed("grep -q 'active = yes' /etc/audit/plugins.d/syslog.conf")
+
+            # Dashboards are provisioned and marked as such. `.meta.provisioned`
+            # is the assertion that these are the read-only Nix-managed ones
+            # rather than something left in the database by an earlier step.
+            for uid in ["home-host", "home-services", "home-logs", "home-http"]:
+                machine.wait_until_succeeds(
+                    "PW=$(cat /run/secrets/grafana-admin-password); "
+                    'curl -fsS -u "admin:$PW" '
+                    f"http://127.0.0.1:3030/api/dashboards/uid/{uid} "
+                    "| jq -e '.meta.provisioned == true'",
+                    timeout=60,
+                )
+
+            # Alerting: the contact point, the policy tree and the notification
+            # template all made it through provisioning.
+            for endpoint in ["contact-points", "policies", "templates"]:
+                machine.wait_until_succeeds(
+                    "PW=$(cat /run/secrets/grafana-admin-password); "
+                    'curl -fsS -u "admin:$PW" '
+                    f"http://127.0.0.1:3030/api/v1/provisioning/{endpoint} "
+                    "| grep -q ntfy",
+                    timeout=60,
+                )
+            rules = machine.succeed(
+                "PW=$(cat /run/secrets/grafana-admin-password); "
+                'curl -fsS -u "admin:$PW" '
+                "http://127.0.0.1:3030/api/v1/provisioning/alert-rules | jq -e 'length'"
+            ).strip()
+            assert int(rules) >= 9, rules
+
+            # The end of the whole chain: the `always-firing` rule this node
+            # adds trips, the notification policy routes it to the ntfy contact
+            # point, and the custom payload template renders a body ntfy
+            # accepts. That last step is the one thing here that cannot be
+            # checked statically — Grafana's webhook posts its own JSON envelope
+            # by default, which ntfy would publish as an unreadable wall of
+            # JSON, and a malformed replacement is a 400 at publish time that
+            # nothing else would notice. If a message comes out of the topic,
+            # the format is right.
+            #
+            # group_wait is 30s and the group evaluates every minute, so this
+            # takes a couple of minutes to arrive.
+            machine.wait_until_succeeds(
+                "curl -fsS 'http://127.0.0.1:2586/alerts/json?poll=1' "
+                "| jq -e -s 'map(select(.event == \"message\")) | length > 0'",
+                timeout=300,
+            )
+            # And it is a real notification rather than a dump of Grafana's
+            # envelope: the title comes from the template's `%q`-quoted
+            # printf, so finding the alertname there proves it rendered.
+            message = machine.succeed(
+                "curl -fsS 'http://127.0.0.1:2586/alerts/json?poll=1' "
+                "| jq -e -r -s 'map(select(.event == \"message\")) | .[0].title'"
+            ).strip()
+            assert "always-firing" in message, message
           '';
         };
 

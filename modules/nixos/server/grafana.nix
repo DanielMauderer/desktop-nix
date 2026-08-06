@@ -19,11 +19,16 @@
 # assertion in flake.nix.
 #
 # Storage: the SQLite database lives on the mirrored ZFS pool. It is small, but
-# it holds every hand-built dashboard, alert rule and API key — the one part of
-# the observability stack that is not derived from something else and cannot be
-# rebuilt by waiting. Datasources are provisioned from Nix instead, so a fresh
-# install comes up already wired to Prometheus and Loki; dashboards are imported
-# in the UI, the same division of labour as NPM's UI-managed proxy hosts.
+# it holds every hand-built dashboard and API key — the one part of the
+# observability stack that is not derived from something else and cannot be
+# rebuilt by waiting.
+#
+# Datasources and dashboards are both provisioned from Nix, so a fresh install
+# comes up wired to Prometheus and Loki *and* already showing something. Both
+# are consequently read-only in the UI: edit `./dashboards/*.json` and rebuild,
+# or use "Save as copy" for a throwaway. Dashboards built by hand stay in the
+# database untouched — provisioning adds, it never cleans up after itself.
+# Alerting is provisioned too, from alerts.nix.
 { config, ... }:
 let
   dataDir = "/hdd_pool_1/services/grafana";
@@ -38,6 +43,11 @@ let
   # Keep in sync with metrics.nix and logs.nix.
   prometheusUrl = "http://127.0.0.1:9090";
   lokiUrl = "http://127.0.0.1:3100";
+
+  # The folder the provisioned dashboards land in. Keep in sync with alerts.nix,
+  # which puts its rule group in the same folder so a board and the alerts about
+  # it sit together — Grafana creates the folder on demand from either side.
+  dashboardFolder = "Home server";
 
   # Shared shape for both sops entries below.
   secret = {
@@ -131,6 +141,41 @@ in
             uid = "loki";
             access = "proxy";
             url = lokiUrl;
+          }
+        ];
+      };
+
+      # Four small dashboards written for *this* box, rather than an imported
+      # grafana.com board: the generic ones are thousands of lines and half
+      # their panels are for hardware that is not here, while these name the
+      # actual units, mountpoints and proxy hosts.
+      #
+      # The panels reference the datasources above by the fixed uids
+      # `prometheus` and `loki`, which is what lets the JSON be checked into the
+      # repo unmodified — there is nothing to substitute at build time, so the
+      # directory is passed through as a plain store path.
+      dashboards.settings = {
+        apiVersion = 1;
+        providers = [
+          {
+            name = "nix";
+            type = "file";
+            folder = dashboardFolder;
+            # Read-only in the UI. Grafana could not write back to a store path
+            # in any case; saying so explicitly turns a confusing "save failed"
+            # into a greyed-out button.
+            allowUiUpdates = false;
+            # This provider is a mirror of the repo, not an append-only import:
+            # deleting a file below should remove the dashboard, or a renamed
+            # board lingers forever as an orphan nobody dares delete.
+            disableDeletion = false;
+            # The path is a store path that only changes on rebuild, so polling
+            # is a formality — but Grafana insists on a value.
+            updateIntervalSeconds = 60;
+            options = {
+              path = ./dashboards;
+              foldersFromFilesStructure = false;
+            };
           }
         ];
       };

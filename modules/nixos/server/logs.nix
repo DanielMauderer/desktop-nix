@@ -1,6 +1,20 @@
 # Logs half of the observability stack: Loki as the log store, Grafana Alloy as
-# the agent that ships this host's systemd journal into it. metrics.nix is the
-# matching half for metrics; grafana.nix reads both.
+# the agent that ships this host's logs into it. metrics.nix is the matching
+# half for metrics; grafana.nix reads both.
+#
+# Two sources, and the split is worth understanding before adding a third:
+#
+#   the journal   — everything on this box is a native systemd unit (Forgejo,
+#                   Paperless, ntfy, Postgres, the Cloudflare DDNS timer, the
+#                   nightly dumps), so `loki.source.journal` already covers all
+#                   of them: `{unit="postgresql.service"}` and friends. sudo
+#                   arrives here too, via authpriv, as does auditd — see the
+#                   `auditd.plugins.syslog` note at the bottom. A new *service*
+#                   therefore needs no change to this file.
+#   NPM's files   — the reverse proxy is the one container on the box, and its
+#                   nginx writes access/error logs straight into its volume.
+#                   Those never touch journald, which is why there is a file
+#                   source below and a group to make it readable.
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
 #   3100  Loki's HTTP API — push *and* query. This is the one piece of the stack
@@ -36,6 +50,19 @@ let
 
   httpPort = 3100;
   grpcPort = 9096;
+
+  # NPM's nginx writes its access and error logs to files inside its volume, so
+  # they are the one thing on this box that never reaches journald. The path is
+  # the host side of reverse-proxy.nix's `/hdd_pool_1/services/npm/data:/data`
+  # bind mount — keep both in sync.
+  npmLogDir = "/hdd_pool_1/services/npm/data/logs";
+
+  # Alloy runs under DynamicUser, so it owns nothing and can be granted nothing
+  # by uid. A supplementary group is the only handle it has on a file it does
+  # not own — the same mechanism that already gets it into the journal. The
+  # group is declared here, by the module that *reads* the files;
+  # reverse-proxy.nix, which owns the directory, is what puts the group on it.
+  npmLogGroup = "npm-logs";
 
   # Keep in sync with forgejo.nix and nfs.nix — same LAN, same VPN subnet as
   # wireguard.nix, same podman bridge as the NPM container and Actions jobs.
@@ -92,6 +119,82 @@ let
       // day, so a restart cannot replay months of journal into Loki and trip
       // the ingestion rate limit.
       max_age = "12h"
+    }
+
+    // NPM's nginx logs. This is the only non-journal source on the box: the
+    // reverse proxy runs in a container that writes them straight into its
+    // volume, so nothing about a request to git.mauderer.work is visible from
+    // the journal — `podman-npm.service` carries only nginx's startup chatter.
+    local.file_match "npm" {
+      path_targets = [
+        { __path__ = "${npmLogDir}/*_access.log", job = "npm", log_type = "access" },
+        { __path__ = "${npmLogDir}/*_error.log",  job = "npm", log_type = "error"  },
+      ]
+
+      // NPM creates a fresh pair of files whenever a proxy host is added in its
+      // UI, so the glob has to be re-evaluated rather than resolved once at
+      // startup.
+      sync_period = "1m"
+    }
+
+    loki.source.file "npm" {
+      targets    = local.file_match.npm.targets
+      forward_to = [loki.process.npm.receiver]
+
+      // Same intent as `max_age` on the journal source: a first start (or a
+      // restart after the state directory is lost) must not replay the whole
+      // accumulated access log into Loki.
+      tail_from_end = true
+    }
+
+    loki.process "npm" {
+      forward_to = [loki.write.local.receiver]
+
+      // Only the access log has a fixed shape. NPM's proxy hosts use its
+      // `proxy` log_format:
+      //
+      //   [$time_local] $upstream_cache_status $upstream_status $status -
+      //   $request_method $scheme $host "$request_uri" [Client $remote_addr] …
+      //
+      // The error log is nginx's own free-form format and is forwarded
+      // unparsed. A line that does not match falls through untouched rather
+      // than being dropped, so the `standard` log_format that NPM uses for
+      // 404/dead hosts still arrives — just without the labels.
+      stage.match {
+        selector = `{log_type="access"}`
+
+        stage.regex {
+          expression = `^\[(?P<ts>[^\]]+)\] (?P<cache_status>\S+) (?P<upstream_status>\S+) (?P<status>\d{3}) - (?P<method>\S+) (?P<scheme>\S+) (?P<vhost>\S+) "(?P<uri>[^"]*)" \[Client (?P<client>[^\]]+)\]`
+        }
+
+        // Three labels, all bounded: a handful of status codes, a handful of
+        // methods, one vhost per proxy host. `client` is extracted and stays in
+        // the line — promoting a visitor IP to a label is one Loki stream per
+        // client, which is the textbook way to destroy an instance. Same
+        // reasoning as the journal relabels above.
+        stage.labels {
+          values = {
+            status = "status",
+            method = "method",
+            vhost  = "vhost",
+          }
+        }
+
+        // Use nginx's own timestamp rather than the moment Alloy read the line,
+        // so a backlog after a restart lands at the right place on a graph.
+        stage.timestamp {
+          source = "ts"
+          format = "02/Jan/2006:15:04:05 -0700"
+        }
+
+        // loki.source.file adds `filename` automatically. On an access line
+        // that is one stream per proxy-host file for no query value `vhost`
+        // does not already give — but it is left in place on error lines
+        // below, where it is the only thing identifying the host.
+        stage.label_drop {
+          values = ["filename"]
+        }
+      }
     }
 
     loki.write "local" {
@@ -200,15 +303,41 @@ in
 
   environment.etc."alloy/config.alloy".text = alloyConfig;
 
+  # Declared here rather than in reverse-proxy.nix so this module stays
+  # self-contained — the VM test node imports logs.nix without the proxy.
+  users.groups.${npmLogGroup} = { };
+
   systemd.services.alloy = {
-    # Alloy runs under DynamicUser, so journal access is not inherited from
-    # anywhere — without this group the source component starts and reads
-    # nothing but its own messages.
-    serviceConfig.SupplementaryGroups = [ "systemd-journal" ];
+    # Alloy runs under DynamicUser, so file access is not inherited from
+    # anywhere — without these groups the source components start and read
+    # nothing but Alloy's own messages.
+    #
+    # systemd-journal: the journal source. npm-logs: NPM's files on the pool,
+    # whose directory reverse-proxy.nix hands to this group.
+    #
+    # (`serviceConfig` values are systemd unit options, which merge by
+    # concatenation, so this adds to the upstream module's own
+    # `SupplementaryGroups` rather than replacing it. systemd-journal is
+    # restated because it is the reason this block exists at all.)
+    serviceConfig.SupplementaryGroups = [
+      "systemd-journal"
+      npmLogGroup
+    ];
     # Ordering only, never a Requires: Alloy retries pushes with backoff, so it
     # must survive Loki being down rather than refusing to start with it.
     after = [ "loki.service" ];
   };
+
+  # The audit rules in core/hardening.nix' sibling core/audit.nix produce events
+  # that never reach journald on their own: auditd owns the kernel's audit
+  # netlink socket, and writes to /var/log/audit/audit.log — a 0600 file in a
+  # 0700 directory, recreated on every rotation, which a DynamicUser service
+  # cannot read and cannot be given an ACL for (its uid changes).
+  #
+  # Rather than fight that, have auditd fan the events out to syslog, where the
+  # journal source above already collects them: `{syslog_identifier="audisp-syslog"}`.
+  # Keep in sync with core/audit.nix, which defines the rules themselves.
+  security.auditd.plugins.syslog.active = true;
 
   # :3100 is admitted only from the three named sources. The podman bridge is
   # the interesting one — it is what lets a containerised deployment on this box

@@ -261,24 +261,76 @@ it in NPM.
    Grafana's database. **Leave it alone.** It also ships random, which is what
    you want, and unlike the admin password it cannot be rotated: the database is
    encrypted under it and there is no official re-key path, so changing it
-   orphans anything already stored. Harmless before first use, not after.
+   orphans anything already stored. That used to be harmless before first use —
+   it no longer is, because the alerting contact point in step 5 stores the ntfy
+   token under this key from the first boot.
 2. **Log in.** With the VPN up, browse `http://10.100.0.1:3030` as `admin`. The
    port is 3030, not Grafana's default 3000, because 3000-3010 is already spoken
    for on this box.
 3. **Datasources are already there.** `Prometheus` and `Loki` are provisioned
    from Nix (`modules/nixos/server/grafana.nix`) and are read-only in the UI —
    edit them in that file, not in the browser.
-4. **Import dashboards.** Nothing is provisioned: use *Dashboards → New →
-   Import* and paste a grafana.com dashboard ID. `1860` (Node Exporter Full) is
-   the one to start with; `13639` gives a Loki log view. Imported dashboards live
-   in the SQLite database on the pool, so they survive an SSD rebuild.
+4. **Dashboards are already there too.** Four are provisioned from
+   `modules/nixos/server/dashboards/`, in the *Home server* folder: **Host**
+   (CPU, memory, both filesystems, disk and network throughput, ZFS ARC,
+   temperatures), **Services** (scrape targets, unit state, failed units, how
+   long ago each nightly backup ran, cert expiry), **Logs** (journal volume and
+   errors, with a `unit` picker) and **HTTP** (NPM's access logs by status,
+   vhost and method).
+
+   Like the datasources they are **read-only in the UI** — the JSON is a Nix
+   store path, so there is nothing to save back to. Change a panel by editing
+   the file and rebuilding; use *Save as copy* for a throwaway. Dashboards you
+   build in the browser are unaffected and live in the database on the pool.
+5. **Point alerting at your phone.** Everything is provisioned except the
+   credential, which has to come from ntfy at runtime. Using the write-only
+   `svc` account from §7:
+   ```sh
+   sudo ntfy token add --label "grafana alerting" svc   # prints tk_…
+   ```
+   Then put it in sops — note this one is an **env-file line**, not a bare value
+   like the Grafana secrets:
+   ```sh
+   nix develop
+   sops secrets/home-server/ntfy.yaml
+   # ntfy-alert-token: NTFY_ALERT_TOKEN=tk_…
+   ```
+   Commit and `switch`. The repo ships an obvious placeholder, so until you do
+   this Grafana starts fine and every notification is silently rejected by ntfy
+   with a 401 — verify rather than assume (below).
+
+   Subscribe the phone to the `alerts` topic; the `maudi` admin account from §7
+   already has read access to it.
 
 Worth knowing:
 
 - **What is scraped:** the host's node exporter (CPU, memory, disks,
-  filesystems, network, hwmon temperatures, ZFS ARC, systemd unit state), the
-  smartctl exporter (per-drive SMART health for the pool disks and the NVMe
-  root), and Prometheus, Loki, Alloy and Grafana themselves.
+  filesystems, network, hwmon temperatures, ZFS ARC, systemd unit *and timer*
+  state), the smartctl exporter (per-drive SMART health for the pool disks and
+  the NVMe root), the postgres exporter (over the Unix socket as the `postgres`
+  user — no password anywhere), the blackbox exporter (HTTPS probes of
+  `git.mauderer.work` and `ntfy.mauderer.work`), and Prometheus, Loki, Alloy and
+  Grafana themselves.
+- **What is in Loki**, and the labels worth knowing:
+  - `{job="systemd-journal", unit="forgejo.service"}` — every service on this
+    box is a native systemd unit, so the journal already covers all of them:
+    Postgres, Forgejo, Paperless, ntfy, the Cloudflare DDNS timer, the nightly
+    dumps. Adding a service needs no change to `logs.nix`.
+  - `{syslog_identifier="sudo"}`, `{syslog_identifier="audisp-syslog"}` — sudo
+    arrives through authpriv, and the audit rules through auditd's syslog
+    plugin. Neither is read out of `/var/log`.
+  - `{job="npm", vhost="git.mauderer.work", status="200"}` — NPM's nginx access
+    logs, the one source that is not the journal. Also `log_type="error"` for
+    nginx's own error log. The client IP is deliberately *not* a label (one Loki
+    stream per visitor is how the instance gets ruined) — filter the line
+    instead: `{job="npm"} |= "Client 1.2.3.4"`.
+- **Uptime probes measure the outside view.** `probe_success` covers DNS, the
+  dynamic AAAA record, the Cloudflare edge, NPM and the backend — so it can go
+  red while every local unit is happily active, which is the point. One caveat:
+  because `*.mauderer.work` is proxied (orange cloud),
+  `probe_ssl_earliest_cert_expiry` is **Cloudflare's edge certificate**, not
+  NPM's Let's Encrypt one. `metrics.nix` documents how to probe the origin
+  directly if you want the LE cert watched.
 - **Retention** is 90 days on both sides. Prometheus additionally caps its TSDB
   blocks at 20 GiB and trims on whichever limit trips first. That cap bounds
   Prometheus, not the SSD as a whole — watch `node_filesystem_avail_bytes` for
@@ -289,9 +341,37 @@ Worth knowing:
   authentication** on that port — the source restriction is the access control,
   so never add it to `allowedTCPPorts`. To have Prometheus scrape a deployment,
   add a job to `scrapeConfigs` in `modules/nixos/server/metrics.nix`.
-- **No alerting yet.** Alertmanager is deliberately not configured — it needs a
-  notification route (SMTP or a webhook, plus a sops-held credential) that hasn't
-  been chosen.
+- **Alerting** is Grafana's own, not Alertmanager, and every rule is in
+  `modules/nixos/server/alerts.nix` rather than clicked into the database. Nine
+  rules ship: root and pool free space, any failed systemd unit, a dead scrape
+  target, a nightly backup that has not run in 36 h, SMART failure, a public
+  endpoint down, a certificate inside 14 days, and repeated SSH auth failures
+  (the one rule that queries Loki rather than Prometheus). All route to the
+  `alerts` topic on ntfy with priority 4 while firing and 3 on recovery.
+
+  The rules and the notification policy are read-only in the UI for the same
+  reason the dashboards are. Two are deliberately absent and documented in the
+  module: a ZFS **pool health** alert, because the node exporter's zfs collector
+  exposes ARC and IO but not `zpool status` (a failing scrub still shows up as a
+  failed unit); and per-attribute SMART thresholds, pending confirmation of the
+  exporter's label names on this hardware.
+- **Verify alerting rather than trusting it.** A wrong token fails silently — 
+  Grafana starts, and ntfy rejects each notification with a 401 nobody sees.
+  After the switch:
+  ```sh
+  # rules loaded?
+  PW=$(sudo cat /run/secrets/grafana-admin-password)
+  curl -fsS -u "admin:$PW" http://10.100.0.1:3030/api/v1/provisioning/alert-rules | jq length
+
+  # does the token actually publish?
+  sudo sh -c 'set -a; . /run/secrets/ntfy-alert-token; \
+    curl -fsS -H "Authorization: Bearer $NTFY_ALERT_TOKEN" \
+      -d "{\"topic\":\"alerts\",\"title\":\"test\",\"message\":\"hello\"}" \
+      http://127.0.0.1:2586/'
+  ```
+  The second command should make the phone buzz. Better still, cause a real
+  alert once — `systemctl start` something that fails — and confirm it arrives
+  with a readable title rather than a wall of JSON.
 
 ## 9. Verify
 
