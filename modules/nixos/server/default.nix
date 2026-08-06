@@ -8,6 +8,7 @@ _: {
     ./forgejo.nix
     ./forgejo-runner.nix
     ./paperless.nix
+    ./ntfy.nix
     ./postgresql.nix
     ./metrics.nix
     ./logs.nix

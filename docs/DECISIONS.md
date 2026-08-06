@@ -135,6 +135,21 @@ matters lives here; the rest is in the Nix code and `git log`.
   drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: six
   service oneshots create siblings there with no ordering between them, so a
   group-owned `0750` parent can only work for one of them.
+- **Push notifications = native `services.ntfy-sh`, public through NPM, closed by
+  default** — home-server. The exposure call is the opposite of Paperless's and
+  for the same reason: a notification that only arrives while the phone is on the
+  VPN is not a push notification, so `:2586` gets an NPM proxy host
+  (`ntfy.mauderer.work`) and is admitted from the podman bridge and `wg0` only —
+  no new WAN ports. Being public is exactly why it ships shut:
+  `auth-default-access: deny-all`, no self-signup, `behind-proxy` on so rate
+  limiting sees real clients, and attachments disabled so it is not a public
+  upload target. Accounts and tokens are created with the `ntfy` CLI rather than
+  declared in Nix: `auth-users`/`auth-tokens` would put bcrypt hashes and live
+  tokens in the world-readable store, and the only alternative — an
+  `environmentFile` sops secret — buys little for three accounts. State (auth db
+  + a 12 h message cache) stays on the SSD with no ZFS-pool path and no backup:
+  it is four commands to recreate, and anything worth keeping belongs in the
+  service that sent the notification.
 - **Observability = native Prometheus + Loki + Grafana, Grafana VPN-only** —
   home-server. Three modules (`metrics.nix`, `logs.nix`, `grafana.nix`), native
   services rather than the usual container, and no new WAN ports. Grafana is on

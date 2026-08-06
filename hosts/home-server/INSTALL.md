@@ -25,7 +25,7 @@ The secrets-first work is done and in git:
   the install succeeds.
 - Service credentials that must exist at eval time are committed encrypted:
   `secrets/home-server/{cloudflare,paperless,grafana}.yaml`. The Grafana one
-  ships with a random password nobody has seen — replace it in step 7.
+  ships with a random password nobody has seen — replace it in step 8.
 
 ## 1. Check before you install
 
@@ -101,8 +101,10 @@ registration token can only be minted once the forge is running.
 2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
    domain `git.mauderer.work`, forward to `http://10.88.0.1:4000` (the podman
    bridge gateway — i.e. this host, as seen from the NPM container), websockets
-   on, then request a Let's Encrypt cert. No DNS change is needed: the proxied
-   wildcard AAAA from `cloudflare-ddns.nix` already covers it. In the host's
+   on, then request a Let's Encrypt cert. No *new* DNS record is needed — the
+   wildcard AAAA from `cloudflare-ddns.nix` already covers the name — but see
+   the HTTP-01 note in §9: the wildcard has to be grey-clouded while the cert is
+   issued, then switched back to proxied. In the host's
    *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
 3. **Runner token.** In Forgejo: Site Administration → Actions → Runners →
    *Create new runner* → copy the registration token. Then, in the repo:
@@ -171,7 +173,75 @@ Worth knowing:
 - `paperless-manage` is on `PATH` on the server for admin tasks
   (`paperless-manage createsuperuser`, `document_exporter`, …).
 
-## 7. Observability (metrics, logs, dashboards)
+## 7. ntfy (push notifications)
+
+ntfy comes up with the rest of the system, but it starts **closed**: with
+`auth-default-access: deny-all` and no accounts yet, every request except the
+health endpoint is answered with 403. That is deliberate — unlike Paperless this
+one *is* published, so it has to be shut the moment it becomes reachable.
+
+1. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
+   domain `ntfy.mauderer.work`, forward to `http://10.88.0.1:2586` (the podman
+   bridge gateway — this host as the NPM container sees it), **websockets on**
+   (the phone apps hold a WebSocket; without this they silently never connect),
+   then request a Let's Encrypt cert. As with Forgejo, no *new* DNS record is
+   needed — the wildcard AAAA from `cloudflare-ddns.nix` already covers the name
+   — but the cert still has to be issued against a **grey-clouded** wildcard
+   (§9), and the wildcard is shared, so that toggle briefly takes every
+   `*.mauderer.work` host off the Cloudflare proxy. Do it once, issue both
+   certs, switch back.
+2. **Create the accounts**, on the server, **as root**. `ntfy` reads
+   `/etc/ntfy/server.yml` and edits the auth database directly, and the database
+   lives under `/var/lib/private` because the unit uses `DynamicUser` — so
+   `sudo -u ntfy-sh …` cannot reach it. `NTFY_PASSWORD` is what makes these
+   non-interactive (there is no `--password` flag) and it has to be passed
+   through `env`, since `sudo` clears the environment:
+   ```sh
+   # you: full access, used to log in from the phone
+   sudo env NTFY_PASSWORD='<phone password>' ntfy user add --role=admin maudi
+
+   # your services: may publish, may not read anything back
+   sudo env NTFY_PASSWORD="$(head -c 24 /dev/urandom | base64)" ntfy user add svc
+   sudo ntfy access svc '*' write-only
+   sudo ntfy token add svc          # prints tk_… — this is what services use
+   ```
+   `svc`'s password is a throwaway that is never read back — services
+   authenticate with the token, not with it. `sudo ntfy access` with no arguments
+   prints the whole ACL to check the result. Changes take effect immediately;
+   no restart is needed.
+3. **Send a notification** from any service, host or script:
+   ```sh
+   curl -H "Authorization: Bearer tk_…" \
+        -H "Title: ZFS scrub" -H "Priority: high" -H "Tags: warning" \
+        -d "hdd_pool_1 finished with errors" \
+        https://ntfy.mauderer.work/alerts
+   ```
+   The topic (`alerts` here) is just a path segment — invent one per source. The
+   `svc` ACL above covers all of them; narrow it to `ntfy access svc 'alerts*'
+   write-only` if you'd rather whitelist.
+4. **The phone.** Install the ntfy app, add the server
+   `https://ntfy.mauderer.work` under *Settings → Manage users* with the `maudi`
+   credentials, then subscribe to the topics. On **iOS** only, uncomment
+   `upstream-base-url` in `modules/nixos/server/ntfy.nix` and `switch`: Apple
+   requires APNs, which a self-hosted instance cannot speak, so the app polls
+   ntfy.sh and this box forwards a *hash* of the topic (never the message) there.
+   Android's app keeps its own WebSocket and needs nothing.
+
+Worth knowing:
+
+- **Nothing here is backed up**, on purpose. The message cache is transient by
+  design (12 h) and the auth database is these four commands — if the SSD dies,
+  recreate the accounts and re-issue the token. Everything worth keeping belongs
+  in the service that sent the notification.
+- **Attachments are disabled** — `ntfy.nix` blanks `attachment-cache-dir`, which
+  it has to do explicitly because the NixOS module defaults it to a real path. A
+  publish token that can also fill a disk is a different risk profile; use the
+  `Click`/`Attach` headers pointing at an existing URL instead.
+- Accounts *can* be declared in Nix instead (`auth-users`/`auth-access`/
+  `auth-tokens` via `services.ntfy-sh.environmentFile`), but each entry is a
+  bcrypt hash or a live token, so it would need a sops secret — see the comment
+  in `ntfy.nix` before going that way.
+## 8. Observability (metrics, logs, dashboards)
 
 Prometheus, Loki, Grafana Alloy and Grafana come up with the rest of the system.
 Like Paperless, Grafana is **VPN-only by design** — do *not* add a proxy host for
@@ -223,7 +293,7 @@ Worth knowing:
   notification route (SMTP or a webhook, plus a sops-held credential) that hasn't
   been chosen.
 
-## 8. Verify
+## 9. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -237,7 +307,12 @@ Worth knowing:
 - **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
-  needs the proxied domain's A record to be **DNS-only (grey-cloud)** → WAN IP.
+  validation has to reach NPM directly, so set the `*.mauderer.work` wildcard to
+  **DNS-only (grey-cloud)** first, issue the certs, then switch it back to
+  proxied. Behind the orange cloud the challenge is answered by Cloudflare's
+  edge, which cannot serve a token NPM has not been given. The wildcard covers
+  every published host, so grey-clouding it takes them all off the proxy for the
+  duration — issue new certs in one pass rather than one host at a time.
 - **Forgejo:** `systemctl status forgejo` and `curl -fsS
   http://10.100.0.1:4000/api/healthz`; `systemctl list-timers forgejo-dump` shows
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
@@ -248,6 +323,17 @@ Worth knowing:
   port must answer over the VPN and **not** from the LAN or the WAN. Copy a PDF
   into `/hdd_pool_1/share/paperless-inbox` and watch `journalctl -u
   paperless-consumer -f` ingest it.
+- **ntfy:** `systemctl status ntfy-sh` and, over the VPN, `curl -fsS
+  http://10.100.0.1:2586/v1/health` (expect `{"healthy":true}`). `nft list
+  ruleset | grep 2586` must show the source-restricted rule, not a globally open
+  port — 2586 answers only from the podman bridge and the VPN, never the WAN
+  directly. Then prove the door is shut and the key works:
+  ```sh
+  curl -fsS -d hi https://ntfy.mauderer.work/alerts                   # must FAIL (403)
+  curl -fsS -H "Authorization: Bearer tk_…" -d hi https://ntfy.mauderer.work/alerts
+  ```
+  The second one landing on the phone is the only check that covers the proxy
+  host, the certificate and the app together.
 - **Observability:** `curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active'
   | jq -r '.data.activeTargets[] | "\(.labels.job) \(.health)"'` should list six
   jobs, all `up`. If `prometheus-smartctl-exporter` is failed, the drives are
