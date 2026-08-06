@@ -23,6 +23,9 @@ The secrets-first work is done and in git:
 - The matching **plaintext** SSH host key + WireGuard keys are in the gitignored
   `secrets-seed/` on the desktop (used for `--extra-files` below). Keep it until
   the install succeeds.
+- Service credentials that must exist at eval time are committed encrypted:
+  `secrets/home-server/{cloudflare,paperless,grafana}.yaml`. The Grafana one
+  ships with a random password nobody has seen — replace it in step 7.
 
 ## 1. Check before you install
 
@@ -168,7 +171,51 @@ Worth knowing:
 - `paperless-manage` is on `PATH` on the server for admin tasks
   (`paperless-manage createsuperuser`, `document_exporter`, …).
 
-## 7. Verify
+## 7. Observability (metrics, logs, dashboards)
+
+Prometheus, Loki, Grafana Alloy and Grafana come up with the rest of the system.
+Like Paperless, Grafana is **VPN-only by design** — do *not* add a proxy host for
+it in NPM.
+
+1. **Set the Grafana admin password.** The repo ships a random one that nobody
+   has seen; replace it with your own before the first login:
+   ```sh
+   nix develop
+   sops secrets/home-server/grafana.yaml   # key: grafana-admin-password
+   ```
+   It is a **bare** password (no `KEY=` prefix, like the Paperless one). Commit,
+   then `switch` — Grafana re-reads the file on every start, so a rebuild is all
+   a rotation needs.
+2. **Log in.** With the VPN up, browse `http://10.100.0.1:3030` as `admin`. The
+   port is 3030, not Grafana's default 3000, because 3000-3010 is already spoken
+   for on this box.
+3. **Datasources are already there.** `Prometheus` and `Loki` are provisioned
+   from Nix (`modules/nixos/server/grafana.nix`) and are read-only in the UI —
+   edit them in that file, not in the browser.
+4. **Import dashboards.** Nothing is provisioned: use *Dashboards → New →
+   Import* and paste a grafana.com dashboard ID. `1860` (Node Exporter Full) is
+   the one to start with; `13639` gives a Loki log view. Imported dashboards live
+   in the SQLite database on the pool, so they survive an SSD rebuild.
+
+Worth knowing:
+
+- **What is scraped:** the host's node exporter (CPU, memory, disks,
+  filesystems, network, hwmon temperatures, ZFS ARC, systemd unit state), the
+  smartctl exporter (per-drive SMART health for the pool disks and the NVMe
+  root), and Prometheus, Loki, Alloy and Grafana themselves.
+- **Retention** is 90 days on both sides — Prometheus also stops at 20 GiB,
+  whichever comes first, so the OS SSD cannot fill.
+- **Pushing from your own deployments.** Loki's `:3100` is reachable from the
+  podman bridge (`10.88.0.0/16`), the LAN and the VPN, so a container on this box
+  can push to `http://10.88.0.1:3100/loki/api/v1/push`. There is **no
+  authentication** on that port — the source restriction is the access control,
+  so never add it to `allowedTCPPorts`. To have Prometheus scrape a deployment,
+  add a job to `scrapeConfigs` in `modules/nixos/server/metrics.nix`.
+- **No alerting yet.** Alertmanager is deliberately not configured — it needs a
+  notification route (SMTP or a webhook, plus a sops-held credential) that hasn't
+  been chosen.
+
+## 8. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -177,8 +224,8 @@ Worth knowing:
   (host key pinned).
 - `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
   the export; `nft list ruleset` shows only UDP 51820 + TCP 80/443 open on the
-  WAN (SSH 22, the NPM admin UI 81, Paperless 28981 and NFS 2049 stay off the
-  WAN).
+  WAN (SSH 22, the NPM admin UI 81, Paperless 28981, Grafana 3030, Loki 3100 and
+  NFS 2049 stay off the WAN).
 - **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
@@ -193,5 +240,16 @@ Worth knowing:
   port must answer over the VPN and **not** from the LAN or the WAN. Copy a PDF
   into `/hdd_pool_1/share/paperless-inbox` and watch `journalctl -u
   paperless-consumer -f` ingest it.
+- **Observability:** `curl -fsS http://127.0.0.1:9090/api/v1/targets?state=active
+  | jq -r '.data.activeTargets[] | "\(.labels.job) \(.health)"'` should list six
+  jobs, all `up`. If `prometheus-smartctl-exporter` is failed, the drives are
+  hidden behind the RAID HBA — see the `devices` note in
+  `modules/nixos/server/metrics.nix`. Over the VPN, `http://10.100.0.1:3030`
+  serves Grafana and
+  `curl -fsS http://10.100.0.1:3100/ready` answers for Loki; neither must answer
+  from the WAN. Then check logs are flowing:
+  `logcli` isn't installed, so use Grafana's *Explore* on the Loki datasource
+  with `{job="systemd-journal"}` — journal lines should appear within a minute
+  of `systemctl status alloy` going green.
 - Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.
