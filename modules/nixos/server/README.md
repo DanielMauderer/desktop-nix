@@ -14,14 +14,30 @@ Everything here is deliberately absent from the workstation `base`.
 | `forgejo-runner.nix`| **Forgejo Actions runner** (`services.forgejoRunner`, **opt-in**, default off). Jobs run as podman containers via `forgejo-runner`. Registration token is a sops secret (`secrets/home-server/forgejo.yaml`, key `forgejo-runner-token`, **`TOKEN=…` env-file format**). Runs as a host service holding the rootful podman socket — root-equivalent, hence single-user-forge only. |
 | `paperless.nix`    | **Document archive** (`services.paperless`, SQLite, OCR `deu+eng`). HTTP `:28981` admitted **only on `wg0`** — deliberately *not* published through NPM, so it has no WAN surface at all (`http://10.100.0.1:28981`). All state, media and the nightly `document_exporter` run live on the ZFS pool under `/hdd_pool_1/services/paperless`; the drop folder is `/hdd_pool_1/share/paperless-inbox`, inside the NFS export. Admin password is a sops secret (`secrets/home-server/paperless.yaml`, key `paperless-admin-password`, **bare password**). |
 | `ntfy.nix`         | **Push notifications** (`services.ntfy-sh`), served as `https://ntfy.mauderer.work` through NPM so notifications arrive off-LAN — the opposite exposure call from `paperless.nix`, and the reason the instance is closed: `auth-default-access: deny-all`, no self-signup, `behind-proxy` on. HTTP `:2586` admitted only from the podman bridge (the proxy) and the VPN — no new WAN ports. Attachments deliberately off — `attachment-cache-dir` is blanked, which the module has to do explicitly because upstream defaults it to a real path, so it is not a public upload target. State is the auth db + a 12 h message cache under `/var/lib/ntfy-sh` on the SSD — no ZFS pool path, hence no mount-ordering oneshot. **No sops secret**: users/tokens are created with the `ntfy` CLI (as root — `DynamicUser` puts the db under `/var/lib/private`), because the declarative `auth-users` route would put bcrypt hashes and live tokens in the world-readable Nix store. |
+| `postgresql.nix`   | **Shared database server** (`services.postgresql`, pinned `postgresql_18`) for services added later — ships as an empty cluster, no databases or roles. Reachable over the Unix socket **only**: `listen_addresses` is forced to `""`, because `enableTCPIP = false` alone still binds `127.0.0.1:5432`. No firewall rule exists or is needed. Local auth is upstream's **peer** default, so a role is reachable only by the system user of the same name and no password lands in sops. Cluster on the SSD (`/var/lib/postgresql/18`); nightly `pg_dumpall` to `/hdd_pool_1/services/postgresql/dump` (zstd, current + one `.prev` only). |
 | `zfs.nix`          | Imports the pre-existing **ZFS data pool** (`extraPools`, `hdd_pool_1`) on the RAID LUN; monthly scrub. OS lives on a separate ext4 SSD. |
 | `nfs.nix`          | NFSv4 export of `/hdd_pool_1/share` to the LAN + VPN subnets only (edit `lanSubnet`). |
 
 The OS-disk layout is in `hosts/home-server/disk.nix`; the ZFS `hostId` is in
 `hosts/home-server/hardware.nix`.
 
-`/hdd_pool_1/services` is shared by `reverse-proxy.nix`, `forgejo.nix` and
-`paperless.nix`. Their three directory-creating oneshots have no ordering between
-them, so they all leave that parent as `root:root 0755` — traversable, so each
-unprivileged service reaches its own subtree, which stays `0750`. Changing that
-mode in one module without the others locks a service out of its own data.
+`/hdd_pool_1/services` is shared by `reverse-proxy.nix`, `forgejo.nix`,
+`paperless.nix` and `postgresql.nix`. Their four directory-creating oneshots have
+no ordering between them, so they all leave that parent as `root:root 0755` —
+traversable, so each unprivileged service reaches its own subtree, which stays
+`0750` (`0700` for the Postgres dump, which holds every database and role).
+Changing that mode in one module without the others locks a service out of its
+own data.
+
+To give a new service a database, declare it from that service's own module:
+
+```nix
+services.postgresql.ensureDatabases = [ "myservice" ];
+services.postgresql.ensureUsers = [
+  { name = "myservice"; ensureDBOwnership = true; }
+];
+```
+
+Peer auth then maps the unit's system user onto the role of the same name — no
+password, no host, no port. A *containerised* consumer cannot reach a Unix
+socket: bind-mount `/run/postgresql` into it rather than re-enabling TCP.

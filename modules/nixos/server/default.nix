@@ -9,6 +9,7 @@ _: {
     ./forgejo-runner.nix
     ./paperless.nix
     ./ntfy.nix
+    ./postgresql.nix
     ./zfs.nix
     ./nfs.nix
   ];
