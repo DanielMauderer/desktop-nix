@@ -592,7 +592,8 @@
           }
           {
             name = "Grafana state lives on the redundant ZFS pool";
-            assertion = cfg.services.grafana.enable && lib.hasPrefix "/hdd_pool_1/" cfg.services.grafana.dataDir;
+            assertion =
+              cfg.services.grafana.enable && lib.hasPrefix "/hdd_pool_1/" cfg.services.grafana.dataDir;
           }
           {
             # The whole point of Grafana's exposure design, and the same shape
@@ -627,8 +628,7 @@
               let
                 inherit (cfg.services.grafana.settings) security;
               in
-              lib.hasPrefix "$__file{" security.admin_password
-              && lib.hasPrefix "$__file{" security.secret_key;
+              lib.hasPrefix "$__file{" security.admin_password && lib.hasPrefix "$__file{" security.secret_key;
           }
           {
             name = "Grafana has no self-registration and no anonymous access";

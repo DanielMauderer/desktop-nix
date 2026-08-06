@@ -123,16 +123,15 @@ in
     # smartctl_exporter exits when `smartctl --scan` finds nothing, which is the
     # situation in a VM with virtio disks. The nixosTest turns the exporter off,
     # and this keeps it from leaving a permanently-down scrape target behind.
-    scrapeConfigs =
-      [
-        (localJob "node" nodePort)
-        (localJob "prometheus" prometheusPort)
-        (localJob "loki" lokiPort)
-        (localJob "alloy" alloyPort)
-        (localJob "grafana" grafanaPort)
-      ]
-      ++ lib.optional config.services.prometheus.exporters.smartctl.enable (
-        localJob "smartctl" smartctlPort
-      );
+    scrapeConfigs = [
+      (localJob "node" nodePort)
+      (localJob "prometheus" prometheusPort)
+      (localJob "loki" lokiPort)
+      (localJob "alloy" alloyPort)
+      (localJob "grafana" grafanaPort)
+    ]
+    ++ lib.optional config.services.prometheus.exporters.smartctl.enable (
+      localJob "smartctl" smartctlPort
+    );
   };
 }
