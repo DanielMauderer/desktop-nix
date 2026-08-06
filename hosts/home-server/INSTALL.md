@@ -186,6 +186,12 @@ it in NPM.
    It is a **bare** password (no `KEY=` prefix, like the Paperless one). Commit,
    then `switch` — Grafana re-reads the file on every start, so a rebuild is all
    a rotation needs.
+
+   The same file holds `grafana-secret-key`, which encrypts secrets *inside*
+   Grafana's database. **Leave it alone.** It also ships random, which is what
+   you want, and unlike the admin password it cannot be rotated: the database is
+   encrypted under it and there is no official re-key path, so changing it
+   orphans anything already stored. Harmless before first use, not after.
 2. **Log in.** With the VPN up, browse `http://10.100.0.1:3030` as `admin`. The
    port is 3030, not Grafana's default 3000, because 3000-3010 is already spoken
    for on this box.

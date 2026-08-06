@@ -38,6 +38,14 @@ let
   # Keep in sync with metrics.nix and logs.nix.
   prometheusUrl = "http://127.0.0.1:9090";
   lokiUrl = "http://127.0.0.1:3100";
+
+  # Shared shape for both sops entries below.
+  secret = {
+    sopsFile = ../../../secrets/home-server/grafana.yaml;
+    owner = "grafana";
+    group = "grafana";
+    mode = "0400";
+  };
 in
 {
   services.grafana = {
@@ -65,6 +73,20 @@ in
         # the ini in the world-readable Nix store. Grafana expands `$__file{}`
         # for any setting.
         admin_password = "$__file{${config.sops.secrets.grafana-admin-password.path}}";
+
+        # The key Grafana uses to encrypt secrets *inside its own database* —
+        # datasource credentials, alert-notifier tokens, service-account keys.
+        # nixpkgs dropped the shared default (it was the same well-known string
+        # on every NixOS install, which made those DB secrets decryptable by
+        # anyone) and now asserts that this is set, so it is not optional.
+        #
+        # Rotating it later is not a config change: the existing database is
+        # encrypted under the old key and there is no official re-key path, so
+        # changing this value orphans whatever is already stored. That is
+        # harmless today — the datasources here are provisioned from Nix and
+        # hold no credentials — but stops being harmless once anything is added
+        # in the UI.
+        secret_key = "$__file{${config.sops.secrets.grafana-secret-key.path}}";
         # Served as plain HTTP over WireGuard, so the session cookie must not be
         # marked Secure or no browser will send it back. This is the same
         # posture as NPM's admin UI on :81 and Forgejo's :4000 bootstrap path —
@@ -115,17 +137,16 @@ in
     };
   };
 
-  # Admin password, decrypted to /run/secrets at activation (keyless CI: the
-  # encrypted file just has to exist). The file must hold the BARE password.
+  # Both secrets are decrypted to /run/secrets at activation (keyless CI: the
+  # encrypted file just has to exist), and both hold a BARE value — no `KEY=`
+  # prefix.
   #
   # `owner` matters here in a way it does not for the other secrets on this
-  # host: Grafana opens this file itself, as the unprivileged grafana user,
-  # rather than having systemd hand it in as a credential.
-  sops.secrets.grafana-admin-password = {
-    sopsFile = ../../../secrets/home-server/grafana.yaml;
-    owner = "grafana";
-    group = "grafana";
-    mode = "0400";
+  # host: Grafana opens these files itself, as the unprivileged grafana user,
+  # rather than having systemd hand them in as credentials.
+  sops.secrets = {
+    grafana-admin-password = secret;
+    grafana-secret-key = secret;
   };
 
   # Admit the UI only on the VPN interface, never the WAN. Same pattern as

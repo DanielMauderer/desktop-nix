@@ -618,10 +618,17 @@
           }
           {
             # `settings` is rendered into an ini file in the world-readable Nix
-            # store, so the password may only ever be a reference to a runtime
-            # file — never the value itself.
-            name = "Grafana admin password is read from a file, not the Nix store";
-            assertion = lib.hasPrefix "$__file{" cfg.services.grafana.settings.security.admin_password;
+            # store, so neither the admin password nor the database encryption
+            # key may ever be the value itself — only a reference to a runtime
+            # file. nixpkgs asserts that `secret_key` is set at all; this is the
+            # stricter half, that it is not set to a literal.
+            name = "Grafana admin password and secret key are read from files, not the Nix store";
+            assertion =
+              let
+                inherit (cfg.services.grafana.settings) security;
+              in
+              lib.hasPrefix "$__file{" security.admin_password
+              && lib.hasPrefix "$__file{" security.secret_key;
           }
           {
             name = "Grafana has no self-registration and no anonymous access";
@@ -817,11 +824,19 @@
           gnupg.sshKeyPaths = lib.mkForce [ ];
           # Redirected to the fixture rather than forced away, so the sops path
           # is exercised end to end: the test logs into Grafana with the
-          # fixture's plaintext.
-          secrets.grafana-admin-password = {
-            sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
-            key = "fixture_secret";
-          };
+          # fixture's plaintext. The secret key rides along on the same fixture
+          # value — it only has to be *a* key for Grafana to start.
+          secrets =
+            let
+              fixture = {
+                sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+                key = "fixture_secret";
+              };
+            in
+            {
+              grafana-admin-password = fixture;
+              grafana-secret-key = fixture;
+            };
         };
 
         # Virtio disks expose no SMART data, and smartctl_exporter exits when
@@ -1510,6 +1525,7 @@
             # Grafana: the sops-decrypted password is what the instance actually
             # accepts, and both datasources were provisioned from Nix.
             machine.succeed("test -e /run/secrets/grafana-admin-password")
+            machine.succeed("test -e /run/secrets/grafana-secret-key")
             machine.fail("curl -fsS -u admin:wrong-password http://127.0.0.1:3030/api/datasources")
             types = machine.succeed(
                 "curl -fsS -u admin:sops-fixture-canary-7a3f "
