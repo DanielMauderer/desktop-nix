@@ -528,8 +528,7 @@
               let
                 rule = "ip saddr { 10.88.0.0/16, 10.100.0.0/24 } tcp dport 2586 accept";
               in
-              cfg.networking.nftables.enable
-              && lib.hasInfix rule cfg.networking.firewall.extraInputRules;
+              cfg.networking.nftables.enable && lib.hasInfix rule cfg.networking.firewall.extraInputRules;
           }
           {
             # The guard that makes publishing ntfy defensible at all: an open

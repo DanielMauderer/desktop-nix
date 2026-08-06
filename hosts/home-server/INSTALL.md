@@ -98,8 +98,10 @@ registration token can only be minted once the forge is running.
 2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
    domain `git.mauderer.work`, forward to `http://10.88.0.1:4000` (the podman
    bridge gateway — i.e. this host, as seen from the NPM container), websockets
-   on, then request a Let's Encrypt cert. No DNS change is needed: the proxied
-   wildcard AAAA from `cloudflare-ddns.nix` already covers it. In the host's
+   on, then request a Let's Encrypt cert. No *new* DNS record is needed — the
+   wildcard AAAA from `cloudflare-ddns.nix` already covers the name — but see
+   the HTTP-01 note in §8: the wildcard has to be grey-clouded while the cert is
+   issued, then switched back to proxied. In the host's
    *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
 3. **Runner token.** In Forgejo: Site Administration → Actions → Runners →
    *Create new runner* → copy the registration token. Then, in the repo:
@@ -179,8 +181,12 @@ one *is* published, so it has to be shut the moment it becomes reachable.
    domain `ntfy.mauderer.work`, forward to `http://10.88.0.1:2586` (the podman
    bridge gateway — this host as the NPM container sees it), **websockets on**
    (the phone apps hold a WebSocket; without this they silently never connect),
-   then request a Let's Encrypt cert. The proxied wildcard AAAA from
-   `cloudflare-ddns.nix` already covers the name, so there is no DNS change.
+   then request a Let's Encrypt cert. As with Forgejo, no *new* DNS record is
+   needed — the wildcard AAAA from `cloudflare-ddns.nix` already covers the name
+   — but the cert still has to be issued against a **grey-clouded** wildcard
+   (§8), and the wildcard is shared, so that toggle briefly takes every
+   `*.mauderer.work` host off the Cloudflare proxy. Do it once, issue both
+   certs, switch back.
 2. **Create the accounts**, on the server, **as root**. `ntfy` reads
    `/etc/ntfy/server.yml` and edits the auth database directly, and the database
    lives under `/var/lib/private` because the unit uses `DynamicUser` — so
@@ -247,7 +253,12 @@ Worth knowing:
 - **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
   `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
   it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
-  needs the proxied domain's A record to be **DNS-only (grey-cloud)** → WAN IP.
+  validation has to reach NPM directly, so set the `*.mauderer.work` wildcard to
+  **DNS-only (grey-cloud)** first, issue the certs, then switch it back to
+  proxied. Behind the orange cloud the challenge is answered by Cloudflare's
+  edge, which cannot serve a token NPM has not been given. The wildcard covers
+  every published host, so grey-clouding it takes them all off the proxy for the
+  duration — issue new certs in one pass rather than one host at a time.
 - **Forgejo:** `systemctl status forgejo` and `curl -fsS
   http://10.100.0.1:4000/api/healthz`; `systemctl list-timers forgejo-dump` shows
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
