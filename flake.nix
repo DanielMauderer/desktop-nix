@@ -643,12 +643,11 @@
             assertion =
               let
                 p = cfg.services.grafana.provision;
+                # Sorted, so reordering the list in grafana.nix (which only
+                # affects display order in the UI) does not fail the check.
+                types = lib.sort lib.lessThan (map (d: d.type) p.datasources.settings.datasources);
               in
-              p.enable
-              && (map (d: d.type) p.datasources.settings.datasources) == [
-                "prometheus"
-                "loki"
-              ];
+              p.enable && lib.concatStringsSep "," types == "loki,prometheus";
           }
           {
             # Same guard as the Paperless one: without these oneshots loki and
@@ -657,14 +656,13 @@
             name = "Loki and Grafana directories are created after the ZFS pool is mounted";
             assertion =
               let
-                orderedAfterMount =
-                  name:
-                  let
-                    unit = cfg.systemd.services.${name} or null;
-                  in
-                  unit != null && builtins.elem "zfs-mount.service" unit.after;
+                loki = cfg.systemd.services.loki-data-dirs or null;
+                grafana = cfg.systemd.services.grafana-data-dirs or null;
               in
-              orderedAfterMount "loki-data-dirs" && orderedAfterMount "grafana-data-dirs";
+              loki != null
+              && builtins.elem "zfs-mount.service" loki.after
+              && grafana != null
+              && builtins.elem "zfs-mount.service" grafana.after;
           }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
@@ -826,17 +824,16 @@
           # is exercised end to end: the test logs into Grafana with the
           # fixture's plaintext. The secret key rides along on the same fixture
           # value — it only has to be *a* key for Grafana to start.
-          secrets =
-            let
-              fixture = {
-                sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
-                key = "fixture_secret";
-              };
-            in
-            {
-              grafana-admin-password = fixture;
-              grafana-secret-key = fixture;
+          secrets = {
+            grafana-admin-password = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
             };
+            grafana-secret-key = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
+            };
+          };
         };
 
         # Virtio disks expose no SMART data, and smartctl_exporter exits when

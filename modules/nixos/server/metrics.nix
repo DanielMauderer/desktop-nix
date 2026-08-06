@@ -1,6 +1,10 @@
 # Metrics half of the observability stack: native `services.prometheus` plus the
-# exporters that describe this box's hardware. Grafana (grafana.nix) is the only
-# reader; logs.nix is the matching half for the journal.
+# exporters that describe this box's hardware. logs.nix is the matching half for
+# the journal.
+#
+# The data path is entirely on loopback: Prometheus scrapes the exporters, and
+# Grafana (grafana.nix) queries Prometheus. Nothing here is read from off the
+# box, which is why every port below is bound to 127.0.0.1.
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
 #   9090  Prometheus itself — bound to 127.0.0.1 and never firewalled open at
@@ -10,8 +14,8 @@
 #         one-line change (drop `listenAddress`, add a wg0 rule), deliberately
 #         not taken: the expression browser is an unauthenticated read of every
 #         metric on the box.
-#   9100  node exporter, 127.0.0.1 only.
-#   9633  smartctl exporter, 127.0.0.1 only.
+#   9100  node exporter, scraped by Prometheus over loopback only.
+#   9633  smartctl exporter, likewise.
 #
 # Because nothing here is listed in `allowedTCPPorts` (or admitted per-interface)
 # the "WAN TCP surface is exactly 80/443" assertion in flake.nix is untouched.
@@ -43,7 +47,9 @@ let
   # names end up in dashboards and alert expressions.
   localJob = name: port: {
     job_name = name;
-    static_configs = [ { targets = [ "127.0.0.1:${toString port}" ]; } ];
+    static_configs = [
+      { targets = [ "127.0.0.1:${toString port}" ]; }
+    ];
   };
 in
 {
@@ -113,6 +119,10 @@ in
       };
     };
 
+    # The smartctl job is gated on the exporter actually being enabled:
+    # smartctl_exporter exits when `smartctl --scan` finds nothing, which is the
+    # situation in a VM with virtio disks. The nixosTest turns the exporter off,
+    # and this keeps it from leaving a permanently-down scrape target behind.
     scrapeConfigs =
       [
         (localJob "node" nodePort)
@@ -121,10 +131,6 @@ in
         (localJob "alloy" alloyPort)
         (localJob "grafana" grafanaPort)
       ]
-      # Gated on the exporter actually being enabled: smartctl_exporter exits
-      # when `smartctl --scan` finds nothing, which is the situation in a VM
-      # with virtio disks. The nixosTest turns the exporter off, and this keeps
-      # it from leaving a permanently-down scrape target behind when it does.
       ++ lib.optional config.services.prometheus.exporters.smartctl.enable (
         localJob "smartctl" smartctlPort
       );

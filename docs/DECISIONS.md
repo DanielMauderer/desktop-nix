@@ -129,8 +129,9 @@ matters lives here; the rest is in the Nix code and `git log`.
   `:3030` (3000-3010 is taken, as for Paperless), admitted on `wg0` only and
   deliberately given no NPM proxy host — a dashboard of the whole box is the last
   thing that should answer on the WAN. Prometheus and the node/smartctl exporters
-  bind `127.0.0.1` and are never firewalled open at all, since Grafana is their
-  only reader. Loki's `:3100` is the one exception: it is push *and* query with no
+  bind `127.0.0.1` and are never firewalled open at all: Prometheus scrapes the
+  exporters over loopback and Grafana queries Prometheus, so the whole metrics
+  path stays on the box. Loki's `:3100` is the one exception: it is push *and* query with no
   authentication, so it is admitted from the podman bridge, LAN and VPN by a
   source-restricted rule (as with NFS and Forgejo) precisely so deployments can
   ship to it — that restriction *is* the access control.

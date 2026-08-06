@@ -246,7 +246,7 @@ Worth knowing:
   port must answer over the VPN and **not** from the LAN or the WAN. Copy a PDF
   into `/hdd_pool_1/share/paperless-inbox` and watch `journalctl -u
   paperless-consumer -f` ingest it.
-- **Observability:** `curl -fsS http://127.0.0.1:9090/api/v1/targets?state=active
+- **Observability:** `curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active'
   | jq -r '.data.activeTargets[] | "\(.labels.job) \(.health)"'` should list six
   jobs, all `up`. If `prometheus-smartctl-exporter` is failed, the drives are
   hidden behind the RAID HBA — see the `devices` note in
