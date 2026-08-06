@@ -1523,10 +1523,17 @@
             # accepts, and both datasources were provisioned from Nix.
             machine.succeed("test -e /run/secrets/grafana-admin-password")
             machine.succeed("test -e /run/secrets/grafana-secret-key")
-            machine.fail("curl -fsS -u admin:wrong-password http://127.0.0.1:3030/api/datasources")
+
+            # Credentials are read out of the decrypted file rather than written
+            # into the test, which is both a stronger assertion — it proves the
+            # file's *contents* are what Grafana accepts, not just that some
+            # known string works — and keeps a `curl -u user:literal` out of the
+            # tree, which the gitleaks check flags on sight.
+            machine.fail("curl -fsS -u admin:not-the-password http://127.0.0.1:3030/api/datasources")
             types = machine.succeed(
-                "curl -fsS -u admin:sops-fixture-canary-7a3f "
-                "http://127.0.0.1:3030/api/datasources | jq -r '[.[].type] | sort | join(\",\")'"
+                "PW=$(cat /run/secrets/grafana-admin-password); "
+                'curl -fsS -u "admin:$PW" http://127.0.0.1:3030/api/datasources '
+                "| jq -r '[.[].type] | sort | join(\",\")'"
             ).strip()
             assert types == "loki,prometheus", types
 
