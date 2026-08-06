@@ -501,6 +501,81 @@
               in
               unit != null && builtins.elem "zfs-mount.service" unit.after;
           }
+          {
+            # Pinned rather than inherited from upstream's stateVersion ladder.
+            # An unpinned package that moves does not fail — dataDir is
+            # /var/lib/postgresql/${psqlSchema}, so it would initialise a new,
+            # empty cluster beside the old one. The major is asserted, not the
+            # full version, so a minor bump from a lock update still passes.
+            name = "PostgreSQL enabled on a pinned major version";
+            assertion =
+              cfg.services.postgresql.enable
+              && lib.versions.major cfg.services.postgresql.package.version == "18";
+          }
+          {
+            # `enableTCPIP = false` is not sufficient on its own: upstream
+            # renders listen_addresses = "localhost" for it, which still binds
+            # 127.0.0.1:5432. Empty means no TCP listener at all — which is what
+            # makes the absence of any firewall rule correct rather than merely
+            # untested.
+            name = "PostgreSQL listens on the Unix socket only, never TCP";
+            assertion =
+              !cfg.services.postgresql.enableTCPIP
+              && cfg.services.postgresql.settings.listen_addresses == "";
+          }
+          {
+            # Nothing listens, so nothing may be admitted — by any of the three
+            # routes this config uses. "WAN TCP surface is exactly 80/443" above
+            # already covers allowedTCPPorts; the per-interface set and
+            # extraInputRules are the two a future edit would actually reach for.
+            name = "PostgreSQL opens no firewall port, on any interface";
+            assertion =
+              !(builtins.elem 5432 cfg.networking.firewall.allowedTCPPorts)
+              && !(builtins.elem 5432 (cfg.networking.firewall.interfaces.wg0.allowedTCPPorts or [ ]))
+              && !(lib.hasInfix "5432" cfg.networking.firewall.extraInputRules);
+          }
+          {
+            # Socket-only is only safe because local connections are peer-
+            # authenticated: a role is reachable by the system user of the same
+            # name and by nobody else, so no service needs a password in sops.
+            # This is upstream's default and postgresql.nix deliberately does not
+            # restate it (`authentication` is types.lines — a definition appends
+            # rather than replaces), so this assertion is what holds the property.
+            name = "PostgreSQL local auth is peer, never trust";
+            assertion =
+              let
+                hba = cfg.services.postgresql.authentication;
+              in
+              builtins.match "(.|\n)*local +all +all +peer(.|\n)*" hba != null
+              && !(lib.hasInfix "trust" hba);
+          }
+          {
+            # The SSD/pool split, same as Forgejo: the cluster is latency-bound
+            # and every path under it needs tmpfiles rules, which cannot reach
+            # the pool. Durability is the dump below, not the data directory.
+            name = "PostgreSQL cluster stays on the SSD root";
+            assertion = lib.hasPrefix "/var/lib/" cfg.services.postgresql.dataDir;
+          }
+          {
+            # backupAll (which an empty `databases` selects) means pg_dumpall, so
+            # roles and globals are captured too and new databases are covered
+            # without editing the module.
+            name = "PostgreSQL dumps all databases nightly onto the redundant ZFS pool";
+            assertion =
+              cfg.services.postgresqlBackup.enable
+              && cfg.services.postgresqlBackup.backupAll
+              && lib.hasPrefix "/hdd_pool_1/" cfg.services.postgresqlBackup.location;
+          }
+          {
+            # Guards the ordering fix: postgresqlBackup declares its location
+            # through systemd.tmpfiles, which runs before zfs-mount.service.
+            name = "PostgreSQL dump directory is created after the ZFS pool is mounted";
+            assertion =
+              let
+                unit = cfg.systemd.services.postgresql-dump-dirs or null;
+              in
+              unit != null && builtins.elem "zfs-mount.service" unit.after;
+          }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -621,6 +696,41 @@
         virtualisation = {
           memorySize = 4096;
           diskSize = 8192;
+        };
+      };
+
+      # PostgreSQL test node: the module on its own, for the same reason
+      # forgejoTestNode and paperlessTestNode exist — the home-server host cannot
+      # boot in QEMU. Only the dump location moves off the pool; the cluster
+      # already lives at the module's real /var/lib path, so the thing under test
+      # is the production configuration.
+      #
+      # No sops fixture is needed here: peer auth means the module holds no
+      # secret at all, which is itself part of the design.
+      postgresqlTestNode = {
+        imports = [ ./modules/nixos/server/postgresql.nix ];
+
+        services.postgresqlBackup.location = lib.mkForce "/var/lib/postgresql-dump";
+
+        # Same reasoning as paperlessTestNode: not `enable = false`, which masks
+        # the unit (symlink to /dev/null) while still emitting its requiredBy
+        # edge, leaving postgresqlBackup Requiring a masked unit. Clearing the
+        # edges leaves it defined but unreferenced, and upstream's tmpfiles rule
+        # creates the /var/lib location this node uses instead.
+        systemd.services.postgresql-dump-dirs = {
+          requires = lib.mkForce [ ];
+          after = lib.mkForce [ ];
+          before = lib.mkForce [ ];
+          requiredBy = lib.mkForce [ ];
+        };
+
+        environment.systemPackages = [
+          pkgs.iproute2 # ss, for the "no TCP listener" check
+          pkgs.zstd # to read the dump back
+        ];
+        virtualisation = {
+          memorySize = 2048;
+          diskSize = 4096;
         };
       };
     in
@@ -1217,6 +1327,55 @@
             # account was created from it — the sops path, exercised end to end.
             machine.succeed("test -e /run/secrets/paperless-admin-password")
             machine.succeed("grep -q '^admin:' /var/lib/paperless/superuser-state")
+          '';
+        };
+
+        # PostgreSQL: the cluster comes up on the pinned major, is reachable over
+        # the Unix socket and *only* the socket, peer auth actually rejects a
+        # mismatched system user, and the nightly pg_dumpall produces a real dump.
+        test-postgresql = testLib.makeTest {
+          name = "postgresql";
+          nodes.machine = postgresqlTestNode;
+          testScript = ''
+            machine.wait_for_unit("postgresql.service")
+
+            # The socket is the only way in, and it works.
+            machine.succeed("test -S /run/postgresql/.s.PGSQL.5432")
+            machine.succeed("sudo -u postgres psql -tAc 'SELECT 1' | grep -qx 1")
+
+            # No TCP listener at all — the runtime half of the listen_addresses
+            # assertion. With `enableTCPIP = false` alone (upstream's default,
+            # listen_addresses = "localhost") this line would find :5432 bound on
+            # loopback and the test would fail, which is the point of asserting it
+            # here rather than trusting the option name.
+            machine.fail("ss -ltn | grep -q ':5432'")
+
+            # The pinned major is what actually booted. The eval assertion checks
+            # the package; this checks the server that came out of it.
+            ver = machine.succeed("sudo -u postgres psql -tAc 'SHOW server_version'").strip()
+            assert ver.startswith("18"), "unexpected server_version: " + ver
+
+            # dataDir follows the pinned major, so the cluster is where the
+            # SSD-split assertion says it is.
+            machine.succeed("test -d /var/lib/postgresql/18")
+
+            # Peer auth bites: a system user with no matching role cannot connect,
+            # which is what makes a passwordless socket-only server safe.
+            machine.fail("su nobody -s /bin/sh -c 'psql -U postgres -c \"SELECT 1\"'")
+
+            # The dump path, run for real rather than waiting for the timer:
+            # pg_dumpall piped through zstd, landing a non-empty file.
+            machine.succeed("systemctl start postgresqlBackup.service")
+            machine.succeed("test -s /var/lib/postgresql-dump/all.sql.zstd")
+            # And it is a genuine cluster dump, not an empty stream that happens
+            # to compress to a few bytes.
+            machine.succeed(
+                "zstd -dc /var/lib/postgresql-dump/all.sql.zstd "
+                "| grep -q 'PostgreSQL database cluster dump'"
+            )
+
+            # The timer is what makes it nightly; the unit alone would never run.
+            machine.succeed("systemctl list-timers --all | grep -q postgresqlBackup")
           '';
         };
 
