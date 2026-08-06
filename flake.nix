@@ -520,8 +520,7 @@
             # untested.
             name = "PostgreSQL listens on the Unix socket only, never TCP";
             assertion =
-              !cfg.services.postgresql.enableTCPIP
-              && cfg.services.postgresql.settings.listen_addresses == "";
+              !cfg.services.postgresql.enableTCPIP && cfg.services.postgresql.settings.listen_addresses == "";
           }
           {
             # Nothing listens, so nothing may be admitted — by any of the three
@@ -546,8 +545,7 @@
               let
                 hba = cfg.services.postgresql.authentication;
               in
-              builtins.match "(.|\n)*local +all +all +peer(.|\n)*" hba != null
-              && !(lib.hasInfix "trust" hba);
+              builtins.match "(.|\n)*local +all +all +peer(.|\n)*" hba != null && !(lib.hasInfix "trust" hba);
           }
           {
             # The SSD/pool split, same as Forgejo: the cluster is latency-bound
