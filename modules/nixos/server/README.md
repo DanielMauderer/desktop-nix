@@ -32,6 +32,15 @@ its own subtree, which stays `0750` (`0700` for the Postgres dump, which holds
 every database and role). Changing that mode in one module without the others
 locks a service out of its own data.
 
+The same six oneshots also `chmod 0755` the pool **root** `/hdd_pool_1`, because
+nothing else in the repo owns its mode: `zfs.nix` imports the pool untouched, so
+the mountpoint keeps whatever the box's former Proxmox install set — which was
+`0750 maudi:polkituser`, not traversable by any service user. A service running
+unprivileged with a `WorkingDirectory` on the pool then fails at systemd's
+`CHDIR` step before it ever executes (this is what broke `grafana.service`).
+Ownership is deliberately left alone — `maudi` owning the mountpoint may matter
+for local access to `/hdd_pool_1/share` — and only the `o+x` bit is needed.
+
 Every one of those oneshots exists for the same reason: `systemd.tmpfiles` runs
 before `zfs-mount.service`, so a module that declares a directory on the pool the
 normal way gets it created under the *unmounted* mountpoint and then hidden. Each

@@ -163,7 +163,7 @@ in
     # cannot work once a second unprivileged service wants the same parent.
     script = ''
       mkdir -p /hdd_pool_1/services/forgejo/dump
-      chmod 0755 /hdd_pool_1/services
+      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
       chown root:forgejo /hdd_pool_1/services/forgejo
       chown forgejo:forgejo /hdd_pool_1/services/forgejo/dump
       chmod 0750 /hdd_pool_1/services/forgejo /hdd_pool_1/services/forgejo/dump

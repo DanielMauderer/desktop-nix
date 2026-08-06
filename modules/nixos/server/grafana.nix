@@ -175,9 +175,16 @@ in
     # none of those oneshots are ordered against each other — so all of them
     # must leave the parent as root:root 0755 or the last one to run locks the
     # others out of their own subtree. See the note in server/README.md.
+    #
+    # The pool *root* needs the same treatment, and nothing else in the repo
+    # owns it: zfs.nix imports hdd_pool_1 untouched, so its mode is whatever the
+    # box's former Proxmox install left behind (0750 maudi:*, which is exactly
+    # what broke this unit's service — systemd failed at CHDIR into
+    # WorkingDirectory before grafana even started). Only o+x is needed; the
+    # ownership is left alone deliberately, see server/README.md.
     script = ''
       mkdir -p ${dataDir}
-      chmod 0755 /hdd_pool_1/services
+      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
       chown grafana:grafana ${dataDir}
       chmod 0750 ${dataDir}
     '';

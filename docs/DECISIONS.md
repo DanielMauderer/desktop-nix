@@ -134,7 +134,12 @@ matters lives here; the rest is in the Nix code and `git log`.
   (`/hdd_pool_1/share/paperless-inbox`) so any client that mounts the share has a
   drop folder. `/hdd_pool_1/services` is therefore `root:root 0755`: six
   service oneshots create siblings there with no ordering between them, so a
-  group-owned `0750` parent can only work for one of them.
+  group-owned `0750` parent can only work for one of them. The same oneshots
+  `chmod 0755` the pool *root*: `zfs.nix` imports `hdd_pool_1` untouched, so its
+  mountpoint mode is inherited from the box's former Proxmox install and no
+  module owned it — an untraversable pool root kills any unprivileged service
+  with a `WorkingDirectory` on the pool at systemd's `CHDIR` step. Mode only;
+  ownership stays as-is, since `maudi` owns the mountpoint used for the share.
 - **Push notifications = native `services.ntfy-sh`, public through NPM, closed by
   default** — home-server. The exposure call is the opposite of Paperless's and
   for the same reason: a notification that only arrives while the phone is on the

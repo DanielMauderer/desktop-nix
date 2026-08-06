@@ -73,7 +73,7 @@ _: {
     # its own subtree; the subtrees themselves stay 0750.
     script = ''
       mkdir -p /hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/letsencrypt
-      chmod 0755 /hdd_pool_1/services
+      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
       chmod 0750 /hdd_pool_1/services/npm
     '';
   };

@@ -133,7 +133,7 @@ in
     # would forbid, leaving every consumed document behind.
     script = ''
       mkdir -p ${dataDir}/index ${dataDir}/media ${dataDir}/export ${inboxDir}
-      chmod 0755 /hdd_pool_1/services
+      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
       # Only the directories this unit creates, never `chown -R`: paperless owns
       # everything it writes below them, and recursing would re-walk the whole
       # document tree on every boot.

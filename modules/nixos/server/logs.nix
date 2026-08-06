@@ -245,11 +245,14 @@ in
     # must leave the parent in the same state or the last one to run locks the
     # others out of their own subtree. The agreed state is root:root 0755:
     # world-*traversable* so every unprivileged service can reach its own
-    # directory, while each subtree stays 0750 and owned by its service.
+    # directory, while each subtree stays 0750 and owned by its service. The
+    # pool *root* is chmodded for the same reason: zfs.nix imports hdd_pool_1
+    # untouched, so its mode is inherited from the box's former install and is
+    # not traversable by service users. See server/README.md.
     script = ''
       mkdir -p ${dataDir}/chunks ${dataDir}/rules ${dataDir}/tsdb-index \
         ${dataDir}/tsdb-cache ${dataDir}/compactor
-      chmod 0755 /hdd_pool_1/services
+      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
       # Only the directories this unit creates, never `chown -R`: loki owns
       # everything it writes below them, and recursing would re-walk every
       # chunk on the pool on each boot.

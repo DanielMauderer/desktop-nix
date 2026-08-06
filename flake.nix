@@ -978,6 +978,15 @@
           };
         };
 
+        # Seed the pool root in the broken state the real box was found in: the
+        # mountpoint owned by a non-service user at 0750, which is what
+        # `zfs.extraPools` leaves behind when the pool predates this config.
+        # tmpfiles runs long before the data-dirs oneshots, so grafana.service
+        # only starts if one of them really does chmod the root — without that,
+        # systemd fails at CHDIR into WorkingDirectory. Creating it root:root
+        # 0755 (which is what the VM would do on its own) tests nothing.
+        systemd.tmpfiles.rules = [ "d /hdd_pool_1 0750 nobody nogroup -" ];
+
         # Virtio disks expose no SMART data, and smartctl_exporter exits when
         # `smartctl --scan` finds nothing. metrics.nix drops its scrape config
         # along with it, so this leaves no permanently-down target behind.
@@ -1716,6 +1725,10 @@
             # The data-dirs oneshots ran: the pool layout exists with the 0755
             # on the shared parent that npm/forgejo/paperless/loki/grafana all
             # have to leave behind, and 0750 service-owned subtrees.
+            # The pool root itself included: the node seeds it 0750 nobody, so
+            # this is 755 only because a data-dirs oneshot widened it.
+            machine.succeed("stat -c '%a' /hdd_pool_1 | grep -qx 755")
+            machine.succeed("stat -c '%U' /hdd_pool_1 | grep -qx nobody")
             machine.succeed("stat -c '%a' /hdd_pool_1/services | grep -qx 755")
             machine.succeed("stat -c '%U %a' /hdd_pool_1/services/loki | grep -qx 'loki 750'")
             machine.succeed("stat -c '%U %a' /hdd_pool_1/services/grafana | grep -qx 'grafana 750'")

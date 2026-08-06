@@ -135,7 +135,7 @@ in
     # role, so it is the most sensitive file on the pool.
     script = ''
       mkdir -p ${dumpDir}
-      chmod 0755 /hdd_pool_1/services
+      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
       chown root:postgres /hdd_pool_1/services/postgresql
       chmod 0750 /hdd_pool_1/services/postgresql
       chown postgres:postgres ${dumpDir}
