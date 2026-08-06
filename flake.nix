@@ -501,6 +501,59 @@
               in
               unit != null && builtins.elem "zfs-mount.service" unit.after;
           }
+          {
+            name = "ntfy enabled";
+            assertion = cfg.services.ntfy-sh.enable;
+          }
+          {
+            name = "ntfy public URL is HTTPS (TLS terminates at the reverse proxy)";
+            assertion = lib.hasPrefix "https://" cfg.services.ntfy-sh.settings.base-url;
+          }
+          {
+            # The counterpart of the Paperless exposure assertion, one step
+            # weaker on purpose: ntfy IS public, but only through NPM. Its port
+            # must still never join the globally-open set — the "WAN TCP surface
+            # is exactly 80/443" assertion above is what enforces that.
+            name = "ntfy listens on 2586 and never on the WAN directly";
+            assertion =
+              lib.hasSuffix ":2586" cfg.services.ntfy-sh.settings.listen-http
+              && !(builtins.elem 2586 cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            # extraInputRules is an nftables-only option: under the iptables
+            # backend these rules are silently dropped, so checking their text
+            # without checking the backend would assert nothing.
+            name = "ntfy admitted only from the podman bridge and the VPN (nftables backend)";
+            assertion =
+              let
+                rule = "ip saddr { 10.88.0.0/16, 10.100.0.0/24 } tcp dport 2586 accept";
+              in
+              cfg.networking.nftables.enable
+              && lib.hasInfix rule cfg.networking.firewall.extraInputRules;
+          }
+          {
+            # The guard that makes publishing ntfy defensible at all: an open
+            # instance lets anyone who guesses a topic name read the phone's
+            # notifications or spam it.
+            name = "ntfy is closed by default (deny-all, no self-signup)";
+            assertion =
+              cfg.services.ntfy-sh.settings.auth-default-access == "deny-all"
+              && !cfg.services.ntfy-sh.settings.enable-signup;
+          }
+          {
+            # Without this every request looks like it came from the proxy, so
+            # rate limiting accounts the whole internet as a single visitor.
+            name = "ntfy trusts the reverse proxy's forwarded-for header";
+            assertion = cfg.services.ntfy-sh.settings.behind-proxy;
+          }
+          {
+            # Must be asserted, not assumed: the upstream module defaults
+            # attachment-cache-dir to a real path, so uploads are ON unless the
+            # module explicitly blanks it out. A public file store that anyone
+            # holding the publish token can fill is not what this box is for.
+            name = "ntfy attachments disabled (no public upload target)";
+            assertion = cfg.services.ntfy-sh.settings.attachment-cache-dir == "";
+          }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -621,6 +674,23 @@
         virtualisation = {
           memorySize = 4096;
           diskSize = 8192;
+        };
+      };
+
+      # ntfy test node: the module on its own, for the same reason forgejoTestNode
+      # exists. Nothing is overridden — there is no pool path and no sops secret
+      # to redirect, so the node runs the production settings verbatim, which is
+      # what makes the deny-all assertions in the test script meaningful.
+      #
+      # No nftables line here on purpose: ntfy.nix defaults it on itself, since
+      # its source-restricted rule needs that backend. This node is the check that
+      # the module really is self-contained.
+      ntfyTestNode = {
+        imports = [ ./modules/nixos/server/ntfy.nix ];
+        environment.systemPackages = [ pkgs.curl ];
+        virtualisation = {
+          memorySize = 2048;
+          diskSize = 4096;
         };
       };
     in
@@ -1217,6 +1287,65 @@
             # account was created from it — the sops path, exercised end to end.
             machine.succeed("test -e /run/secrets/paperless-admin-password")
             machine.succeed("grep -q '^admin:' /var/lib/paperless/superuser-state")
+          '';
+        };
+
+        # ntfy: the service comes up, the health endpoint answers, the closed-by-
+        # default posture actually denies an anonymous publish, and an
+        # authenticated publish→poll round trip works. The last part is the point:
+        # an open port proves nothing about a server whose whole design is that
+        # only authorized clients may read or write a topic.
+        test-ntfy = testLib.makeTest {
+          name = "ntfy";
+          nodes.machine = ntfyTestNode;
+          testScript = ''
+            import json
+
+            machine.wait_for_unit("ntfy-sh.service")
+            machine.wait_for_open_port(2586)
+
+            # Health is the one endpoint that answers without credentials.
+            health = json.loads(machine.succeed("curl -fsS http://localhost:2586/v1/health"))
+            assert health["healthy"], health
+
+            # auth-default-access = deny-all, before any user exists: an
+            # anonymous read is refused. ntfy answers 403 with a JSON body and
+            # curl -f then exits non-zero, so assert on the body rather than
+            # just "it failed" — a connection refused would look the same.
+            denied = json.loads(machine.succeed("curl -sS 'http://localhost:2586/alerts/json?poll=1'"))
+            assert denied["http"] == 403, denied
+            machine.fail("curl -fsS -d hello http://localhost:2586/alerts")
+
+            # Bootstrap a publisher the way INSTALL.md does. NTFY_PASSWORD is
+            # what makes `ntfy user add` non-interactive — there is no flag —
+            # and the commands run as root because DynamicUser puts the auth db
+            # under /var/lib/private (see the note in ntfy.nix).
+            machine.succeed("NTFY_PASSWORD=testpass ntfy user add --role=user --ignore-exists svc")
+            machine.succeed("ntfy access svc alerts rw")
+
+            # Round trip: publish as that user, then poll the message back out.
+            machine.succeed("curl -fsS -u svc:testpass -d 'scrub found errors' http://localhost:2586/alerts")
+            notif = json.loads(
+                machine.succeed("curl -fsS -u svc:testpass 'http://localhost:2586/alerts/json?poll=1'")
+            )
+            assert notif["message"] == "scrub found errors", notif
+
+            # The ACL is per topic, not a blanket grant: the same credentials
+            # must not reach a topic they were never given access to.
+            machine.fail("curl -fsS -u svc:testpass -d nope http://localhost:2586/other")
+
+            # The settings the design depends on reached the rendered config.
+            # Matched loosely — the YAML writer is free to quote scalars.
+            conf = "/etc/ntfy/server.yml"
+            machine.succeed(f"grep -qE '^base-url:.*https://ntfy\\.mauderer\\.work' {conf}")
+            machine.succeed(f"grep -qE '^auth-default-access:.*deny-all' {conf}")
+            machine.succeed(f"grep -qE '^behind-proxy: *true' {conf}")
+            machine.succeed(f"grep -qE '^enable-signup: *false' {conf}")
+            # Attachments stay off: the key is present (upstream defaults it to a
+            # path) but must name no directory at all.
+            machine.fail(f"grep -qE '^attachment-cache-dir:.*/' {conf}")
+            # Upstream forwarding (iOS only) is off, so no topic hash leaves the box.
+            machine.fail(f"grep -q upstream-base-url {conf}")
           '';
         };
 

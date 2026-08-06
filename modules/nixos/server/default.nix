@@ -8,6 +8,7 @@ _: {
     ./forgejo.nix
     ./forgejo-runner.nix
     ./paperless.nix
+    ./ntfy.nix
     ./zfs.nix
     ./nfs.nix
   ];
