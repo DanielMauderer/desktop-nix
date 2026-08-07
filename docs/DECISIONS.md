@@ -181,3 +181,14 @@ matters lives here; the rest is in the Nix code and `git log`.
   that will still exist. Relabel rules promote only low-cardinality journal fields
   (unit, host, priority, syslog identifier) to Loki labels, since one stream per
   label combination is how a Loki instance is usually ruined.
+- **Baseline dashboards are provisioned from Nix; the UI keeps the scratch half**
+  — `modules/nixos/server/dashboards/*.json` are handcrafted for exactly the
+  metrics this box scrapes and land in a read-only `NixOS` folder, so a
+  reinstalled server shows host health, logs and stack health immediately instead
+  of an empty Grafana. Community dashboards (grafana.com #1860 and friends) are
+  deliberately *not* vendored: they are hundreds of kilobytes, carry
+  `__inputs`/`${DS_PROMETHEUS}` placeholders that appear to be an import-API
+  feature rather than a file-provisioner one,
+  and assume label sets this host does not have — paste those into the UI-owned
+  General folder instead. The price is that provisioned dashboards cannot be saved
+  from the UI: export the JSON, replace the file, rebuild.

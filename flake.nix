@@ -650,6 +650,31 @@
               p.enable && lib.concatStringsSep "," types == "loki,prometheus";
           }
           {
+            # The baseline dashboards are raw JSON, so nothing in Nix type-checks
+            # them. These two properties are the ones whose absence breaks
+            # provisioning silently — Grafana logs the rejection and carries on,
+            # so grafana.service still starts green: a non-null `id` copied out
+            # of a UI export collides with an existing dashboard on re-provision,
+            # and a missing `uid` makes every rebuild mint a new one, breaking
+            # saved links. Panel contents are deliberately not checked here; the
+            # nixosTest asks the running Grafana which dashboards it loaded.
+            name = "Provisioned Grafana dashboards pin a uid and leave id null";
+            assertion =
+              let
+                dir = ./modules/nixos/server/dashboards;
+                files = lib.filter (lib.hasSuffix ".json") (
+                  lib.attrNames (builtins.readDir dir)
+                );
+                ok =
+                  f:
+                  let
+                    d = builtins.fromJSON (builtins.readFile (dir + "/${f}"));
+                  in
+                  (d.id or null) == null && lib.isString (d.uid or null) && d.uid != "";
+              in
+              files != [ ] && lib.all ok files;
+          }
+          {
             # Same guard as the Paperless one: without these oneshots loki and
             # grafana race zfs-mount.service and start against a missing
             # directory (or, worse, one shadowed by the unmounted pool).
@@ -1785,6 +1810,20 @@
                 "| jq -r '[.[].type] | sort | join(\",\")'"
             ).strip()
             assert types == "loki,prometheus", types
+
+            # The three provisioned dashboards actually loaded. This has to be
+            # asked of the running instance: Grafana logs a rejected dashboard
+            # and keeps going, so a schema error leaves the unit green and only
+            # shows up as a folder that is missing a panel nobody looks at.
+            # Provisioning runs asynchronously after startup, hence the retry.
+            machine.wait_until_succeeds(
+                "PW=$(cat /run/secrets/grafana-admin-password); "
+                'curl -fsS -u "admin:$PW" '
+                "'http://127.0.0.1:3030/api/search?type=dash-db' "
+                "| jq -e '[.[].uid] | sort == "
+                "[\"home-server-host\",\"home-server-logs\",\"home-server-stack\"]'",
+                timeout=60,
+            )
 
             # Loki accepts a push and serves it back: a real round trip through
             # the on-pool store, not just a liveness probe.

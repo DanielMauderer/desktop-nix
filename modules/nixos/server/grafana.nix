@@ -19,11 +19,31 @@
 # assertion in flake.nix.
 #
 # Storage: the SQLite database lives on the mirrored ZFS pool. It is small, but
-# it holds every hand-built dashboard, alert rule and API key — the one part of
+# it holds every alert rule, API key and UI-built dashboard — the one part of
 # the observability stack that is not derived from something else and cannot be
-# rebuilt by waiting. Datasources are provisioned from Nix instead, so a fresh
-# install comes up already wired to Prometheus and Loki; dashboards are imported
-# in the UI, the same division of labour as NPM's UI-managed proxy hosts.
+# rebuilt by waiting.
+#
+# Dashboards are split deliberately:
+#
+#   * the baseline three live in ./dashboards/*.json and are provisioned from
+#     Nix into a read-only "NixOS" folder, so a reinstalled box comes up already
+#     showing host health, logs and stack health rather than an empty Grafana;
+#   * the General folder stays UI-owned, for scratch dashboards and for pasting
+#     in community JSON (e.g. grafana.com #1860, the exhaustive node-exporter
+#     view) — the same division of labour as NPM's UI-managed proxy hosts.
+#
+# The cost of the provisioned half is that those dashboards cannot be saved from
+# the UI (`allowUiUpdates` is false, and the Nix store is read-only anyway). The
+# round trip is: edit in the UI → "Export → Save to file" → replace the JSON in
+# ./dashboards → rebuild. Bumping `allowUiUpdates` would only move the edits
+# into SQLite where the next rebuild silently overwrites them, so it stays off.
+#
+# Each JSON pins `"uid"` and `"id": null`, and every panel target names the
+# datasource by the uids provisioned below, rather than relying on the
+# `${DS_PROMETHEUS}` inputs that grafana.com exports carry — that substitution
+# looks like a property of the import API, not of the file provisioner, so
+# anything taken from there is safest pasted through the UI (or has its
+# `__inputs` stripped and the uid substituted by hand).
 { config, ... }:
 let
   dataDir = "/hdd_pool_1/services/grafana";
@@ -131,6 +151,25 @@ in
             uid = "loki";
             access = "proxy";
             url = lokiUrl;
+          }
+        ];
+      };
+
+      # The baseline dashboards, from ./dashboards. `foldersFromFilesStructure`
+      # is off: the whole directory is one flat folder, which is all three files
+      # need. `disableDeletion` keeps them from being removed in the UI, since
+      # the next rebuild would bring them straight back anyway.
+      dashboards.settings = {
+        apiVersion = 1;
+        providers = [
+          {
+            name = "nixos";
+            type = "file";
+            folder = "NixOS";
+            allowUiUpdates = false;
+            disableDeletion = true;
+            updateIntervalSeconds = 60;
+            options.path = ./dashboards;
           }
         ];
       };
