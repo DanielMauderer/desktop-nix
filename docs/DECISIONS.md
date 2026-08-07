@@ -81,11 +81,27 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **waydroid** (Android container) — private-laptop + desktop; never work-laptop.
 - **server** (WireGuard server, SSH-over-VPN, ZFS, NFS) — home-server only.
 - **Reverse proxy = Nginx Proxy Manager container** (UI-driven LE certs), not
-  native `services.nginx`/`security.acme` — home-server only. Admin UI is
-  published on the VPN address (`10.100.0.1:81`), not merely firewalled, because
-  podman's port-publish DNAT bypasses the input-chain firewall. Containers run
-  rootful-but-hardened (`no-new-privileges`); no service container ever mounts
-  the podman/docker management socket.
+  native `services.nginx`/`security.acme` — home-server only. It runs with
+  **`--network=host`, publishing no ports**, which reverses the earlier
+  "publish the admin port on `10.100.0.1:81`" model. That model existed because
+  podman's publish DNAT bypasses the input-chain firewall — true, but it also
+  only ever emitted rules in the nftables `ip` family, and this box is IPv6-only
+  inbound (DS-Lite), so `:80`/`:443` refused every v6 connection: Let's Encrypt's
+  HTTP-01 fetch and Cloudflare's origin alike. In the host netns nginx is an
+  ordinary host listener with no DNAT, so `allowedTCPPorts` governs it and the
+  wg0-only rule is what keeps `:81` off the WAN. Cost: this one container gives
+  up its network namespace (mount/PID/user namespaces and the hardening below
+  are untouched), and upstreams must be `127.0.0.1` in NPM's UI rather than the
+  podman bridge gateway. Containers run rootful-but-hardened
+  (`no-new-privileges`); no service container ever mounts the podman/docker
+  management socket.
+- **Certificates are issued by DNS-01, not HTTP-01** — the corollary of the
+  IPv6-only inbound path. DNS-01 needs no inbound connectivity, survives the
+  orange cloud (which is not optional here: with no public IPv4, the Cloudflare
+  proxy is the only path for v4 visitors), and is the sole option for a
+  wildcard. The Cloudflare credential is entered in NPM's UI and lives in
+  container state on the pool — the `cloudflare-api-token` sops secret is
+  `cloudflare-dyndns`'s, not NPM's, though the same zone scope fits both.
 - **Self-hosted forge = native `services.forgejo`** (SQLite, state on the SSD,
   nightly `forgejo dump` to the ZFS pool) behind the NPM proxy — the first native
   web service on the box; everything else there is a container. GitHub is demoted

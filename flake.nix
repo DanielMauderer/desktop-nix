@@ -333,20 +333,23 @@
             assertion = !(builtins.elem 81 cfg.networking.firewall.allowedTCPPorts);
           }
           {
-            name = "NPM admin port published on the VPN address only, never all interfaces";
-            assertion =
-              let
-                ports = cfg.virtualisation.oci-containers.containers.npm.ports or [ ];
-              in
-              builtins.elem "10.100.0.1:81:81" ports && !(builtins.elem "81:81" ports);
+            name = "NPM admin UI (81) admitted on the wg0 VPN interface";
+            assertion = builtins.elem 81 cfg.networking.firewall.interfaces.wg0.allowedTCPPorts;
           }
           {
-            name = "NPM publishes the public 80/443 proxy ports";
+            # The reason this replaced the old "published on 10.100.0.1 only"
+            # assertion: podman's publish DNAT is IPv4-only without an
+            # IPv6-enabled network, and this box is IPv6-only inbound, so
+            # published ports left :80/:443 refusing over v6 — ACME and the
+            # Cloudflare origin both. In the host netns the input chain governs
+            # nginx directly, which is why the wg0 rule above is now the control.
+            # Publishing anything again would silently reinstate the bypass.
+            name = "NPM runs in the host netns and publishes no ports (DNAT would bypass the firewall)";
             assertion =
               let
-                ports = cfg.virtualisation.oci-containers.containers.npm.ports or [ ];
+                npm = cfg.virtualisation.oci-containers.containers.npm;
               in
-              builtins.elem "80:80" ports && builtins.elem "443:443" ports;
+              builtins.elem "--network=host" (npm.extraOptions or [ ]) && (npm.ports or [ ]) == [ ];
           }
           {
             # The Actions runner deliberately holds this socket, but it does so

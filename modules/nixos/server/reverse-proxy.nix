@@ -1,25 +1,55 @@
 # Public reverse proxy for the home-server, run as the Nginx Proxy Manager (NPM)
 # container. Let's Encrypt certs and proxy hosts are managed through NPM's web UI
-# (HTTP-01 challenge over :80); Nix owns the container, its ports and its volumes.
+# (DNS-01 challenge via Cloudflare — see the DNS note below); Nix owns the
+# container, its network model and its volumes.
+#
+# Networking: the container runs in the HOST network namespace (`--network=host`),
+# not with published ports. This is not a convenience — the box is IPv6-only
+# inbound (DS-Lite; see cloudflare-ddns.nix), and podman's port publishing does
+# not reach it. `ports = [ "80:80" ]` becomes an nftables DNAT rule in the `ip`
+# family only; with no IPv6-enabled podman network there is no `ip6` counterpart.
+# Measured from the LAN: `10.100.0.1:80` answered 200 while the host's global
+# IPv6 refused the connection instantly. Since the only public record is an AAAA,
+# that meant Let's Encrypt's HTTP-01 fetch was refused outright ("Error getting
+# validation data") and Cloudflare had no origin to proxy to.
+# In the host netns nginx binds :80/:443 itself, on both families, with no DNAT.
 #
 # Exposure:
-#   80, 443  published on all interfaces — the public reverse proxy plus the
+#   80, 443  bound on all interfaces — the public reverse proxy plus the
 #            HTTP-01 ACME challenge path. These are the only extra WAN ports.
-#   81       the admin UI, published ONLY on the wg0 VPN address (10.100.0.1).
+#   81       the admin UI, VPN-only.
+#   Anything NPM binds internally (its Node backend) is no longer confined to a
+#   container netns and lands on the host. None of it is in any firewall rule, so
+#   the input chain drops it everywhere except loopback — check `ss -tlnp` after
+#   a version bump if a new listener appears, and for a port conflict with the
+#   native services on this box.
 #
-# Why bind :81 to the VPN address rather than only firewalling it: podman
-# publishes container ports via DNAT in the forward path, which bypasses the
-# nixos-fw input chain that `allowedTCPPorts` rules live in — a port published on
-# 0.0.0.0 is reachable from the WAN regardless of the firewall. Binding the admin
-# publish to 10.100.0.1 is what actually keeps it VPN-only; the wg0 firewall rule
-# below is kept as defence-in-depth / intent.
+# What keeps :81 off the WAN is now the firewall, and that inverts the rationale
+# this file used to carry. With published ports, podman's DNAT sits in the forward
+# path and bypasses the nixos-fw input chain, so `allowedTCPPorts` could not
+# protect a container port at all and the `10.100.0.1:81:81` publish bind was the
+# only real control. With host networking there is no DNAT: nginx is an ordinary
+# host listener, so the input chain applies to it exactly as it does to sshd, and
+# the wg0-only rule below is the enforcement rather than a statement of intent.
+#
+# Upstreams must be addressed as 127.0.0.1 in NPM's UI, not as the podman bridge
+# gateway (10.88.0.1). The proxy no longer sits on that bridge, and with no
+# container attached to it the interface may not exist at all. Host-local traffic
+# traverses `lo`, which the firewall accepts unconditionally, so the
+# source-restricted rules in forgejo.nix / ntfy.nix / logs.nix keep admitting the
+# proxy without change.
 #
 # DNS: `*.mauderer.work` is a *proxied* (orange-cloud) AAAA record kept current by
-# cloudflare-ddns.nix, so HTTP-01 challenges traverse the Cloudflare edge rather
-# than hitting :80 directly. Cloudflare passes /.well-known/acme-challenge
-# through, so this works — but DNS-01 is the robust path for a proxied wildcard.
-# For any host you do want to validate directly, set that record DNS-only
-# (grey-cloud) pointing at the WAN address with :80 reachable.
+# cloudflare-ddns.nix. Because inbound IPv4 does not exist here, the orange cloud
+# is what gives IPv4 visitors any path in at all — grey-cloud is a debugging
+# state, not a steady one. Certificates should therefore be issued by **DNS-01**
+# (NPM: Certificates → Add → DNS Challenge → Cloudflare), which needs no inbound
+# connectivity and is the only option for a wildcard. Note that NPM reads those
+# credentials from its own UI-entered state on the pool, *not* from the
+# `cloudflare-api-token` sops secret that cloudflare-ddns.nix uses — the same
+# token scope (Zone:DNS:Edit + Zone:Zone:Read) works, but it is config outside
+# this flake. Port 80 stays open regardless: ACME no longer needs it, the
+# HTTP→HTTPS redirect does.
 _: {
   # Public HTTP/HTTPS for the reverse proxy (and HTTP-01 challenges on :80).
   networking.firewall.allowedTCPPorts = [
@@ -27,16 +57,13 @@ _: {
     443
   ];
 
-  # NPM admin UI: VPN-only, never the WAN (the publish bind above enforces this).
+  # NPM admin UI: VPN-only, never the WAN. In the host netns nginx binds :81 on
+  # all interfaces, so this rule (plus 81's absence from allowedTCPPorts) is what
+  # enforces it — see the header on why that is now sufficient.
   networking.firewall.interfaces.wg0.allowedTCPPorts = [ 81 ];
 
   virtualisation.oci-containers.containers.npm = {
     image = "jc21/nginx-proxy-manager:2.15.1";
-    ports = [
-      "80:80" # WAN HTTP + HTTP-01 ACME
-      "443:443" # WAN HTTPS
-      "10.100.0.1:81:81" # admin UI, VPN address only
-    ];
     volumes = [
       "/hdd_pool_1/services/npm/data:/data"
       "/hdd_pool_1/services/npm/letsencrypt:/etc/letsencrypt"
@@ -45,7 +72,15 @@ _: {
     # there is also no --privileged, no host device passthrough and — crucially —
     # no docker/podman socket mount (a container with the management socket is
     # effectively root on the host). Only the two data volumes are bind-mounted.
-    extraOptions = [ "--security-opt=no-new-privileges" ];
+    #
+    # --network=host gives up network-namespace isolation for this one container
+    # (see the header): the mount, PID and user namespaces are untouched, and
+    # nothing here was relying on the netns as a boundary — every port it holds
+    # was published to the host anyway.
+    extraOptions = [
+      "--network=host"
+      "--security-opt=no-new-privileges"
+    ];
   };
 
   # Bind-mount sources for the container. Podman does not create them: a missing
@@ -78,16 +113,12 @@ _: {
     '';
   };
 
-  # The admin port binds to the wg0 address and the data lives on the ZFS pool, so
-  # start the container only once the VPN interface is up and the pool is mounted.
+  # The data lives on the ZFS pool, so start the container only once the pool is
+  # mounted. The former wireguard-wg0 dependency is gone with the publish bind
+  # that needed it: nothing binds a wg0 address any more, so a VPN that failed to
+  # come up would have taken the public proxy down with it for no reason.
   systemd.services.podman-npm = {
-    after = [
-      "wireguard-wg0.service"
-      "zfs-mount.service"
-    ];
-    requires = [
-      "wireguard-wg0.service"
-      "zfs-mount.service"
-    ];
+    after = [ "zfs-mount.service" ];
+    requires = [ "zfs-mount.service" ];
   };
 }
