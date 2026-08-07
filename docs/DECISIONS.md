@@ -192,3 +192,64 @@ matters lives here; the rest is in the Nix code and `git log`.
   and assume label sets this host does not have — paste those into the UI-owned
   General folder instead. The price is that provisioned dashboards cannot be saved
   from the UI: export the JSON, replace the file, rebuild.
+- **Script-shaped metrics go through the node exporter's textfile collector, not
+  a second exporter** — `nixos-metrics.nix` (update pipeline: pending reboot,
+  autoUpgrade result, nixpkgs staleness, generations, store size) and
+  `backup-metrics.nix` (freshness, size and retention of the three nightly
+  backups) are hourly oneshots writing `.prom` files that the node exporter
+  re-serves. No new listener, no new scrape job, and the series carry the same
+  `job="node"` label as the rest of the box. Two rules the writers must follow:
+  write-then-rename, because the collector parses whatever it finds and a
+  partial file drops *every* textfile sample in the scrape; and never
+  pre-compute an age, because `time() - metric` at query time is correct while a
+  baked-in age is stale on arrival. Nothing expires a stale file, so
+  `node_textfile_mtime_seconds` is the freshness guard on the dashboards.
+  Backups report zeros rather than nothing for a missing directory — an absent
+  sample cannot be alerted on, a zero can.
+- **Alerts are delivered by the box's own ntfy, through two independent paths**
+  — `alerts.nix`. No Alertmanager and no third party: the push server is already
+  here, already reaches the phone off-LAN, and adding a second alerting daemon to
+  route between Prometheus and it buys nothing at this scale. The two paths are
+  deliberate rather than redundant. Grafana's rules can alert on anything in the
+  TSDB but need Grafana, Prometheus and a working scrape loop; a systemd
+  `OnFailure=` handler needs none of those, so it is the floor that still reports
+  when the observability stack itself is what died. The credential is a
+  **password, not a token**, because ntfy can only mint tokens itself — which
+  would make sops a copy of server state; a password lets sops stay
+  authoritative and `ntfy user add` consume it. It never enters the Nix store:
+  the Grafana contact point is generated into `/run` by a oneshot in
+  grafana.service's dependency chain, because `provision.alerting.contactPoints.settings`
+  is rendered into the store. Every rule sets `noDataState = OK` — the default
+  is `NoData`, which alerts on an absent series, and these rules are written so
+  that absence *is* the healthy state.
+- **Blackbox probes go to `127.0.0.1:443` with the real hostname as SNI, not to
+  the public hostname** — `blackbox.nix`. Probing `https://ntfy.mauderer.work`
+  from this box would depend on the router hairpinning, and would silently
+  produce nothing if it does not. NPM publishes `:443` on all interfaces, so
+  loopback reaches it; supplying the hostname through `tls_config.server_name`
+  and a `Host` header makes the request indistinguishable from a real client's
+  except for the network path, and exercises TLS termination plus backend
+  routing — which matters because proxy hosts live in NPM's UI, not in Nix.
+  Certificate verification is left on (`insecure_skip_verify` would make the
+  probe pass against the expired certificate it exists to warn about). The
+  honest limitation, recorded on the dashboard itself: none of this proves
+  reachability from the internet, which needs a prober somewhere else. The
+  exporter is loopback-only for a stronger reason than the others — anything
+  that can reach `/probe` can make this box fetch a URL of its choosing.
+- **A service's metrics endpoint must not inherit its service's public exposure**
+  — the rule the three native endpoints follow, and they resolve it differently
+  because the software allows different things. **postgres_exporter** is a
+  separate loopback listener and needs no credential at all (`runAsLocalSuperUser`
+  + the Unix socket = peer auth, the same argument `postgresql.nix` already makes
+  for having no sops entry). **ntfy** gets `metrics-listen-http` on its own
+  loopback port rather than `enable-metrics`, which would serve `/metrics` from
+  the listener NPM publishes as `ntfy.mauderer.work`. **Forgejo** can do neither —
+  it has one listener and NPM proxies it — so it is the single scrape target on
+  this box that is not loopback-only and therefore the single one carrying a
+  credential: a sops-held bearer token handed to Forgejo and to Prometheus as a
+  systemd credential, never through `settings` (which is world-readable in the
+  Nix store). The cost is that `services.prometheus.checkConfig` drops to
+  `syntax-only`, because the full `promtool check config` stats every referenced
+  file and a systemd credential does not exist at build time; the nixosTest
+  recovers the lost coverage by asserting every target is healthy on a running
+  instance.

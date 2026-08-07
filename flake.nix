@@ -410,6 +410,25 @@
               && lib.hasPrefix "/hdd_pool_1/" cfg.services.forgejo.dump.backupDir;
           }
           {
+            # Forgejo is the only service here whose /metrics rides on a
+            # listener NPM proxies to the WAN, so the token is what keeps repo
+            # counts and the exact version off the public internet. Both halves
+            # are asserted: that metrics are on at all (otherwise the scrape job
+            # in metrics.nix is a permanently-down target), and that the token
+            # arrives as a runtime file rather than through `settings`, which is
+            # rendered into the world-readable Nix store. Same rule, and the
+            # same reasoning, as the Grafana password assertion below.
+            name = "Forgejo metrics are enabled and token-gated from a runtime file";
+            assertion =
+              let
+                forgejo = cfg.services.forgejo;
+              in
+              forgejo.settings.metrics.ENABLED
+              && (forgejo.settings.metrics.TOKEN or null) == null
+              && lib.isString (forgejo.secrets.metrics.TOKEN or null)
+              && forgejo.secrets.metrics.TOKEN != "";
+          }
+          {
             # The real guard on the whole design: Forgejo's :4000 and :2222 are
             # admitted by source-restricted nftables rules, so neither may ever
             # appear in the globally-open set. Stated as an exact match rather
@@ -534,6 +553,93 @@
             # dashboard instead of only in the journal.
             name = "node exporter reports systemd unit state";
             assertion = builtins.elem "systemd" cfg.services.prometheus.exporters.node.enabledCollectors;
+          }
+          {
+            # The transport for nixos-metrics.nix. Both halves are needed and
+            # neither fails loudly on its own: without the collector the file is
+            # written and never read, and without the flag the collector reads
+            # its own empty default directory. Either way the update metrics
+            # just silently do not exist.
+            name = "node exporter re-exports the textfile directory";
+            assertion =
+              let
+                node = cfg.services.prometheus.exporters.node;
+              in
+              builtins.elem "textfile" node.enabledCollectors
+              && lib.any (lib.hasPrefix "--collector.textfile.directory=") node.extraFlags;
+          }
+          {
+            # …and that the directory the collector reads is the one the writer
+            # writes. Both modules hold the path as a literal (the convention
+            # metrics.nix uses for its sibling modules' ports), so this is what
+            # turns a typo into a failed eval instead of an empty dashboard.
+            name = "nixos-metrics writes to the directory the node exporter reads";
+            assertion =
+              let
+                flag = "--collector.textfile.directory=";
+                dirs = map (lib.removePrefix flag) (
+                  lib.filter (lib.hasPrefix flag) cfg.services.prometheus.exporters.node.extraFlags
+                );
+                timer = cfg.systemd.timers.nixos-metrics or null;
+                unit = cfg.systemd.services.nixos-metrics or null;
+              in
+              timer != null
+              && unit != null
+              && lib.length dirs == 1
+              && lib.any (rule: lib.hasInfix (lib.head dirs) rule) cfg.systemd.tmpfiles.rules;
+          }
+          {
+            # The blackbox exporter is the one component here that makes
+            # *outbound* requests on a caller's behalf: anything that can reach
+            # /probe can make this box fetch a URL of its choosing. Loopback-only
+            # is therefore not merely consistency with the other exporters, it is
+            # the control that stops it being an open request forwarder.
+            name = "blackbox exporter is loopback-only and never firewalled open";
+            assertion =
+              let
+                e = cfg.services.prometheus.exporters.blackbox;
+              in
+              e.enable
+              && e.listenAddress == "127.0.0.1"
+              && !(builtins.elem e.port cfg.networking.firewall.allowedTCPPorts)
+              && !(lib.any (ifc: builtins.elem e.port (ifc.allowedTCPPorts or [ ])) (
+                lib.attrValues cfg.networking.firewall.interfaces
+              ));
+          }
+          {
+            # Every probe job goes through the same three-step relabel: the
+            # configured target becomes `?target=`, then `instance`, and only
+            # then is the address rewritten to the exporter. Getting that wrong
+            # does not fail — Prometheus happily scrapes 127.0.0.1:9115/probe
+            # with no target and records `probe_success 0` forever, which reads
+            # as "the service is down" rather than as "the probe is misbuilt".
+            name = "blackbox probe jobs rewrite the target into a probe parameter";
+            assertion =
+              let
+                probeJobs = lib.filter (j: lib.hasPrefix "probe-" j.job_name) cfg.services.prometheus.scrapeConfigs;
+                wellFormed =
+                  j:
+                  j.metrics_path == "/probe"
+                  && (j.params.module or [ ]) != [ ]
+                  && lib.any (r: (r.target_label or "") == "__param_target") j.relabel_configs
+                  && lib.any (
+                    r: (r.target_label or "") == "__address__" && lib.hasInfix "9115" (r.replacement or "")
+                  ) j.relabel_configs;
+              in
+              probeJobs != [ ] && lib.all wellFormed probeJobs;
+          }
+          {
+            # `insecure_skip_verify` would make the certificate probe pass
+            # against any certificate at all — including the expired one it
+            # exists to warn about. The probes connect to 127.0.0.1 and name the
+            # real host in `server_name`, so verification genuinely applies here;
+            # this keeps it that way.
+            name = "blackbox certificate probes verify the certificate";
+            assertion =
+              let
+                conf = builtins.readFile cfg.services.prometheus.exporters.blackbox.configFile;
+              in
+              lib.hasInfix "server_name" conf && !(lib.hasInfix "insecure_skip_verify" conf);
           }
           {
             name = "Loki log store lives on the redundant ZFS pool";
@@ -662,9 +768,7 @@
             assertion =
               let
                 dir = ./modules/nixos/server/dashboards;
-                files = lib.filter (lib.hasSuffix ".json") (
-                  lib.attrNames (builtins.readDir dir)
-                );
+                files = lib.filter (lib.hasSuffix ".json") (lib.attrNames (builtins.readDir dir));
                 ok =
                   f:
                   let
@@ -688,6 +792,34 @@
               && builtins.elem "zfs-mount.service" loki.after
               && grafana != null
               && builtins.elem "zfs-mount.service" grafana.after;
+          }
+          {
+            # `onFailure` is attached by *defining* the unit, so naming a unit
+            # that does not exist on this host does not fail — it silently
+            # creates an empty one and watches nothing. This is the check that
+            # every watched name is a unit that actually does something.
+            name = "every OnFailure-watched unit exists and has an ExecStart";
+            assertion =
+              let
+                watched = lib.filterAttrs (
+                  _: u: builtins.elem "notify-failure@%n.service" (u.onFailure or [ ])
+                ) cfg.systemd.services;
+                real = u: (u.script or "") != "" || (u.serviceConfig.ExecStart or "") != "";
+              in
+              watched != { } && lib.all real (lib.attrValues watched);
+          }
+          {
+            # The notifier must never become a dependency of the units it
+            # watches: a `requires` on ntfy would mean a failing backup cannot
+            # even report itself when ntfy is also down.
+            name = "the failure notifier does not require ntfy";
+            assertion =
+              let
+                unit = cfg.systemd.services."notify-failure@" or null;
+              in
+              unit != null
+              && builtins.elem "ntfy-sh.service" unit.after
+              && !(builtins.elem "ntfy-sh.service" (unit.requires or [ ]));
           }
           {
             name = "ntfy enabled";
@@ -740,6 +872,19 @@
             # holding the publish token can fill is not what this box is for.
             name = "ntfy attachments disabled (no public upload target)";
             assertion = cfg.services.ntfy-sh.settings.attachment-cache-dir == "";
+          }
+          {
+            # `enable-metrics` would serve /metrics from the main listener —
+            # the one NPM publishes as ntfy.mauderer.work. The dedicated
+            # listener is the whole point, so both halves are stated: the
+            # public one off, the loopback one on. Anything but a 127.0.0.1
+            # bind here silently puts the endpoint on the LAN or the WAN.
+            name = "ntfy metrics are on a loopback-only listener, not the public one";
+            assertion =
+              let
+                s = cfg.services.ntfy-sh.settings;
+              in
+              (s.enable-metrics or false) == false && lib.hasPrefix "127.0.0.1:" (s.metrics-listen-http or "");
           }
           {
             # Pinned rather than inherited from upstream's stateVersion ladder.
@@ -814,6 +959,38 @@
               in
               unit != null && builtins.elem "zfs-mount.service" unit.after;
           }
+          {
+            # The exporter reaches the cluster over the Unix socket as the
+            # local superuser, which is what makes it the one exporter on this
+            # box that needs no credential — the same peer-auth argument the
+            # module makes for itself. `runAsLocalSuperUser` is the load-bearing
+            # half: without it the unit runs as a DynamicUser that peer auth
+            # maps to no role at all, and every scrape fails authentication.
+            name = "postgres exporter is loopback-only and authenticates by peer, not by password";
+            assertion =
+              let
+                e = cfg.services.prometheus.exporters.postgres;
+              in
+              e.enable
+              && e.listenAddress == "127.0.0.1"
+              && e.runAsLocalSuperUser
+              && e.environmentFile == null
+              && !(builtins.elem e.port cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            # The backup dumps are the only copy of the forge, the archive and
+            # the databases that survives losing the SSD, and the failure mode
+            # that loses data is silent: a unit that exits 0 having written
+            # nothing. This timer is what measures the files instead of the
+            # unit — see backup-metrics.nix.
+            name = "backup freshness is measured on a timer";
+            assertion =
+              let
+                timer = cfg.systemd.timers.backup-metrics or null;
+                unit = cfg.systemd.services.backup-metrics or null;
+              in
+              timer != null && unit != null && builtins.elem "zfs-mount.service" unit.after;
+          }
         ];
       testLib = import "${nixpkgs}/nixos/lib/testing-python.nix" {
         inherit system pkgs;
@@ -859,11 +1036,41 @@
       # which is why it has assertions but no VM test. Dumps are forced off
       # because their target lives on the ZFS pool.
       forgejoTestNode = {
-        imports = [ ./modules/nixos/server/forgejo.nix ];
+        imports = [
+          inputs.sops-nix.nixosModules.sops
+          ./modules/nixos/server/forgejo.nix
+        ];
         services.forgejo.dump.enable = lib.mkForce false;
         # No nftables line here on purpose: forgejo.nix defaults it on itself,
         # since its source-restricted rules need that backend. This node is the
         # check that the module really is self-contained.
+
+        # The metrics token comes from sops, and the module reads
+        # `config.sops.secrets.…path` at eval time — so, exactly as in
+        # paperlessTestNode, the secret is redirected to the test fixture rather
+        # than forced away. `lib.mkForce null` cannot rescue this: the module
+        # system evaluates every definition to read its priority, so a missing
+        # `sops.secrets` attr throws before any override applies.
+        #
+        # Pointing it at the fixture also keeps the path exercised end to end:
+        # the test below authenticates to /metrics with the fixture's
+        # *plaintext*, which proves the file's contents are what Forgejo checks.
+        environment.etc."test-age-key.txt" = {
+          text = testAgeKey + "\n";
+          mode = "0400";
+        };
+        sops = {
+          age = {
+            sshKeyPaths = lib.mkForce [ ];
+            keyFile = "/etc/test-age-key.txt";
+          };
+          gnupg.sshKeyPaths = lib.mkForce [ ];
+          secrets.forgejo-metrics-token = {
+            sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+            key = "fixture_secret";
+          };
+        };
+
         environment.systemPackages = [ pkgs.curl ];
         virtualisation = {
           memorySize = 2048;
@@ -970,8 +1177,36 @@
         imports = [
           inputs.sops-nix.nixosModules.sops
           ./modules/nixos/server/metrics.nix
+          ./modules/nixos/server/nixos-metrics.nix
+          ./modules/nixos/server/backup-metrics.nix
           ./modules/nixos/server/logs.nix
           ./modules/nixos/server/grafana.nix
+          # Forgejo is here for one reason: it is the only scrape target that is
+          # not loopback-only and the only one carrying a credential, so it is
+          # the only one whose *scrape* can fail on its own. That path —
+          # LoadCredential resolved by PID 1, read by a unit running under
+          # PrivateUsers, presented as a bearer token Forgejo then has to
+          # accept — is exercised nowhere else: test-forgejo proves Forgejo
+          # accepts the token, not that Prometheus can produce it.
+          #
+          # It also carries more weight than usual now that `checkConfig` is
+          # `syntax-only` (see metrics.nix): a wrong credentials path no longer
+          # fails the build, and Prometheus refuses to *start* when it cannot
+          # read the file — which takes the whole stack down, on a headless box.
+          ./modules/nixos/server/forgejo.nix
+          # ntfy and the alerting module: alerts.nix is where "how does this box
+          # tell me something is wrong" lives, and both halves of it — the
+          # systemd OnFailure handler and Grafana's contact point — end at the
+          # local ntfy. Testing either without ntfy present would only prove
+          # that the config parses.
+          ./modules/nixos/server/ntfy.nix
+          ./modules/nixos/server/alerts.nix
+          # PostgreSQL, because metrics.nix declares its exporter (gated on this
+          # module being imported) and the thing worth testing is the scrape:
+          # the exporter carries no credential and relies on peer auth over the
+          # socket, so "does it authenticate" is answered by the target being
+          # healthy, not by the unit starting.
+          ./modules/nixos/server/postgresql.nix
         ];
 
         environment.etc."test-age-key.txt" = {
@@ -997,6 +1232,21 @@
               key = "fixture_secret";
             };
             grafana-secret-key = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
+            };
+            # Same fixture for the Forgejo metrics token: both ends of the
+            # scrape read the one value, so any fixture works — what is under
+            # test is that they agree.
+            forgejo-metrics-token = {
+              sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+              key = "fixture_secret";
+            };
+            # The ntfy publish password, redirected to the same fixture. The
+            # test creates the `alerts` ntfy account *from this file*, which is
+            # the production flow in miniature: the value in sops is
+            # authoritative and `ntfy user add` consumes it.
+            ntfy-alert-password = {
               sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
               key = "fixture_secret";
             };
@@ -1026,15 +1276,70 @@
             requires = lib.mkForce [ ];
             after = lib.mkForce [ ];
           };
+          # Forgejo's dump stays *enabled* here, unlike in forgejoTestNode, and
+          # its oneshot gets the same treatment as the other two rather than
+          # being switched off. That is not fussiness: upstream lists
+          # `dump.backupDir` in forgejo.service's ReadWritePaths
+          # unconditionally — `dump.enable = false` does not remove it — so the
+          # unit fails 226/NAMESPACE unless that directory exists. Upstream's
+          # own tmpfiles rule cannot create it on this node either, because the
+          # pool root is deliberately seeded 0750 nobody and tmpfiles refuses
+          # the unsafe path transition. forgejo-dump-dirs is the thing that
+          # chmods the root and makes it work, which makes running it here a
+          # test of the fix rather than a workaround for it.
+          forgejo-dump-dirs = {
+            requires = lib.mkForce [ ];
+            after = lib.mkForce [ ];
+          };
+          postgresql-dump-dirs = {
+            requires = lib.mkForce [ ];
+            after = lib.mkForce [ ];
+          };
         };
 
         environment.systemPackages = [
           pkgs.curl
           pkgs.jq
         ];
+        # Roomier than the other nodes: this one now runs the whole stack plus
+        # Forgejo.
         virtualisation = {
-          memorySize = 4096;
-          diskSize = 8192;
+          memorySize = 6144;
+          diskSize = 12288;
+        };
+      };
+
+      # Blackbox test node: the probe exporter plus the Prometheus that drives
+      # it, and nothing else.
+      #
+      # Kept out of observabilityTestNode deliberately. That test asserts every
+      # scrape target is healthy, and these probes are aimed at things a VM does
+      # not have — NPM on :443, the public DNS records, the service health
+      # endpoints — so they are *expected* to fail there and would turn a
+      # meaningful assertion into one that has to carve out exceptions.
+      #
+      # What is under test here is the wiring, which is where the mistakes are:
+      # that the config blackbox generates is one it accepts, that every module
+      # named by a scrape job exists in it, and that the relabel chain really
+      # does turn a configured target into a `?target=` parameter. Whether a
+      # given remote answers is not a property of this repo.
+      blackboxTestNode = {
+        imports = [
+          ./modules/nixos/server/metrics.nix
+          ./modules/nixos/server/blackbox.nix
+        ];
+
+        # Same reason as in observabilityTestNode: virtio disks expose no SMART
+        # data, and the exporter exits when `smartctl --scan` finds nothing.
+        services.prometheus.exporters.smartctl.enable = lib.mkForce false;
+
+        environment.systemPackages = [
+          pkgs.curl
+          pkgs.jq
+        ];
+        virtualisation = {
+          memorySize = 2048;
+          diskSize = 4096;
         };
       };
 
@@ -1624,6 +1929,42 @@
             machine.succeed(f"grep -qE '^DEFAULT_ACTIONS_URL *= *github' {conf}")
             machine.succeed(f"grep -qE '^ROOT_URL *= *https://' {conf}")
             machine.succeed(f"grep -qE '^START_SSH_SERVER *= *true' {conf}")
+
+            # The metrics endpoint is on, and gated. Both directions are checked
+            # because only the pair is meaningful: an endpoint that answers
+            # without the token is a public read of the forge through NPM, and a
+            # token that Forgejo does not actually accept is a permanently-down
+            # scrape target that nobody notices.
+            machine.fail("curl -fsS http://localhost:4000/metrics")
+            metrics = machine.succeed(
+                'TOKEN=$(cat /run/secrets/forgejo-metrics-token); '
+                'curl -fsS -H "Authorization: Bearer $TOKEN" '
+                "http://localhost:4000/metrics"
+            )
+            # Matched on the suffix, not the full name: the namespace prefix is
+            # assembled at runtime from a constant Forgejo has renamed before
+            # (gitea_ -> forgejo_), and pinning it here would turn a cosmetic
+            # upstream change into a failing test.
+            forge_series = sorted(
+                line.split()[0].split("{")[0]
+                for line in metrics.splitlines()
+                if line and not line.startswith("#") and line.startswith(("gitea_", "forgejo_"))
+            )
+            print("forge metric names:", forge_series)
+            assert any(s.endswith("repositories") for s in forge_series), metrics[:400]
+            assert any(s.endswith("users") for s in forge_series), metrics[:400]
+
+            # A wrong token must not be accepted — otherwise the check above
+            # would also pass on a build where TOKEN never reached app.ini.
+            machine.fail(
+                "curl -fsS -H 'Authorization: Bearer not-the-token' "
+                "http://localhost:4000/metrics"
+            )
+
+            # And the token itself never lands in the world-readable store copy
+            # of the config. app.ini is assembled at runtime from the systemd
+            # credential; this is the runtime half of the eval assertion.
+            machine.succeed(f"grep -qE '^ENABLED *= *true' {conf}")
           '';
         };
 
@@ -1725,6 +2066,34 @@
             machine.fail(f"grep -qE '^attachment-cache-dir:.*/' {conf}")
             # Upstream forwarding (iOS only) is off, so no topic hash leaves the box.
             machine.fail(f"grep -q upstream-base-url {conf}")
+
+            # Metrics live on their own loopback listener and *only* there. The
+            # second half is the one that matters: :2586 is what NPM publishes
+            # as ntfy.mauderer.work, so a /metrics answering there would be a
+            # public read. ntfy serves the endpoint on exactly one listener, and
+            # this is the check that it is the right one.
+            machine.wait_for_open_port(9686)
+            machine.succeed("ss -ltn | grep -q '127.0.0.1:9686'")
+            machine.fail("ss -ltn | grep -q '0.0.0.0:9686'")
+
+            # ntfy's own series, not just the Go runtime ones every exporter
+            # emits — those would be present even if the metrics feature itself
+            # were off. `ntfy_topics_total` is a gauge registered at startup;
+            # `ntfy_messages_published_success` is the counter incremented by
+            # the publish this script already did above.
+            ntfy_metrics = machine.succeed("curl -fsS http://127.0.0.1:9686/metrics")
+            for name in ["ntfy_topics_total", "ntfy_messages_published_success"]:
+                assert name in ntfy_metrics, "missing " + name
+
+            # The public listener serves no metrics. Asserted on the *body*,
+            # not the status code: /metrics on :2586 returns 200, because ntfy's
+            # bundled web app answers any unrouted path with its index page. A
+            # `machine.fail("curl -fsS …")` here would therefore fail even
+            # though the property holds — and, worse, would keep passing if
+            # ntfy ever did start exporting there.
+            public = machine.succeed("curl -fsS http://localhost:2586/metrics")
+            assert "ntfy_topics_total" not in public, "metrics exposed on the public listener"
+            assert "go_gc_duration_seconds" not in public, "metrics exposed on the public listener"
           '';
         };
 
@@ -1737,13 +2106,17 @@
           name = "observability";
           nodes.machine = observabilityTestNode;
           testScript = ''
+            import json
+
             machine.wait_for_unit("prometheus.service")
             machine.wait_for_unit("prometheus-node-exporter.service")
             machine.wait_for_unit("loki.service")
             machine.wait_for_unit("alloy.service")
             machine.wait_for_unit("grafana.service")
+            machine.wait_for_unit("forgejo.service")
 
             machine.wait_for_open_port(9090)
+            machine.wait_for_open_port(4000)
             machine.wait_for_open_port(3100)
             machine.wait_for_open_port(3030)
 
@@ -1790,8 +2163,35 @@
                 "| jq -r '[.data.activeTargets[].labels.job] | sort | join(\",\")'"
             ).strip()
             # smartctl is absent by design on this node — see the comment on
-            # observabilityTestNode.
-            assert jobs == "alloy,grafana,loki,node,prometheus", jobs
+            # observabilityTestNode. Every other job is present because its
+            # module is imported: metrics.nix gates each on the sibling service
+            # being enabled.
+            #
+            # `forgejo` being in this list *and* healthy is the assertion that
+            # matters: its scrape is the only one that has to authenticate, so
+            # a credential Prometheus cannot read, or a token Forgejo does not
+            # accept, shows up here as the one target that is down.
+            assert jobs == "alloy,forgejo,grafana,loki,node,ntfy,postgres,prometheus", jobs
+
+            # The postgres exporter specifically: it carries no credential and
+            # relies on peer auth over the socket, so `pg_up 1` — not merely a
+            # healthy target — is what proves `runAsLocalSuperUser` is doing its
+            # job. Without it the unit runs as a DynamicUser that peer auth maps
+            # to no role, and the exporter serves metrics reporting pg_up 0.
+            machine.succeed("ss -ltn | grep -q '127.0.0.1:9187'")
+            machine.fail("ss -ltn | grep -q '0.0.0.0:9187'")
+            machine.wait_until_succeeds(
+                "curl -fsS http://127.0.0.1:9187/metrics -o /tmp/pg.prom", timeout=60
+            )
+            assert "pg_up 1" in machine.succeed("cat /tmp/pg.prom").splitlines(), (
+                "exporter could not authenticate to the cluster"
+            )
+
+            # ...and specifically that it is the *token* doing the work, not a
+            # Forgejo that quietly serves metrics to anyone. Without this, the
+            # target above would also be healthy on a build where the token
+            # never reached app.ini.
+            machine.fail("curl -fsS http://127.0.0.1:4000/metrics")
 
             # Grafana: the sops-decrypted password is what the instance actually
             # accepts, and both datasources were provisioned from Nix.
@@ -1821,9 +2221,76 @@
                 'curl -fsS -u "admin:$PW" '
                 "'http://127.0.0.1:3030/api/search?type=dash-db' "
                 "| jq -e '[.[].uid] | sort == "
-                "[\"home-server-host\",\"home-server-logs\",\"home-server-stack\"]'",
+                "[\"home-server-host\",\"home-server-logs\",\"home-server-nixos\","
+                "\"home-server-services\",\"home-server-stack\","
+                "\"home-server-uptime\"]'",
                 timeout=60,
             )
+
+            # nixos-metrics.nix writes the textfile the node exporter re-exports.
+            # Run the oneshot by hand rather than waiting for the timer, then
+            # scrape: this is the whole path (script → .prom file → collector →
+            # /metrics), which is what a typo in either half of the directory
+            # pair would break.
+            machine.succeed("systemctl start nixos-metrics.service")
+            machine.succeed("test -s /var/lib/node-exporter-textfile/nixos.prom")
+            # No assertion that the .tmp file is absent: both units also carry an
+            # OnBootSec timer with a randomised delay, so a timer-driven run can
+            # legitimately be mid-write at any moment here and the check fails
+            # intermittently. The atomic-rename contract is covered by
+            # node_textfile_scrape_error below, which is what a partial file
+            # actually breaks — and covers it continuously rather than at one
+            # instant.
+
+            nixos_metrics = machine.succeed("curl -fsS http://127.0.0.1:9100/metrics")
+            for name in [
+                "nixos_reboot_required",
+                "nixos_generation_count",
+                "nixos_store_path_count",
+                "nixos_nixpkgs_timestamp_seconds",
+                "nixos_unit_last_finish_timestamp_seconds",
+                # Emitted by the collector itself, and the only thing that tells
+                # a fresh file from a writer that died — see nixos-metrics.nix.
+                "node_textfile_mtime_seconds",
+            ]:
+                assert name in nixos_metrics, "missing " + name
+
+            # Exact-value checks are made against the text fetched above rather
+            # than by piping curl into grep: `grep -q` closes the pipe on its
+            # first match, and `curl -f` then dies of a write error (exit 23)
+            # even though the match succeeded. Whether that happens depends on
+            # where in the payload the metric sorts, which makes the piped form
+            # an intermittently-failing test.
+            samples = nixos_metrics.splitlines()
+
+            # A parse error in the .prom file does not fail the scrape loudly —
+            # it sets this to 1 and drops the samples. The names being present
+            # above does not rule it out for a *later* line in the file.
+            assert "node_textfile_scrape_error 0" in samples, "textfile parse error"
+
+            # The booted closure is the activated one in a fresh VM, so the
+            # reboot flag must read 0. This is the check that would have caught
+            # comparing whole toplevel store paths instead of the kernel
+            # components — that version reports 1 here and after every rebuild.
+            assert "nixos_reboot_required 0" in samples, "spurious pending reboot"
+
+            # backup-metrics.nix writes a second file into the same directory,
+            # and the two must coexist: the collector concatenates every .prom
+            # it finds, so a duplicate HELP/TYPE line for the same metric name
+            # across files is a parse error that drops the whole scrape.
+            machine.succeed("systemctl start backup-metrics.service")
+            machine.succeed("test -s /var/lib/node-exporter-textfile/backups.prom")
+
+            both = machine.succeed("curl -fsS http://127.0.0.1:9100/metrics").splitlines()
+            assert "node_textfile_scrape_error 0" in both, "two .prom files do not parse together"
+            assert any(
+                line.startswith("backup_last_success_timestamp_seconds{")
+                for line in both
+            ), "backup metrics missing"
+            # The backup directories do not exist on this node, and that has to
+            # read as "no backup" rather than as a gap in the series — an absent
+            # sample cannot be alerted on, a zero can.
+            assert 'backup_file_count{job="forgejo"} 0' in both, "missing dir should report 0"
 
             # Loki accepts a push and serves it back: a real round trip through
             # the on-pool store, not just a liveness probe.
@@ -1845,6 +2312,112 @@
                 timeout=60,
             )
 
+            # --- Alerting -------------------------------------------------
+            # Bootstrap the publisher the way INSTALL.md does, reading the
+            # password out of the decrypted file rather than a literal — so
+            # this proves the file's *contents* are what both halves use.
+            machine.wait_for_unit("ntfy-sh.service")
+            machine.wait_for_open_port(2586)
+            machine.succeed(
+                "NTFY_PASSWORD=$(cat /run/secrets/ntfy-alert-password) "
+                "ntfy user add --role=user --ignore-exists alerts"
+            )
+            machine.succeed("ntfy access alerts home-server rw")
+
+            # The generated contact point exists, is not world-readable, and —
+            # the point of generating it at all — the password is nowhere in
+            # the Nix store. `settings` instead of `path` would put it in the
+            # store copy of the provisioning directory, which is what this
+            # catches.
+            machine.succeed("test -f /run/grafana-alerting/contactPoints.yaml")
+            machine.succeed(
+                "stat -c '%U:%G %a' /run/grafana-alerting/contactPoints.yaml "
+                "| grep -qx 'root:grafana 640'"
+            )
+            secret = machine.succeed("cat /run/secrets/ntfy-alert-password").strip()
+            machine.succeed(
+                f"grep -rq -- {secret!r} /run/grafana-alerting/contactPoints.yaml"
+            )
+            machine.fail(
+                "grep -rlq -- "
+                + repr(secret)
+                + " /nix/store/*-grafana-provisioning 2>/dev/null"
+            )
+
+            # Grafana loaded the contact point, the notification policy that
+            # routes to it, and the rule group. Provisioning failures are
+            # logged and skipped, so grafana.service is green either way —
+            # these have to be asked of the running instance.
+            def grafana_api(path):
+                return (
+                    "PW=$(cat /run/secrets/grafana-admin-password); "
+                    f'curl -fsS -u "admin:$PW" http://127.0.0.1:3030{path}'
+                )
+
+            machine.wait_until_succeeds(
+                grafana_api("/api/v1/provisioning/contact-points")
+                + " | jq -e '[.[] | select(.name == \"ntfy\")] | length == 1'",
+                timeout=60,
+            )
+            machine.wait_until_succeeds(
+                grafana_api("/api/v1/provisioning/policies")
+                + " | jq -e '.receiver == \"ntfy\"'",
+                timeout=60,
+            )
+            rules = json.loads(
+                machine.succeed(grafana_api("/api/v1/provisioning/alert-rules"))
+            )
+            assert len(rules) >= 10, rules
+            # Grafana's default is NoData, which *alerts* when a series is
+            # absent — and absence is the healthy state for every rule here by
+            # construction, so the default would make the whole group fire
+            # permanently.
+            for r in rules:
+                assert r["noDataState"] == "OK", r["title"]
+                assert r["execErrState"] == "Error", r["title"]
+
+            # The delivery path itself, exercised with a Grafana-shaped payload
+            # against the exact URL the contact point uses. This is what proves
+            # ntfy's message templating is doing its job: without
+            # `template=yes` the notification body would be the raw JSON.
+            url = machine.succeed(
+                "grep -oP '(?<=url: ).*' /run/grafana-alerting/contactPoints.yaml"
+            ).strip()
+            payload = '{"title":"canary-title","message":"canary-message"}'
+            machine.succeed(
+                "PW=$(cat /run/secrets/ntfy-alert-password); "
+                'curl -fsS -u "alerts:$PW" -H "Content-Type: application/json" '
+                f"--data-raw '{payload}' '{url}'"
+            )
+            delivered = json.loads(
+                machine.succeed(
+                    "PW=$(cat /run/secrets/ntfy-alert-password); "
+                    'curl -fsS -u "alerts:$PW" '
+                    "'http://127.0.0.1:2586/home-server/json?poll=1'"
+                )
+            )
+            assert delivered["message"] == "canary-message", delivered
+            assert delivered["title"] == "canary-title", delivered
+
+            # The systemd half. A unit that fails must trigger the handler, and
+            # the notification must carry the failing unit's name — that is the
+            # whole value over "something broke".
+            machine.succeed(
+                "systemd-run --unit=canary-failure --wait --collect "
+                "/bin/sh -c 'exit 1' || true"
+            )
+            machine.succeed(
+                "systemctl start notify-failure@loki.service.service"
+            )
+            failure = json.loads(
+                machine.succeed(
+                    "PW=$(cat /run/secrets/ntfy-alert-password); "
+                    'curl -fsS -u "alerts:$PW" '
+                    "'http://127.0.0.1:2586/home-server/json?poll=1'"
+                ).strip().splitlines()[-1]
+            )
+            assert "loki.service" in failure["title"], failure
+
             # Alloy ships the journal, and the relabel rules promote the syslog
             # identifier to a real label — without them every line would land in
             # one unfilterable stream, so querying by it proves both halves.
@@ -1861,6 +2434,93 @@
         # PostgreSQL: the cluster comes up on the pinned major, is reachable over
         # the Unix socket and *only* the socket, peer auth actually rejects a
         # mismatched system user, and the nightly pg_dumpall produces a real dump.
+        # Blackbox: the exporter comes up loopback-only, the generated config
+        # carries a module for every probe job, a real probe through /probe
+        # succeeds, and the relabel chain lands the right `instance` labels.
+        test-blackbox = testLib.makeTest {
+          name = "blackbox";
+          nodes.machine = blackboxTestNode;
+          testScript = ''
+            import json
+
+            machine.wait_for_unit("prometheus-blackbox-exporter.service")
+            machine.wait_for_unit("prometheus.service")
+            machine.wait_for_open_port(9115)
+            # The probe below aims at this port, and `wait_for_unit` returns as
+            # soon as systemd considers the unit started — which is before
+            # Prometheus has bound its listener. Without this the probe races
+            # startup and reports probe_success 0 for a target that is fine.
+            machine.wait_for_open_port(9090)
+
+            # An exporter that fetches arbitrary URLs on request must not be
+            # reachable from off the box — the runtime half of the assertion.
+            machine.succeed("ss -ltn | grep -q '127.0.0.1:9115'")
+            machine.fail("ss -ltn | grep -q '0.0.0.0:9115'")
+
+            # A real probe end to end, against the one HTTP endpoint this node
+            # is guaranteed to have. probe_success 1 proves the exporter parsed
+            # its config, resolved the module and made the request.
+            probe = machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9115/probe"
+                "?module=http_2xx&target=http://127.0.0.1:9090/-/healthy'"
+            ).splitlines()
+            assert "probe_success 1" in probe, probe
+
+            # The per-host TLS module exists and is loadable. It cannot succeed
+            # here (nothing serves :443 in the VM), so the assertion is on the
+            # *absence* of an error: blackbox answers 400 for a module it does
+            # not know, and 200 with probe_success 0 for one it does.
+            tls = machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9115/probe"
+                "?module=tls_ntfy_mauderer_work&target=https://127.0.0.1:443/'"
+            )
+            assert "probe_success 0" in tls.splitlines(), tls
+            machine.fail(
+                "curl -fsS 'http://127.0.0.1:9115/probe"
+                "?module=no_such_module&target=https://127.0.0.1:443/'"
+            )
+
+            # Every module a scrape job names exists in the generated config.
+            # This is the failure that is invisible otherwise: Prometheus keeps
+            # scraping, blackbox keeps answering 400, and the dashboard reads
+            # "the service is down" rather than "the probe is misconfigured".
+            # Service discovery populates this shortly after startup, not at
+            # the instant the port opens, hence the retry.
+            machine.wait_until_succeeds(
+                "curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active' "
+                "| jq -e '[.data.activeTargets[] "
+                "| select(.labels.job | startswith(\"probe-\"))] | length > 0'",
+                timeout=120,
+            )
+            targets = json.loads(
+                machine.succeed(
+                    "curl -fsS 'http://127.0.0.1:9090/api/v1/targets?state=active'"
+                )
+            )["data"]["activeTargets"]
+            probes = [t for t in targets if t["labels"]["job"].startswith("probe-")]
+            print("probe jobs:", sorted(t["labels"]["job"] for t in probes))
+
+            for t in probes:
+                url = t["scrapeUrl"]
+                # The relabel chain ran: the scrape goes to the exporter, and
+                # the probed thing travels as a parameter rather than as the
+                # address. Without the chain this would be a bare /probe with
+                # no target, which blackbox answers 400 to.
+                assert "127.0.0.1:9115/probe" in url, url
+                assert "target=" in url, url
+                assert "module=" in url, url
+
+            # ...and the `instance` label names the probed thing, not the
+            # exporter. For the TLS and DNS jobs every target string is
+            # identical (127.0.0.1:443 / the resolver), so this is also what
+            # keeps the two public hosts from collapsing into one series.
+            instances = sorted(t["labels"]["instance"] for t in probes)
+            for host in ["ntfy.mauderer.work", "git.mauderer.work"]:
+                assert instances.count(host) == 2, (host, instances)
+            assert not any(i.startswith("127.0.0.1:9115") for i in instances), instances
+          '';
+        };
+
         test-postgresql = testLib.makeTest {
           name = "postgresql";
           nodes.machine = postgresqlTestNode;
@@ -1904,6 +2564,11 @@
 
             # The timer is what makes it nightly; the unit alone would never run.
             machine.succeed("systemctl list-timers --all | grep -q postgresqlBackup")
+
+            # The Prometheus exporter for this cluster is declared in
+            # metrics.nix and exercised by test-observability, which imports
+            # both modules — the question there is whether the *scrape*
+            # authenticates, which needs a Prometheus.
           '';
         };
 

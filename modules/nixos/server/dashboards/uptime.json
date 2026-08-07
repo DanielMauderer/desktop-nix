@@ -1,0 +1,268 @@
+{
+  "id": null,
+  "uid": "home-server-uptime",
+  "title": "Home server — uptime and certificates",
+  "description": "Synthetic probes from blackbox.nix. NOTE: these run ON the box being probed, so they do not prove internet reachability — they prove NPM routes, the certificates are valid and not expiring, and the public DNS records still resolve. Edit modules/nixos/server/dashboards/uptime.json.",
+  "tags": ["nixos", "blackbox"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "1m",
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "text",
+      "title": "What these probes mean",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "id": 90,
+      "options": {
+        "mode": "markdown",
+        "content": "The prober runs **on this box**, so a green panel does not prove the service is reachable from the internet — a request to a public hostname either hairpins through the router or never leaves at all. What is proven: NPM terminates TLS with a valid certificate for each hostname and routes to the right backend, the certificates are not about to expire, and Cloudflare still serves the DNS records `cloudflare-ddns` publishes."
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Certificate expiry",
+      "description": "Days until the earliest certificate in the chain expires. Let's Encrypt issues for 90 days and NPM renews at 30 — so a value drifting below 21 means renewal has stopped working.",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 3 },
+      "id": 1,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(probe_ssl_earliest_cert_expiry - time()) / 86400",
+          "legendFormat": "{{instance}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "decimals": 1,
+          "noValue": "no probe",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 14 },
+              { "color": "yellow", "value": 21 },
+              { "color": "green", "value": 30 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Proxy routing",
+      "description": "A request to 127.0.0.1:443 carrying the real hostname as SNI and Host — the whole NPM chain, TLS termination and backend routing included. Proxy hosts live in NPM's UI, not in Nix, so this is the only thing watching them.",
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 3 },
+      "id": 2,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "probe_success{job=~\"probe-tls-.*\"}",
+          "legendFormat": "{{instance}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "no probe",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "FAILING", "color": "red", "index": 1 },
+                "1": { "text": "ok", "color": "green", "index": 0 }
+              }
+            }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Public DNS",
+      "description": "An AAAA lookup for each public hostname against a public resolver. cloudflare-ddns republishes the box's IPv6 every five minutes; this is what shows a stalled updater or a deleted record.",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 3 },
+      "id": 3,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "probe_success{job=~\"probe-dns-.*\"}",
+          "legendFormat": "{{instance}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "no probe",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "NOT RESOLVING", "color": "red", "index": 1 },
+                "1": { "text": "ok", "color": "green", "index": 0 }
+              }
+            }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Certificate lifetime remaining",
+      "description": "The sawtooth is renewal working: each issue resets the line to 90 days. A line that keeps falling through 30 is a renewal that did not happen.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 10,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(probe_ssl_earliest_cert_expiry - time()) / 86400",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "min": 0,
+          "custom": { "fillOpacity": 10, "showPoints": "never", "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 14 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "min"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Probe success",
+      "description": "Every probe, one line each. Gaps are Prometheus not scraping; zeros are the probe running and failing — the two mean different things.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 11,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "probe_success",
+          "legendFormat": "{{job}} — {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "custom": { "fillOpacity": 20, "showPoints": "never", "lineInterpolation": "stepAfter" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Probe duration",
+      "description": "How long each probe took. A climbing line on the TLS probes is usually the backend getting slow, not the proxy.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
+      "id": 12,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "probe_duration_seconds",
+          "legendFormat": "{{job}} — {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": { "fillOpacity": 0, "showPoints": "never", "lineWidth": 2 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP status returned",
+      "description": "What the proxy actually answered. A 502 here with a green systemd unit is the classic \"backend moved, NPM still points at the old port\".",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+      "id": 13,
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "probe_http_status_code",
+          "legendFormat": "{{job}} — {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "custom": { "fillOpacity": 0, "showPoints": "always", "lineWidth": 1 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ]
+}

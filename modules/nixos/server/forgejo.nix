@@ -92,7 +92,37 @@ in
       mirror.ENABLED = true;
 
       repository.DEFAULT_BRANCH = "main";
+
+      # Forgejo's own Prometheus endpoint, scraped over loopback by metrics.nix.
+      # It reports repository/user/issue counts, the Go runtime, and the exact
+      # Forgejo version.
+      #
+      # The token is not optional here, which makes this the one metrics
+      # endpoint on the box that is *not* simply left open. Everything else in
+      # metrics.nix binds 127.0.0.1 and is unreachable from anywhere else;
+      # this one rides on :4000, and :4000 is what NPM proxies to the WAN as
+      # git.mauderer.work — so an untokenized /metrics would be a publicly
+      # readable inventory of the forge. NPM's proxy hosts are UI-managed, so
+      # there is no Nix-side way to carve out a path; requiring the token is.
+      metrics.ENABLED = true;
     };
+
+    # `secrets` are handed to Forgejo as systemd credentials and substituted
+    # into app.ini at *runtime*, which is the whole point: `settings` is
+    # rendered into the world-readable Nix store, so the token itself may never
+    # be set there. Same rule the Grafana password follows in grafana.nix.
+    secrets.metrics.TOKEN = config.sops.secrets.forgejo-metrics-token.path;
+  };
+
+  # Decrypted at activation to /run/secrets. Left root-owned at the module
+  # default: systemd's LoadCredential (Forgejo) and this module's own
+  # LoadCredential for Prometheus both read it as PID 1 before dropping
+  # privileges, so no service user ever needs access to the file itself.
+  #
+  # The same file is where forgejo-runner.nix expects `forgejo-runner-token`
+  # when that (default-off) module is switched on.
+  sops.secrets.forgejo-metrics-token = {
+    sopsFile = ../../../secrets/home-server/forgejo.yaml;
   };
 
   # `extraInputRules` exists only on the nftables backend and is silently ignored

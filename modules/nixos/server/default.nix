@@ -11,6 +11,10 @@ _: {
     ./ntfy.nix
     ./postgresql.nix
     ./metrics.nix
+    ./nixos-metrics.nix
+    ./backup-metrics.nix
+    ./blackbox.nix
+    ./alerts.nix
     ./logs.nix
     ./grafana.nix
     ./zfs.nix

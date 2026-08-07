@@ -25,7 +25,9 @@ Headless services host — the only non-desktop machine. Install guide:
   on the SSD, nightly `pg_dumpall` to the pool), an **observability stack**
   (Prometheus + node/smartctl exporters, Loki fed by Grafana Alloy, and Grafana
   itself VPN-only on `10.100.0.1:3030`; Loki's `:3100` is open to the podman
-  bridge, LAN and VPN so deployments can push), and the container groundwork for
+  bridge, LAN and VPN so deployments can push; an hourly oneshot feeds the node
+  exporter's textfile collector with update-pipeline metrics — pending reboot,
+  autoUpgrade result, nixpkgs staleness), and the container groundwork for
   docker-compose / Ansible-managed services. WAN surface is exactly UDP 51820 +
   TCP 80/443.
 - **Disk:** disko SSD root; ZFS data pool on the HBA drives.

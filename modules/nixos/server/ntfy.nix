@@ -13,6 +13,10 @@
 #   2586  HTTP, admitted only from the podman bridge subnet (the NPM container,
 #         which proxies it) and from the VPN. TLS terminates in NPM, so this
 #         speaks plain HTTP and must never reach the WAN.
+#   9686  Prometheus metrics, on a *separate* listener bound to 127.0.0.1 and
+#         never firewalled open at all — the same posture as the exporters in
+#         metrics.nix. The separation is the point: see the note on
+#         `metrics-listen-http` below.
 #
 # Source-restricted nftables rules again, for the same reason as forgejo.nix: the
 # port must never be globally open. `extraInputRules` is a `lines` option, so this
@@ -41,6 +45,11 @@ let
 
   domain = "ntfy.mauderer.work";
   httpPort = 2586;
+
+  # Loopback-only, and never firewalled open — see the metrics note in the
+  # settings block. Kept in sync with metrics.nix by hand, the same convention
+  # that module uses for its siblings' ports.
+  metricsPort = 9686;
 
   # The module's StateDirectory. Both databases live here.
   stateDir = "/var/lib/ntfy-sh";
@@ -97,6 +106,18 @@ in
       # the publish token can fill up is another, and notifications do not need
       # one — link to a URL with the `Attach` header instead.
       attachment-cache-dir = "";
+
+      # Prometheus metrics on their own loopback listener, scraped by
+      # metrics.nix. Deliberately NOT `enable-metrics = true`, which is the
+      # obvious option and the wrong one: that serves /metrics from the *main*
+      # listener, and the main listener is what NPM proxies to the WAN as
+      # ntfy.mauderer.work. `metrics-listen-http` moves the endpoint to a
+      # separate socket instead, and ntfy then serves it *only* there — so the
+      # public vhost has no /metrics at all and the exposure story stays "the
+      # port is bound to 127.0.0.1", the same as every other exporter.
+      #
+      # Setting both would put it back on the public listener; only this one.
+      metrics-listen-http = "127.0.0.1:${toString metricsPort}";
 
       # iOS only: Apple requires APNs, which a self-hosted instance cannot speak,
       # so the app polls ntfy.sh instead and needs the instance to forward a

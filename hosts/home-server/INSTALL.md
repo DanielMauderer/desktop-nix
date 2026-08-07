@@ -24,8 +24,13 @@ The secrets-first work is done and in git:
   `secrets-seed/` on the desktop (used for `--extra-files` below). Keep it until
   the install succeeds.
 - Service credentials that must exist at eval time are committed encrypted:
-  `secrets/home-server/{cloudflare,paperless,grafana}.yaml`. The Grafana one
-  ships with a random password nobody has seen — replace it in step 8.
+  `secrets/home-server/{cloudflare,paperless,grafana,forgejo,ntfy}.yaml`. The Grafana
+  one ships with a random password nobody has seen — replace it in step 8. The
+  Forgejo one holds `forgejo-metrics-token`, a random value that gates Forgejo's
+  `/metrics` (it rides on the listener NPM publishes); nobody needs to read it —
+  Forgejo and Prometheus both get it as a systemd credential — so it needs no
+  install step. `forgejo-runner-token` goes in the same file if the (default-off)
+  Actions runner is ever enabled.
 
 ## 1. Check before you install
 
@@ -209,6 +214,21 @@ one *is* published, so it has to be shut the moment it becomes reachable.
    authenticate with the token, not with it. `sudo ntfy access` with no arguments
    prints the whole ACL to check the result. Changes take effect immediately;
    no restart is needed.
+
+   Then the account this box's **own alerting** publishes as. Unlike `svc`, this
+   password is *not* a throwaway and is *not* invented here — it is already in
+   sops (`secrets/home-server/ntfy.yaml`, key `ntfy-alert-password`), because
+   both Grafana's contact point and the `notify-failure@` systemd handler read
+   it from there. Copy it out rather than making a new one:
+   ```sh
+   sudo env NTFY_PASSWORD="$(sudo cat /run/secrets/ntfy-alert-password)" \
+     ntfy user add --role=user alerts
+   sudo ntfy access alerts home-server rw
+   ```
+   `rw`, not write-only: Grafana's contact point only publishes, but read access
+   on this one topic is what lets you poll the topic back to check delivery.
+   Confirm the whole path end to end from Grafana's UI — *Alerting → Contact
+   points → ntfy → Test* — and the phone should buzz.
 3. **Send a notification** from any service, host or script:
    ```sh
    curl -H "Authorization: Bearer tk_…" \

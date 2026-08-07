@@ -143,6 +143,13 @@ in
     '';
   };
 
+  # The Prometheus view of this cluster is declared in metrics.nix, next to the
+  # other exporters, rather than here. Worth knowing while reading this module:
+  # that exporter needs no secret either, for exactly the reason the header
+  # above gives — it reaches the cluster over the Unix socket as the `postgres`
+  # system user, so peer auth covers it and the socket-only posture is
+  # untouched.
+
   # psql on the admin's PATH, so `sudo -u postgres psql` works over the socket
   # without going through the service's own closure.
   environment.systemPackages = [ config.services.postgresql.package ];
