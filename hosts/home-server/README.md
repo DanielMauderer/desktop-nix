@@ -13,7 +13,7 @@ Headless services host — the only non-desktop machine. Install guide:
   the same shell as every other host.
 - **`server` provides:** WireGuard **VPN server**, **VPN-only SSH**, a public
   **reverse proxy** (Nginx Proxy Manager on WAN 80/443; admin UI VPN-only on
-  `10.100.0.1:81`; Let's Encrypt via HTTP-01), a **ZFS** data pool, an **NFS**
+  `10.100.0.1:81`; Let's Encrypt via DNS-01), a **ZFS** data pool, an **NFS**
   export, a self-hosted **Forgejo** forge (`git.mauderer.work` via the proxy;
   git-SSH on 2222, LAN/VPN only) with an opt-in **Actions runner** that executes
   jobs as podman containers, a **Paperless-ngx document archive** (VPN-only on

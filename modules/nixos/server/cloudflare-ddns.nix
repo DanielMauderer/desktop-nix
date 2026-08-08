@@ -1,11 +1,17 @@
-# Dynamic DNS for the wildcard record `*.mauderer.work`.
+# Dynamic DNS for `mauderer.work` and the wildcard record `*.mauderer.work`.
 #
 # The ISP hands out a dynamic IPv6 prefix, so the server's global address changes
 # whenever the line reconnects. `cloudflare-dyndns` discovers the current public
 # address (via ipv6.icanhazip.com / api6.ipify.org) and PUTs it into Cloudflare's
-# AAAA record for `*.mauderer.work`, proxied (orange cloud). It runs every five
-# minutes and caches the last-published address, so a steady state costs one HTTP
-# request and no API write.
+# AAAA records, proxied (orange cloud). It runs every five minutes and caches the
+# last-published address, so a steady state costs one HTTP request and no API
+# write. A missing record is created rather than only updated, so neither name has
+# to be seeded by hand.
+#
+# Both names are listed because a wildcard does not cover the zone apex: with only
+# `*.mauderer.work`, `test.mauderer.work` resolves and `mauderer.work` returns
+# NXDOMAIN. The same asymmetry applies to certificates — a `*.mauderer.work` cert
+# does not cover the apex either, so both names have to be on it.
 #
 # Only AAAA: `ipv4 = false` (the tool is invoked with `-no-4`). Nothing publishes
 # an A record for this zone.
@@ -34,12 +40,16 @@
   # short-lived one that deprecates within a day — we would publish an AAAA that
   # is dead long before the next prefix change. Disabling them makes the reported
   # address the stable per-prefix SLAAC address, which is also the one Cloudflare
-  # needs to reach as the proxy origin.
+  # needs to reach as the proxy origin. core/networking.nix additionally pins the
+  # interface ID of that stable address to EUI-64, so only the prefix moves.
   networking.tempAddresses = "disabled";
 
   services.cloudflare-dyndns = {
     enable = true;
-    domains = [ "*.mauderer.work" ];
+    domains = [
+      "mauderer.work"
+      "*.mauderer.work"
+    ];
     apiTokenFile = config.sops.secrets.cloudflare-api-token.path;
     proxied = true;
     ipv4 = false;
