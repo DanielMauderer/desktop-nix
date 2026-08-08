@@ -109,7 +109,16 @@ let
 
     prometheus.remote_write "server" {
       endpoint {
-        url = "http://${cfg.serverHost}:${toString cfg.metricsPort}/api/v1/write"
+        // `/api/v1/metrics/write`, not Prometheus' own `/api/v1/write`. The
+        // other end of this hop is the server's Alloy ingest component (see
+        // server/logs.nix), and that is the single path it serves; Prometheus'
+        // spelling 404s every push. Nothing here fails loudly — Alloy logs a
+        // non-recoverable error, drops the batch and carries on — so the only
+        // symptom is a dashboard that stays empty forever. An assertion in
+        // flake.nix pins the path. (The component's name is deliberately not
+        // written out: the "no inbound port" assertion greps this rendered
+        // config for it to prove the client never runs an ingest of its own.)
+        url = "http://${cfg.serverHost}:${toString cfg.metricsPort}/api/v1/metrics/write"
       }
 
       // Bounded on purpose: a suspended laptop accumulates WAL, and Prometheus
@@ -209,6 +218,10 @@ in
       description = ''
         Port of the server's Alloy `prometheus.receive_http` ingest. Kept in sync
         with modules/nixos/server/logs.nix by an assertion in flake.nix.
+
+        The path that goes with it is fixed at `/api/v1/metrics/write` — the one
+        endpoint that component serves — and is not an option, since it is a
+        property of Alloy rather than of this deployment.
       '';
     };
 

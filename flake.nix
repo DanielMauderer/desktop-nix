@@ -316,6 +316,18 @@
               );
           }
           {
+            # The port has an assertion on the server side; the path had none,
+            # and the path is the half that is easy to get wrong. Alloy's
+            # `prometheus.receive_http` serves `/api/v1/metrics/write` only —
+            # Prometheus' own `/api/v1/write` (what logs.nix uses for the second,
+            # loopback hop) 404s every push. Nothing errors: Alloy drops the
+            # batch, retries the next one, and the dashboards stay empty.
+            name = "telemetry pushes to Alloy's receive_http path, not Prometheus'";
+            assertion =
+              !cfg.services.homeServerTelemetry.enable
+              || lib.hasInfix "/api/v1/metrics/write" cfg.environment.etc."alloy/config.alloy".text;
+          }
+          {
             # The two labels that keep client series out of the server's own
             # dashboards (host.json pins job="node"), and the priority filter that
             # keeps 90 days of Hyprland chatter out of Loki. All three are silent
@@ -3100,6 +3112,22 @@
               # Two secrets from the same fixture key: one root-owned, one
               # user-owned, both 0400 so neither is world-readable.
               secrets = {
+                # The host is enrolled, so home-server-client.nix declares its
+                # wg0 key from secrets/private-laptop/wireguard.yaml — which the
+                # test identity is not a recipient of. sops-install-secrets is
+                # all-or-nothing: one undecryptable entry aborts the run and
+                # *nothing* lands in /run/secrets, so the fixture assertions
+                # below fail on a secret they never mention. Redirected to the
+                # fixture (the forgejoTestNode/paperlessTestNode idiom) rather
+                # than disabled, so the manifest keeps the shape the host
+                # actually activates with — several secrets, several sopsFiles.
+                # wg-quick then fails on the sentinel not being a WireGuard key,
+                # which is expected here and blocks nothing: it is `wantedBy`
+                # multi-user.target, not required by it.
+                home-server-wg-key = {
+                  sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+                  key = "fixture_secret";
+                };
                 fixture_secret = {
                   sopsFile = ./secrets/fixtures/test.yaml;
                   owner = "root";
