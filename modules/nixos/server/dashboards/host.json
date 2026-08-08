@@ -2,7 +2,7 @@
   "id": null,
   "uid": "home-server-host",
   "title": "Home server — host",
-  "description": "CPU, memory, filesystems, network, disks, ZFS ARC and SMART health for home-server. Provisioned from Nix; edit modules/nixos/server/dashboards/host.json.",
+  "description": "CPU, memory, filesystems, network, disks, ZFS ARC and SMART health for home-server. Every query is pinned to job=\"node\"/\"smartctl\" so the workstations that remote_write into this Prometheus (job=\"client-node\", see clients.json) cannot merge into these panels. Provisioned from Nix; edit modules/nixos/server/dashboards/host.json.",
   "tags": ["nixos", "node-exporter"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -22,7 +22,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"node\",mode=\"idle\"}[5m])) * 100)",
           "instant": true
         }
       ],
@@ -58,7 +58,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+          "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node\"} / node_memory_MemTotal_bytes{job=\"node\"})",
           "instant": true
         }
       ],
@@ -94,7 +94,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_load1",
+          "expr": "node_load1{job=\"node\"}",
           "instant": true
         }
       ],
@@ -122,7 +122,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+          "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\"})",
           "instant": true
         }
       ],
@@ -158,7 +158,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(node_systemd_unit_state{state=\"failed\"}) or vector(0)",
+          "expr": "sum(node_systemd_unit_state{job=\"node\",state=\"failed\"}) or vector(0)",
           "instant": true
         }
       ],
@@ -192,7 +192,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "time() - node_boot_time_seconds",
+          "expr": "time() - node_boot_time_seconds{job=\"node\"}",
           "instant": true
         }
       ],
@@ -219,7 +219,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg by (mode) (rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) * 100",
+          "expr": "avg by (mode) (rate(node_cpu_seconds_total{job=\"node\",mode!=\"idle\"}[5m])) * 100",
           "legendFormat": "{{mode}}"
         }
       ],
@@ -246,25 +246,25 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "expr": "node_memory_MemTotal_bytes{job=\"node\"} - node_memory_MemAvailable_bytes{job=\"node\"}",
           "legendFormat": "used"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_memory_Cached_bytes + node_memory_Buffers_bytes",
+          "expr": "node_memory_Cached_bytes{job=\"node\"} + node_memory_Buffers_bytes{job=\"node\"}",
           "legendFormat": "cache + buffers"
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_memory_MemTotal_bytes",
+          "expr": "node_memory_MemTotal_bytes{job=\"node\"}",
           "legendFormat": "total"
         },
         {
           "refId": "D",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes",
+          "expr": "node_memory_SwapTotal_bytes{job=\"node\"} - node_memory_SwapFree_bytes{job=\"node\"}",
           "legendFormat": "swap used"
         }
       ],
@@ -301,7 +301,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "100 * (1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|ramfs|overlay|squashfs|nsfs|devtmpfs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|ramfs|overlay|squashfs|nsfs|devtmpfs\"})",
+          "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"node\",fstype!~\"tmpfs|ramfs|overlay|squashfs|nsfs|devtmpfs\"} / node_filesystem_size_bytes{job=\"node\",fstype!~\"tmpfs|ramfs|overlay|squashfs|nsfs|devtmpfs\"})",
           "legendFormat": "{{mountpoint}}",
           "instant": true
         }
@@ -338,13 +338,13 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|podman.*|cni.*\"}[5m]) * 8",
+          "expr": "rate(node_network_receive_bytes_total{job=\"node\",device!~\"lo|veth.*|podman.*|cni.*\"}[5m]) * 8",
           "legendFormat": "{{device}} in"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "-rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|podman.*|cni.*\"}[5m]) * 8",
+          "expr": "-rate(node_network_transmit_bytes_total{job=\"node\",device!~\"lo|veth.*|podman.*|cni.*\"}[5m]) * 8",
           "legendFormat": "{{device}} out"
         }
       ],
@@ -370,13 +370,13 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(node_disk_read_bytes_total{device!~\"dm-.*|loop.*\"}[5m])",
+          "expr": "rate(node_disk_read_bytes_total{job=\"node\",device!~\"dm-.*|loop.*\"}[5m])",
           "legendFormat": "{{device}} read"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "-rate(node_disk_written_bytes_total{device!~\"dm-.*|loop.*\"}[5m])",
+          "expr": "-rate(node_disk_written_bytes_total{job=\"node\",device!~\"dm-.*|loop.*\"}[5m])",
           "legendFormat": "{{device}} write"
         }
       ],
@@ -403,19 +403,19 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_zfs_arc_size",
+          "expr": "node_zfs_arc_size{job=\"node\"}",
           "legendFormat": "ARC size"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "node_zfs_arc_c_max",
+          "expr": "node_zfs_arc_c_max{job=\"node\"}",
           "legendFormat": "ARC max"
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "100 * rate(node_zfs_arc_hits[5m]) / clamp_min(rate(node_zfs_arc_hits[5m]) + rate(node_zfs_arc_misses[5m]), 1)",
+          "expr": "100 * rate(node_zfs_arc_hits{job=\"node\"}[5m]) / clamp_min(rate(node_zfs_arc_hits{job=\"node\"}[5m]) + rate(node_zfs_arc_misses{job=\"node\"}[5m]), 1)",
           "legendFormat": "hit ratio"
         }
       ],
@@ -460,21 +460,21 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartctl_device_smart_status",
+          "expr": "smartctl_device_smart_status{job=\"smartctl\"}",
           "format": "table",
           "instant": true
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartctl_device_temperature{temperature_type=\"current\"}",
+          "expr": "smartctl_device_temperature{job=\"smartctl\",temperature_type=\"current\"}",
           "format": "table",
           "instant": true
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "smartctl_device_power_on_seconds / 86400",
+          "expr": "smartctl_device_power_on_seconds{job=\"smartctl\"} / 86400",
           "format": "table",
           "instant": true
         }

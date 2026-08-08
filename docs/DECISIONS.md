@@ -291,3 +291,15 @@ matters lives here; the rest is in the Nix code and `git log`.
   value rather than a `TOKEN=…` env-file, it is delivered by `LoadCredential`
   because the runner process (not PID 1) opens it under a DynamicUser, and there
   is no re-registration dance on token or label changes.
+
+- **The workstations push telemetry; they are not scraped.** Their Alloy
+  `remote_write`s into an ingest port on the *server's* Alloy, which forwards to
+  Prometheus over loopback. Two things fall out of that shape and neither is
+  incidental. Adding laptops as scrape targets would make `alerts.nix`'s
+  `hs-target-down` (`up == 0` → ntfy) fire on every closed lid, so the choice is
+  push or a weakened alert; `remote_write` produces no `up` series at all. And the
+  extra Alloy hop exists because Prometheus' remote-write receiver shares the
+  listener with its unauthenticated expression browser — writing to `:9090`
+  directly would mean exposing that browser to the VPN, which `metrics.nix` argues
+  against. The cost is that "is this host awake" has no `up` to read and is
+  answered by the age of its newest sample.

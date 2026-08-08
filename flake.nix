@@ -284,6 +284,57 @@
             name = "SSH daemon disabled";
             assertion = !cfg.services.openssh.enable;
           }
+          {
+            # Telemetry pushes to 10.100.0.1, which only exists once the wg0
+            # tunnel is up: enabling it without the client is a host that retries
+            # forever and never appears in Grafana. An implication rather than an
+            # equality, so work-laptop — neither enrolled nor monitored — passes.
+            name = "telemetry is enabled only alongside the home-server tunnel";
+            assertion = !cfg.services.homeServerTelemetry.enable || cfg.services.homeServerClient.enable;
+          }
+          {
+            # telemetry.nix's exposure claim: the data path is entirely outbound.
+            # The client pushes (`remote_write`) and never serves — no exporter
+            # listener to admit, and no `receive_http`, which is the server's half
+            # of the hop and would turn a laptop into an unauthenticated ingest on
+            # whatever café wifi it joins. Only the telemetry ports are checked,
+            # not the whole list: desktop legitimately opens Steam's 27036/27037.
+            name = "telemetry opens no inbound port";
+            assertion =
+              !cfg.services.homeServerTelemetry.enable
+              || (
+                let
+                  text = cfg.environment.etc."alloy/config.alloy".text;
+                  opened = cfg.networking.firewall.allowedTCPPorts;
+                in
+                lib.hasInfix "prometheus.remote_write" text
+                && !(lib.hasInfix "receive_http" text)
+                # 9100 is the node exporter's port, 12345 Alloy's own HTTP server.
+                # Neither is bound here, so neither may be admitted either.
+                && !(builtins.elem 9100 opened)
+                && !(builtins.elem 12345 opened)
+              );
+          }
+          {
+            # The two labels that keep client series out of the server's own
+            # dashboards (host.json pins job="node"), and the priority filter that
+            # keeps 90 days of Hyprland chatter out of Loki. All three are silent
+            # failures: the graphs merge, or the pool fills, and nothing errors.
+            name = "telemetry labels its own jobs and ships only warning-level logs";
+            assertion =
+              !cfg.services.homeServerTelemetry.enable
+              || (
+                let
+                  text = cfg.environment.etc."alloy/config.alloy".text;
+                in
+                lib.hasInfix ''job_name        = "client-node"'' text
+                && lib.hasInfix ''labels = { job = "client-journal" }'' text
+                && lib.hasInfix ''regex         = "[0-4]"'' text
+                # The hostname has to reach both pipelines, or a metric and a log
+                # line disagree about which machine they came from.
+                && lib.hasInfix ''replacement  = "${host}"'' text
+              );
+          }
         ];
 
       # For the headless home-server (core + server, not base). SSH is enabled
@@ -707,6 +758,78 @@
             assertion = builtins.elem "systemd-journal" (
               cfg.systemd.services.alloy.serviceConfig.SupplementaryGroups or [ ]
             );
+          }
+          {
+            # The fleet ingest hop. Both halves have to be present for a client
+            # push to land anywhere: Alloy must accept it, and it must forward to
+            # the loopback Prometheus rather than into a void. Written as an
+            # infix check on the rendered config because that is the only place
+            # the wiring exists — the components are joined by reference, so a
+            # `forward_to` naming a component that does not exist is a runtime
+            # failure, not an eval one.
+            name = "client metric pushes are received and forwarded to Prometheus";
+            assertion =
+              let
+                text = cfg.environment.etc."alloy/config.alloy".text or "";
+                promPort = cfg.services.prometheus.port;
+              in
+              cfg.services.alloy.enable
+              && lib.hasInfix "prometheus.receive_http" text
+              && lib.hasInfix "prometheus.remote_write" text
+              && lib.hasInfix "http://127.0.0.1:${toString promPort}/api/v1/write" text;
+          }
+          {
+            # The other end of that hop. Prometheus discards remote writes with
+            # a 404 unless the receiver is switched on — and the pair with a
+            # loopback `listenAddress` is the invariant that makes the hop worth
+            # having at all: the receiver shares the listener with the
+            # unauthenticated expression browser, so it must not be exposed.
+            # metrics.nix's header is the long version.
+            name = "Prometheus accepts remote writes without leaving loopback";
+            assertion =
+              builtins.elem "--web.enable-remote-write-receiver" cfg.services.prometheus.extraFlags
+              && cfg.services.prometheus.listenAddress == "127.0.0.1";
+          }
+          {
+            # Now that the workstations' series live in this Prometheus, every
+            # alert rule reading a hardware metric has to say whose hardware it
+            # means. Unscoped, `hs-unit-failed` pages on a laptop's failed unit
+            # and `hs-root-filling` on a desktop's full disk — the exact
+            # false-paging the push design was chosen to avoid, and something
+            # `noDataState = "OK"` does not help with, since a present client
+            # series evaluates normally. The dashboards are pinned to match.
+            name = "alert rules on node/smartctl metrics name the server's own jobs";
+            assertion =
+              let
+                rules = cfg.services.grafana.provision.alerting.rules.settings.groups or [ ];
+                exprs = lib.concatMap (g: lib.concatMap (r: map (d: d.model.expr or "") r.data) g.rules) rules;
+                # A metric from an exporter both the server and the clients run,
+                # used without a job selector, is the failure mode.
+                shared = [
+                  "node_systemd_unit_state"
+                  "node_filesystem_avail_bytes"
+                  "node_filesystem_size_bytes"
+                  "node_textfile_mtime_seconds"
+                  "smartctl_device_smart_status"
+                ];
+                unscoped = e: builtins.any (m: lib.hasInfix "${m}{" e && !(lib.hasInfix ''${m}{job="'' e)) shared;
+              in
+              !(builtins.any unscoped exprs);
+          }
+          {
+            # Same shape as the Grafana and Paperless rules below: admitted on
+            # the tunnel interface only, with "WAN TCP surface is exactly 80/443"
+            # as the other half. The ingest is unauthenticated, so the interface
+            # restriction *is* the access control — exactly the Loki argument.
+            name = "client metric ingest admitted only on the wg0 VPN interface, never the WAN";
+            assertion =
+              let
+                port = 9099; # clientIngestPort in server/logs.nix
+                text = cfg.environment.etc."alloy/config.alloy".text or "";
+              in
+              lib.hasInfix "listen_port    = ${toString port}" text
+              && builtins.elem port cfg.networking.firewall.interfaces.wg0.allowedTCPPorts
+              && !(builtins.elem port cfg.networking.firewall.allowedTCPPorts);
           }
           {
             name = "Grafana state lives on the redundant ZFS pool";
@@ -1318,6 +1441,85 @@
         virtualisation = {
           memorySize = 6144;
           diskSize = 12288;
+        };
+      };
+
+      # --- Fleet telemetry: the two nodes for test-client-telemetry -------------
+      #
+      # Deliberately *not* observabilityTestNode with a second machine bolted on.
+      # That node runs Forgejo, PostgreSQL, Grafana and the alerting stack in
+      # 6 GiB, and these VMs run under TCG with no KVM — pairing it with a second
+      # machine would roughly double the slowest test in the tree to prove
+      # something neither Grafana nor Forgejo is involved in. What is under test
+      # here is one path: client Alloy → server Alloy → Prometheus, and client
+      # Alloy → Loki. So the server node is metrics + logs and nothing else.
+      telemetryServerNode = {
+        imports = [
+          ./modules/nixos/server/metrics.nix
+          ./modules/nixos/server/logs.nix
+        ];
+
+        # Both ingress rules in the real config name sources this test does not
+        # have: Loki's :3100 admits three named subnets, and the client ingest is
+        # scoped to `interfaces.wg0`. The driver puts these nodes on
+        # 192.168.1.0/24 with no tunnel, so every push would be dropped by the
+        # firewall rather than by anything under test. Forced off on the node, and
+        # never relaxed in the modules — the assertions in this file are what hold
+        # the real rules to their exact shape.
+        networking.firewall.enable = lib.mkForce false;
+
+        # Virtio disks expose no SMART data; same reason as observabilityTestNode.
+        services.prometheus.exporters.smartctl.enable = lib.mkForce false;
+
+        # Loki's paths are on the pool, which does not exist here.
+        systemd.tmpfiles.rules = [ "d /hdd_pool_1 0755 root root -" ];
+        systemd.services.loki-data-dirs = {
+          requires = lib.mkForce [ ];
+          after = lib.mkForce [ ];
+        };
+
+        environment.systemPackages = [
+          pkgs.curl
+          pkgs.jq
+        ];
+        virtualisation = {
+          memorySize = 2048;
+          cores = 2;
+        };
+      };
+
+      # The pushing side. Only telemetry.nix, not the whole `net` group: its
+      # siblings want a per-host sops key this node has no business holding, and
+      # the module under test is deliberately independent of them.
+      telemetryClientNode = {
+        imports = [ ./modules/nixos/net/telemetry.nix ];
+
+        services.homeServerTelemetry = {
+          enable = true;
+          # No wg0 here, so the default 10.100.0.1 is unroutable. The driver puts
+          # every node's name in every node's /etc/hosts, which is why this option
+          # exists at all.
+          serverHost = "server";
+          # 60s would mean the test spends most of its runtime waiting for the
+          # first scrape. The interval is not what is under test.
+          #
+          # The timeout has to come down with it. Alloy rejects a scrape config
+          # whose timeout exceeds its interval — not the component, the *whole
+          # config* — and then restarts forever. That is worth knowing about here
+          # rather than in production: it is how this test first failed, and under
+          # TCG the restart loop starved the other VM badly enough that it never
+          # finished booting either.
+          scrapeInterval = "5s";
+          scrapeTimeout = "3s";
+        };
+
+        environment.systemPackages = [ pkgs.curl ];
+        virtualisation = {
+          memorySize = 1024;
+          # Two VMs booting under TCG on one host; a second core roughly halves
+          # the time to multi-user and keeps the driver's shell timeout from being
+          # the thing that fails.
+          cores = 2;
         };
       };
 
@@ -2223,7 +2425,7 @@
             ).strip()
             assert types == "loki,prometheus", types
 
-            # The three provisioned dashboards actually loaded. This has to be
+            # The provisioned dashboards actually loaded. This has to be
             # asked of the running instance: Grafana logs a rejected dashboard
             # and keeps going, so a schema error leaves the unit green and only
             # shows up as a folder that is missing a panel nobody looks at.
@@ -2233,9 +2435,9 @@
                 'curl -fsS -u "admin:$PW" '
                 "'http://127.0.0.1:3030/api/search?type=dash-db' "
                 "| jq -e '[.[].uid] | sort == "
-                "[\"home-server-host\",\"home-server-logs\",\"home-server-nixos\","
-                "\"home-server-services\",\"home-server-stack\","
-                "\"home-server-uptime\"]'",
+                "[\"fleet-clients\",\"home-server-host\",\"home-server-logs\","
+                "\"home-server-nixos\",\"home-server-services\","
+                "\"home-server-stack\",\"home-server-uptime\"]'",
                 timeout=60,
             )
 
@@ -2438,6 +2640,178 @@
                 "curl -fsS -G http://127.0.0.1:3100/loki/api/v1/query_range "
                 "--data-urlencode 'query={syslog_identifier=\"alloy-canary\"}' "
                 "| jq -e '.data.result | length > 0'",
+                timeout=180,
+            )
+          '';
+        };
+
+        # Fleet telemetry: a client with no Prometheus and no Loki of its own gets
+        # its metrics and its warning-level journal into the server's, across the
+        # network, by pushing. Everything here is a property that eval-time
+        # assertions cannot reach — whether the data actually arrives, whether the
+        # labels are what the dashboards select on, and whether the priority filter
+        # drops what it claims to drop.
+        test-client-telemetry = testLib.makeTest {
+          name = "client-telemetry";
+          nodes = {
+            server = telemetryServerNode;
+            client = telemetryClientNode;
+          };
+          testScript = ''
+            start_all()
+
+            server.wait_for_unit("prometheus.service")
+            server.wait_for_unit("loki.service")
+            server.wait_for_unit("alloy.service")
+            server.wait_for_open_port(9090)
+            server.wait_for_open_port(3100)
+            # The ingest hop. Bound to 0.0.0.0 on purpose so Alloy does not have
+            # to wait for wg0 — the firewall is what restricts it in production.
+            server.wait_for_open_port(9099)
+
+            client.wait_for_unit("alloy.service")
+
+            # One process, no exporter listener. `prometheus.exporter.unix` is the
+            # node exporter compiled into Alloy and scraped in-process; if this
+            # ever regressed to a standalone exporter, a laptop would be serving
+            # every metric about itself on :9100 to whatever network it joined.
+            client.fail("ss -ltn | grep -q ':9100'")
+            client.fail("systemctl is-active prometheus-node-exporter.service")
+
+            # The resource controls are the answer to "does this cost me frames".
+            # Asserted on the live unit rather than the Nix value, since a typo in
+            # a serviceConfig key is silently dropped by systemd.
+            props = client.succeed(
+                "systemctl show alloy.service "
+                "-p Nice -p CPUWeight -p IOWeight -p MemoryHigh -p MemoryMax"
+            )
+            assert "Nice=10" in props, props
+            assert "CPUWeight=20" in props, props
+            assert "IOWeight=20" in props, props
+            # Deliberately absent: CPUQuota would throttle the agent even on an
+            # idle machine, and worst exactly when a load spike is worth recording.
+            assert "CPUQuotaPerSecUSec=infinity" in client.succeed(
+                "systemctl show alloy.service -p CPUQuotaPerSecUSec"
+            )
+
+            # --- Metrics ---------------------------------------------------
+            # The whole chain: client exporter → client remote_write → server
+            # Alloy receive_http → server Prometheus. Queried through Prometheus'
+            # own API on loopback, which is also the assertion that the receiver
+            # flag is on: without it every push is a 404 and this never appears.
+            def promql(query):
+                return (
+                    "curl -fsS -G http://127.0.0.1:9090/api/v1/query "
+                    f"--data-urlencode 'query={query}' "
+                )
+
+            server.wait_until_succeeds(
+                promql('node_load1{job="client-node", host="client"}')
+                + "| jq -e '.data.result | length == 1'",
+                timeout=180,
+            )
+
+            # Every collector named in telemetry.nix reports success. This is the
+            # assertion that catches a *misspelled* collector — `set_collectors`
+            # takes node_exporter's flag names, which are not always the obvious
+            # ones (`powersupplyclass`, not `power_supply_class`), and neither Nix
+            # nor `alloy validate` can tell: to both it is a list of strings. The
+            # symptom otherwise is a blank dashboard panel.
+            collectors = server.succeed(
+                promql('node_scrape_collector_success{job="client-node"} == 0')
+                + "| jq -r '[.data.result[].metric.collector] | join(\",\")'"
+            ).strip()
+            assert collectors == "", "collectors failing on the client: " + collectors
+
+            server.succeed(
+                promql('count(node_scrape_collector_success{job="client-node"})')
+                + "| jq -e '.data.result[0].value[1] == \"14\"'"
+            )
+
+            # ...and the metric families the panels in clients.json actually
+            # select on, which is the other half: a collector can succeed and
+            # still not be the one producing the series a panel wants.
+            #
+            # node_hwmon_temp_celsius, node_thermal_zone_temp and
+            # node_power_supply_* are deliberately absent from this list: they are
+            # hardware-dependent and a virtio VM has no sensors, no ACPI thermal
+            # zone and no battery. Their collectors are covered above.
+            for metric in [
+                "node_cpu_seconds_total",  # cpu
+                "node_memory_MemAvailable_bytes",  # meminfo
+                "node_load1",  # loadavg
+                "node_filesystem_avail_bytes",  # filesystem
+                "node_disk_read_bytes_total",  # diskstats
+                "node_network_receive_bytes_total",  # netdev
+                "node_boot_time_seconds",  # stat — backs "Uptime"
+                "node_time_seconds",  # time — backs "Last sample age"
+                "node_uname_info",  # uname — backs the $host variable
+                "node_pressure_cpu_waiting_seconds_total",  # pressure
+                "node_systemd_unit_state",  # systemd — backs "Failed units"
+            ]:
+                server.wait_until_succeeds(
+                    promql(metric + '{job="client-node", host="client"}')
+                    + "| jq -e '.data.result | length > 0'",
+                    timeout=60,
+                )
+
+            # `instance` is pinned to the hostname, not to the scrape target's
+            # address. Left at its default it would be the same loopback address
+            # on every client, and all of them would interleave into one series.
+            server.succeed(
+                promql('node_load1{job="client-node"}')
+                + "| jq -e '.data.result[0].metric.instance == \"client\"'"
+            )
+
+            # The server's own series keep the `node` job, so host.json's pinned
+            # selectors still resolve and the two hosts never merge.
+            server.succeed(
+                promql('count by (job) (node_load1)')
+                + "| jq -e '[.data.result[].metric.job] | sort == "
+                "[\"client-node\",\"node\"]'"
+            )
+
+            # --- Logs ------------------------------------------------------
+            server.wait_until_succeeds("curl -fsS http://127.0.0.1:3100/ready", timeout=60)
+
+            # Emitted info-first, so that once the warning has arrived the info
+            # line has demonstrably had at least as long to arrive and its absence
+            # below means it was dropped rather than merely delayed.
+            client.succeed(
+                "systemd-cat -t telemetry-canary -p info echo info-must-be-dropped"
+            )
+            client.succeed(
+                "systemd-cat -t telemetry-canary -p warning echo warning-must-arrive"
+            )
+
+            def logql(query):
+                return (
+                    "curl -fsS -G http://127.0.0.1:3100/loki/api/v1/query_range "
+                    f"--data-urlencode 'query={query}' "
+                )
+
+            server.wait_until_succeeds(
+                logql('{job="client-journal", host="client"} |= `warning-must-arrive`')
+                + "| jq -e '.data.result | length > 0'",
+                timeout=180,
+            )
+
+            # The priority filter, which is the difference between a few MB of
+            # warnings and 90 days of a desktop session's chatter. A `keep` rule
+            # on __journal_priority is the only way to express this — journal
+            # `matches` cannot OR across priorities — so whether it drops the
+            # *entry* rather than just its labels is worth asserting.
+            server.fail(
+                logql('{job="client-journal"} |= `info-must-be-dropped`')
+                + "| jq -e '.data.result | length > 0'"
+            )
+
+            # The server's own journal keeps its own job label, for the same
+            # reason as the metrics above: logs.json selects on it.
+            server.succeed("systemd-cat -t server-canary -p warning echo server-side-line")
+            server.wait_until_succeeds(
+                logql('{job="systemd-journal", host="server"} |= `server-side-line`')
+                + "| jq -e '.data.result | length > 0'",
                 timeout=180,
             )
           '';

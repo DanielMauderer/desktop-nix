@@ -15,9 +15,13 @@ _: {
 
   # Roams, so it reaches the share over the VPN (nfsHost defaults to the VPN IP).
   services.homeServerClient = {
-    # enable = true;                     # ← flip on last, once the server is up
+    enable = true;
     address = "10.100.0.3/32";
   };
+
+  # Push metrics + warning-level journal to the server's Grafana. Rides the wg0
+  # tunnel above, which is why it is enabled alongside it.
+  services.homeServerTelemetry.enable = true;
 
   # Second tunnel (wg1) from the provider wg.conf. Off until this host's key is
   # in secrets/private-laptop/vpn.yaml; fill the three fields from the .conf.

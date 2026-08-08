@@ -14,6 +14,13 @@
 #         one-line change (drop `listenAddress`, add a wg0 rule), deliberately
 #         not taken: the expression browser is an unauthenticated read of every
 #         metric on the box.
+#
+#         This is also why the workstations do not write here directly. The
+#         remote-write receiver enabled below shares this listener, so exposing
+#         it to accept their pushes would expose the expression browser and the
+#         admin API with it. Instead the wg0-facing ingest port lives on Alloy
+#         (logs.nix), which forwards over loopback — one extra hop to keep the
+#         paragraph above true. See modules/nixos/net/telemetry.nix.
 #   9100  node exporter, scraped by Prometheus over loopback only.
 #   9633  smartctl exporter, likewise.
 #
@@ -100,7 +107,18 @@ in
     # emitting high-cardinality series. See the header note on what the size
     # bound does and does not promise about the root filesystem.
     retentionTime = "90d";
-    extraFlags = [ "--storage.tsdb.retention.size=20GB" ];
+    extraFlags = [
+      "--storage.tsdb.retention.size=20GB"
+
+      # Accept `remote_write` pushes on /api/v1/write. This is what lets the
+      # workstations appear here at all: they push rather than being scraped, so
+      # that a laptop with a closed lid is an absent series instead of a firing
+      # `hs-target-down` in alerts.nix. The flag opens no new socket — the
+      # endpoint is on the listener above, which stays on loopback, and the only
+      # thing that reaches it from off-box is Alloy's ingest hop in logs.nix.
+      # Rationale in full: modules/nixos/net/telemetry.nix.
+      "--web.enable-remote-write-receiver"
+    ];
 
     # Downgraded from the full `promtool check config` to a parse-only run, and
     # only when the Forgejo job is in the config. The full check does not just

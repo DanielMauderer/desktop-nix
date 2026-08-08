@@ -13,6 +13,17 @@
 #         to reach it, so it stays on loopback.
 #  12345  Alloy's own HTTP server (its UI and /metrics), left at the upstream
 #         default bind of 127.0.0.1. Prometheus scrapes it over loopback.
+#   9099  Alloy's `prometheus.receive_http` — the workstations' metrics ingest,
+#         admitted on the wg0 interface only and forwarded to Prometheus over
+#         loopback. Bound to 0.0.0.0 with the firewall doing the restricting,
+#         the same posture Grafana takes, so Alloy does not have to wait for wg0
+#         to exist before it can start.
+#
+# Alloy therefore has two jobs on this box: shipping this host's journal (its
+# original one) and terminating the fleet's metric pushes. The second exists
+# here rather than as a Prometheus listener because metrics.nix keeps :9090 on
+# loopback on purpose — see its header, and modules/nixos/net/telemetry.nix for
+# why the clients push at all.
 #
 # `extraInputRules` rather than `allowedTCPPorts` for :3100, for the same reason
 # nfs.nix and forgejo.nix do it: the port must never be globally open, and
@@ -36,6 +47,16 @@ let
 
   httpPort = 3100;
   grpcPort = 9096;
+
+  # Where the workstations' `prometheus.remote_write` lands. Sits with the other
+  # metrics ports (9090/9096/9100) rather than near Alloy's own 12345, since what
+  # it carries is Prometheus data. Outside the 3000-3010 range grafana.nix avoids.
+  clientIngestPort = 9099;
+
+  # metrics.nix. Kept as a literal with this note, the same convention that file
+  # uses for the ports it does not own; an assertion in flake.nix makes a
+  # divergence loud rather than silently misrouting every client's samples.
+  prometheusPort = 9090;
 
   # Keep in sync with forgejo.nix and nfs.nix — same LAN, same VPN subnet as
   # wireguard.nix, same podman bridge as the NPM container and Actions jobs.
@@ -97,6 +118,26 @@ let
     loki.write "local" {
       endpoint {
         url = "http://127.0.0.1:${toString httpPort}/loki/api/v1/push"
+      }
+    }
+
+    // Fleet metrics ingest. The workstations' Alloy instances remote_write here
+    // and this forwards straight into Prometheus over loopback, which is what
+    // keeps :9090 off the VPN (see metrics.nix). No authentication — the wg0
+    // interface restriction below is the access control, exactly the argument
+    // the header makes for Loki's :3100.
+    prometheus.receive_http "clients" {
+      http {
+        listen_address = "0.0.0.0"
+        listen_port    = ${toString clientIngestPort}
+      }
+
+      forward_to = [prometheus.remote_write.clients.receiver]
+    }
+
+    prometheus.remote_write "clients" {
+      endpoint {
+        url = "http://127.0.0.1:${toString prometheusPort}/api/v1/write"
       }
     }
   '';
@@ -216,6 +257,14 @@ in
   networking.firewall.extraInputRules = ''
     ip saddr { ${podmanSubnet}, ${lanSubnet}, ${vpnSubnet} } tcp dport ${toString httpPort} accept
   '';
+
+  # The client ingest port gets the *interface* tier instead — the same one
+  # grafana.nix, paperless.nix and the NPM admin UI use. Loki needs
+  # `extraInputRules` only because it has three source subnets to name; this has
+  # exactly one source, the tunnel, and `interfaces.wg0` says so more directly
+  # than a source-address match would. Absent from `allowedTCPPorts`, so the
+  # "WAN TCP surface is exactly 80/443" assertion in flake.nix stays exact.
+  networking.firewall.interfaces.wg0.allowedTCPPorts = [ clientIngestPort ];
 
   # `extraInputRules` exists only on the nftables backend and is silently
   # ignored under iptables, which would leave :3100 unreachable rather than

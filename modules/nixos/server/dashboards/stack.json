@@ -272,7 +272,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "time() - process_start_time_seconds",
+          "expr": "time() - process_start_time_seconds{job!~\"client-.*\"}",
           "legendFormat": "{{job}}"
         }
       ],

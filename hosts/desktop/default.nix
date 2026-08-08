@@ -26,6 +26,10 @@
     endpoint = "192.168.178.96:51820";
   };
 
+  # Push metrics + warning-level journal to the server's Grafana. Rides the wg0
+  # tunnel above, which is why it is enabled alongside it.
+  services.homeServerTelemetry.enable = true;
+
   # Second tunnel (wg1) from the Fritz!Box wg.conf; key lives in
   # secrets/desktop/vpn.yaml.
   services.vpnClient = {

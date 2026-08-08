@@ -168,29 +168,39 @@ let
       summary = "{{ $labels.job }} has not answered a scrape for 10 minutes.";
     }
     {
+      # `job="node"` here is not decoration. This Prometheus also holds the
+      # workstations' series, pushed in by modules/nixos/net/telemetry.nix under
+      # job="client-node" — and a desktop carries ~1000 unit-state series of its
+      # own. Unscoped, a laptop's failed unit would page as a home-server alert,
+      # which is the outcome the push design exists to avoid. Every rule below
+      # that reads a node/smartctl metric is pinned for the same reason; the
+      # dashboards in dashboards/ are pinned to match.
       uid = "hs-unit-failed";
       title = "systemd unit failed";
-      expr = "node_systemd_unit_state{state=\"failed\"} == 1";
+      expr = "node_systemd_unit_state{job=\"node\",state=\"failed\"} == 1";
       summary = "{{ $labels.name }} is in the failed state.";
     }
     {
       uid = "hs-root-filling";
       title = "Root filesystem filling up";
-      expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} < 0.15";
+      expr = "node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\"} < 0.15";
       for = "15m";
       summary = "Less than 15% free on the SSD root. Prometheus' TSDB and every service's state live here.";
     }
     {
+      # Already safe on the mountpoint alone — no client has /hdd_pool_1 — but
+      # pinned anyway so the whole group reads the same way and a future rule
+      # copied from here inherits the selector rather than the omission.
       uid = "hs-pool-filling";
       title = "ZFS pool filling up";
-      expr = "node_filesystem_avail_bytes{mountpoint=\"/hdd_pool_1\"} / node_filesystem_size_bytes{mountpoint=\"/hdd_pool_1\"} < 0.15";
+      expr = "node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/hdd_pool_1\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/hdd_pool_1\"} < 0.15";
       for = "15m";
       summary = "Less than 15% free on hdd_pool_1. Loki retention and the backups both grow here.";
     }
     {
       uid = "hs-smart-failing";
       title = "Drive reports SMART failure";
-      expr = "smartctl_device_smart_status == 0";
+      expr = "smartctl_device_smart_status{job=\"smartctl\"} == 0";
       summary = "{{ $labels.device }} is predicting failure. Replace it before the vdev degrades.";
     }
     {
@@ -237,7 +247,7 @@ let
     {
       uid = "hs-textfile-stale";
       title = "Textfile metrics are stale";
-      expr = "time() - node_textfile_mtime_seconds > 21600";
+      expr = "time() - node_textfile_mtime_seconds{job=\"node\"} > 21600";
       for = "1h";
       summary = "A .prom writer has not run in 6 hours; the update and backup metrics on the dashboards are no longer current.";
     }

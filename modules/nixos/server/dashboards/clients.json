@@ -1,0 +1,650 @@
+{
+  "id": null,
+  "uid": "fleet-clients",
+  "title": "Workstations — fleet",
+  "description": "Metrics and warning-level journal for the workstations that push into this server (job=\"client-node\" / \"client-journal\", see modules/nixos/net/telemetry.nix). These hosts are not scraped, so there is no `up` series and a machine that is off simply has no recent samples — 'Last sample age' is the thing to read instead. Provisioned from Nix; edit modules/nixos/server/dashboards/clients.json.",
+  "tags": ["nixos", "node-exporter", "clients"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "1m",
+  "time": {"from": "now-6h", "to": "now"},
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": {
+          "query": "label_values(node_uname_info{job=\"client-node\"}, host)",
+          "refId": "host"
+        },
+        "definition": "label_values(node_uname_info{job=\"client-node\"}, host)",
+        "refresh": 2,
+        "includeAll": false,
+        "multi": false,
+        "current": {"text": "", "value": ""}
+      },
+      {
+        "name": "unit",
+        "label": "Unit",
+        "type": "query",
+        "datasource": {"type": "loki", "uid": "loki"},
+        "query": {
+          "label": "unit",
+          "refId": "unit",
+          "stream": "{job=\"client-journal\", host=\"$host\"}",
+          "type": 1
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {"text": ["All"], "value": ["$__all"]}
+      },
+      {
+        "name": "search",
+        "label": "Contains",
+        "type": "textbox",
+        "query": "",
+        "current": {"text": "", "value": ""}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "CPU busy",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"client-node\", host=\"$host\", mode=\"idle\"}[5m])) * 100)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 80},
+              {"color": "red", "value": 95}
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Memory used",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "id": 2,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"client-node\", host=\"$host\"} / node_memory_MemTotal_bytes{job=\"client-node\", host=\"$host\"})",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 85},
+              {"color": "red", "value": 95}
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Root filesystem used",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "id": 3,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"client-node\", host=\"$host\", mountpoint=\"/\"} / node_filesystem_size_bytes{job=\"client-node\", host=\"$host\", mountpoint=\"/\"})",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 80},
+              {"color": "red", "value": 90}
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Failed systemd units",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "id": 4,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(node_systemd_unit_state{job=\"client-node\", host=\"$host\", state=\"failed\"}) or vector(0)",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "id": 5,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "time() - node_boot_time_seconds{job=\"client-node\", host=\"$host\"}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "text", "value": null}]}
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Last sample age",
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "id": 6,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "time() - max(node_time_seconds{job=\"client-node\", host=\"$host\"})",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 300},
+              {"color": "red", "value": 3600}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU by mode",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 7,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "avg by (mode) (rate(node_cpu_seconds_total{job=\"client-node\", host=\"$host\", mode!=\"idle\"}[5m])) * 100",
+          "legendFormat": "{{mode}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"mode": "normal", "group": "A"}
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 8,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemTotal_bytes{job=\"client-node\", host=\"$host\"} - node_memory_MemAvailable_bytes{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "used"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_Cached_bytes{job=\"client-node\", host=\"$host\"} + node_memory_Buffers_bytes{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "cache + buffers"
+        },
+        {
+          "refId": "C",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_MemTotal_bytes{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "total"
+        },
+        {
+          "refId": "D",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_memory_SwapTotal_bytes{job=\"client-node\", host=\"$host\"} - node_memory_SwapFree_bytes{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "swap used"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Load average",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12},
+      "id": 9,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_load1{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "1m"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_load5{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "5m"
+        },
+        {
+          "refId": "C",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_load15{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "15m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Stall time (PSI)",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12},
+      "id": 10,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_pressure_cpu_waiting_seconds_total{job=\"client-node\", host=\"$host\"}[5m])",
+          "legendFormat": "cpu"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_pressure_io_waiting_seconds_total{job=\"client-node\", host=\"$host\"}[5m])",
+          "legendFormat": "io"
+        },
+        {
+          "refId": "C",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_pressure_memory_waiting_seconds_total{job=\"client-node\", host=\"$host\"}[5m])",
+          "legendFormat": "memory"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "description": "Fraction of wall time tasks spent stalled on a resource. This is the number that correlates with a stutter you actually felt, in a way that CPU-busy does not."
+    },
+    {
+      "type": "timeseries",
+      "title": "Temperatures",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12},
+      "id": 11,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_hwmon_temp_celsius{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "{{chip}} {{sensor}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_thermal_zone_temp{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "zone {{zone}} ({{type}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "description": "hwmon covers the CPU/GPU packages; the ACPI thermal zones are what the laptops throttle against."
+    },
+    {
+      "type": "timeseries",
+      "title": "Filesystem usage",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "id": 12,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 * (1 - node_filesystem_avail_bytes{job=\"client-node\", host=\"$host\", fstype!~\"tmpfs|ramfs|overlay|squashfs|nsfs|devtmpfs\"} / node_filesystem_size_bytes{job=\"client-node\", host=\"$host\", fstype!~\"tmpfs|ramfs|overlay|squashfs|nsfs|devtmpfs\"})",
+          "legendFormat": "{{mountpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "description": "Real filesystems only — tmpfs, overlays and the read-only Nix store squashfs are filtered out."
+    },
+    {
+      "type": "timeseries",
+      "title": "Battery",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "id": 13,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_power_supply_capacity{job=\"client-node\", host=\"$host\"}",
+          "legendFormat": "{{power_supply}} charge %"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "node_power_supply_online{job=\"client-node\", host=\"$host\"} * 100",
+          "legendFormat": "{{power_supply}} on AC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "description": "Empty on desktop, which has no battery. 'on AC' is 0 or 100 so it reads against the same axis as the charge level."
+    },
+    {
+      "type": "timeseries",
+      "title": "Network throughput",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+      "id": 14,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_network_receive_bytes_total{job=\"client-node\", host=\"$host\", device!~\"lo|veth.*|podman.*|cni.*|wg[0-9]\"}[5m]) * 8",
+          "legendFormat": "{{device}} in"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "-rate(node_network_transmit_bytes_total{job=\"client-node\", host=\"$host\", device!~\"lo|veth.*|podman.*|cni.*|wg[0-9]\"}[5m]) * 8",
+          "legendFormat": "{{device}} out"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "description": "Physical interfaces only. The wg tunnels are excluded because their traffic is already counted on the interface underneath."
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk I/O",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "id": 15,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "rate(node_disk_read_bytes_total{job=\"client-node\", host=\"$host\", device!~\"dm-.*|loop.*\"}[5m])",
+          "legendFormat": "{{device}} read"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "-rate(node_disk_written_bytes_total{job=\"client-node\", host=\"$host\", device!~\"dm-.*|loop.*\"}[5m])",
+          "legendFormat": "{{device}} written"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Journal (warning and above)",
+      "description": "Everything the clients ship — telemetry.nix drops notice/info/debug at the source, so this is the whole stream, not a filtered view of it.",
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 36},
+      "id": 16,
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "expr": "{job=\"client-journal\", host=\"$host\", unit=~\"$unit\"} |= `$search`",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}
