@@ -251,28 +251,33 @@ in
     after = [ "loki.service" ];
   };
 
-  # :3100 is admitted only from the three named sources. The podman bridge is
-  # the interesting one — it is what lets a containerised deployment on this box
-  # push its logs — and matches the subnet forgejo.nix already names.
-  networking.firewall.extraInputRules = ''
-    ip saddr { ${podmanSubnet}, ${lanSubnet}, ${vpnSubnet} } tcp dport ${toString httpPort} accept
-  '';
+  networking = {
+    firewall = {
+      # :3100 is admitted only from the three named sources. The podman bridge is
+      # the interesting one — it is what lets a containerised deployment on this
+      # box push its logs — and matches the subnet forgejo.nix already names.
+      extraInputRules = ''
+        ip saddr { ${podmanSubnet}, ${lanSubnet}, ${vpnSubnet} } tcp dport ${toString httpPort} accept
+      '';
 
-  # The client ingest port gets the *interface* tier instead — the same one
-  # grafana.nix, paperless.nix and the NPM admin UI use. Loki needs
-  # `extraInputRules` only because it has three source subnets to name; this has
-  # exactly one source, the tunnel, and `interfaces.wg0` says so more directly
-  # than a source-address match would. Absent from `allowedTCPPorts`, so the
-  # "WAN TCP surface is exactly 80/443" assertion in flake.nix stays exact.
-  networking.firewall.interfaces.wg0.allowedTCPPorts = [ clientIngestPort ];
+      # The client ingest port gets the *interface* tier instead — the same one
+      # grafana.nix, paperless.nix and the NPM admin UI use. Loki needs
+      # `extraInputRules` only because it has three source subnets to name; this
+      # has exactly one source, the tunnel, and `interfaces.wg0` says so more
+      # directly than a source-address match would. Absent from
+      # `allowedTCPPorts`, so the "WAN TCP surface is exactly 80/443" assertion
+      # in flake.nix stays exact.
+      interfaces.wg0.allowedTCPPorts = [ clientIngestPort ];
+    };
 
-  # `extraInputRules` exists only on the nftables backend and is silently
-  # ignored under iptables, which would leave :3100 unreachable rather than
-  # merely unrestricted. core/hardening.nix already turns nftables on for every
-  # host; this default keeps the module honest on its own (the VM test node
-  # relies on it) without overriding a host that sets it explicitly. Same
-  # arrangement as forgejo.nix.
-  networking.nftables.enable = lib.mkDefault true;
+    # `extraInputRules` exists only on the nftables backend and is silently
+    # ignored under iptables, which would leave :3100 unreachable rather than
+    # merely unrestricted. core/hardening.nix already turns nftables on for every
+    # host; this default keeps the module honest on its own (the VM test node
+    # relies on it) without overriding a host that sets it explicitly. Same
+    # arrangement as forgejo.nix.
+    nftables.enable = lib.mkDefault true;
+  };
 
   # Every path above is on the ZFS pool, which systemd.tmpfiles cannot create
   # because it runs before zfs-mount.service. Same fix as npm-data-dirs,

@@ -14,30 +14,32 @@
   networking.hostName = "desktop";
   system.stateVersion = "25.05";
 
-  # Always at home, so the share mounts direct over the LAN (SSH still rides the
-  # tunnel). `enable` stays off until enrollment.
-  services.homeServerClient = {
-    enable = true;
-    address = "10.100.0.2/32";
-    nfsHost = "192.168.178.96"; # home-server's LAN IP
-    # Always-home + same LAN as the server: tunnel straight to its LAN IP so the
-    # handshake doesn't depend on Fritz!Box NAT hairpin. Roaming hosts keep the
-    # default vpn.mauderer.work:51820 (WAN) endpoint.
-    endpoint = "192.168.178.96:51820";
-  };
+  services = {
+    # Always at home, so the share mounts direct over the LAN (SSH still rides the
+    # tunnel). `enable` stays off until enrollment.
+    homeServerClient = {
+      enable = true;
+      address = "10.100.0.2/32";
+      nfsHost = "192.168.178.96"; # home-server's LAN IP
+      # Always-home + same LAN as the server: tunnel straight to its LAN IP so the
+      # handshake doesn't depend on Fritz!Box NAT hairpin. Roaming hosts keep the
+      # default vpn.mauderer.work:51820 (WAN) endpoint.
+      endpoint = "192.168.178.96:51820";
+    };
 
-  # Push metrics + warning-level journal to the server's Grafana. Rides the wg0
-  # tunnel above, which is why it is enabled alongside it.
-  services.homeServerTelemetry.enable = true;
+    # Push metrics + warning-level journal to the server's Grafana. Rides the wg0
+    # tunnel above, which is why it is enabled alongside it.
+    homeServerTelemetry.enable = true;
 
-  # Second tunnel (wg1) from the Fritz!Box wg.conf; key lives in
-  # secrets/desktop/vpn.yaml.
-  services.vpnClient = {
-    enable = true;
-    address = [ "192.168.178.208/24,fde5:32d8:78dc::208/64" ]; # Address =
-    endpoint = "9m2lqds859vjlh5k.myfritz.net:52641"; # Endpoint =
-    publicKey = "2vaNA56VJJW4MU4zMaQffBCt9Eac5p7lum80988/Nhc="; # PublicKey =
-    presharedKey = true; # PresharedKey = → secrets/desktop/vpn.yaml, vpn-wg-psk
+    # Second tunnel (wg1) from the Fritz!Box wg.conf; key lives in
+    # secrets/desktop/vpn.yaml.
+    vpnClient = {
+      enable = true;
+      address = [ "192.168.178.208/24,fde5:32d8:78dc::208/64" ]; # Address =
+      endpoint = "9m2lqds859vjlh5k.myfritz.net:52641"; # Endpoint =
+      publicKey = "2vaNA56VJJW4MU4zMaQffBCt9Eac5p7lum80988/Nhc="; # PublicKey =
+      presharedKey = true; # PresharedKey = → secrets/desktop/vpn.yaml, vpn-wg-psk
+    };
   };
 
   # Dual-head desktop; mkBefore so it matches ahead of the laptop-internal fallback.

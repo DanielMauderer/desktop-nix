@@ -50,7 +50,7 @@ let
   configFile = settingsFormat.generate "forgejo-runner.yaml" {
     runner = {
       file = "/var/lib/forgejo-runner/.runner";
-      capacity = cfg.capacity;
+      inherit (cfg) capacity;
     };
     container = {
       # `network` is deliberately left empty. That is what makes the runner build
