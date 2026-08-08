@@ -278,3 +278,16 @@ matters lives here; the rest is in the Nix code and `git log`.
   time NM has auto-generated its own profile and come up on a stable-privacy
   address; a keyfile in `/etc/NetworkManager/system-connections` is there before
   NM starts.
+
+- **The Forgejo Actions runner is a hand-written unit, not
+  `services.gitea-actions-runner`.** That module implements only the deprecated
+  handshake — `forgejo-runner register --token <registration token>` — which a
+  Forgejo 15 server answers with `invalid_argument: runner registration token
+  not found` however freshly the token was minted, and no module in nixpkgs
+  (stable or unstable) speaks the current one. In the current model the *forge*
+  creates the runner and issues a UUID plus a persistent shared secret, which
+  the daemon declares at startup via `--url/--uuid/--token-url`. Consequences
+  that read as bugs if you don't know the switch happened: the token is a bare
+  value rather than a `TOKEN=…` env-file, it is delivered by `LoadCredential`
+  because the runner process (not PID 1) opens it under a DynamicUser, and there
+  is no re-registration dance on token or label changes.

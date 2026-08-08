@@ -17,11 +17,15 @@ _: {
     ../../modules/home/neovim
   ];
 
-  # Forgejo Actions runner. Requires `forgejo-runner-token` in
-  # secrets/home-server/forgejo.yaml (minted in the Forgejo admin UI — see the
-  # "Forgejo" section of INSTALL.md); the secret is enrolled, so this is on.
+  # Forgejo Actions runner. Both the UUID here and `forgejo-runner-token` in
+  # secrets/home-server/forgejo.yaml are issued by the forge when the runner is
+  # created in its admin UI, and are only valid for *that* forge — a rebuilt
+  # instance mints new ones and both must be replaced together (INSTALL.md §5).
   # Forgejo itself is always on.
-  services.forgejoRunner.enable = true;
+  services.forgejoRunner = {
+    enable = true;
+    uuid = "1e25f307-13c8-4119-94b2-9ad8072de161";
+  };
 
   # SSH is key-only (PasswordAuthentication is off in modules/nixos/server/ssh.nix),
   # so the admin's public key must be enrolled here. Replace the placeholder.

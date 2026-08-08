@@ -457,11 +457,20 @@
               && lib.hasInfix "tcp dport 2222 accept" rules;
           }
           {
-            # Vacuously true while the runner is opt-in, but it pins the shape:
-            # if it is ever enabled it must be the native unit, which reaches
-            # podman via DOCKER_HOST rather than a mounted socket.
+            # Pins the shape: the runner must be a host unit reaching podman via
+            # DOCKER_HOST, never a container with the management socket mounted
+            # in. The unit is hand-written (see forgejo-runner.nix on why the
+            # upstream gitea-actions-runner module cannot be used), so this also
+            # catches the unit being renamed out from under the assertion.
             name = "Actions runner (when enabled) runs as a host service";
-            assertion = cfg.services.forgejoRunner.enable -> (cfg.systemd.services ? gitea-runner-forgejo);
+            assertion =
+              cfg.services.forgejoRunner.enable
+              -> (
+                (cfg.systemd.services ? forgejo-runner)
+                &&
+                  (cfg.systemd.services.forgejo-runner.environment.DOCKER_HOST or null)
+                  == "unix:///run/podman/podman.sock"
+              );
           }
           {
             name = "Paperless enabled on the SQLite backend";

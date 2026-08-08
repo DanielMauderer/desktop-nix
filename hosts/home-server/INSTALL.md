@@ -119,30 +119,39 @@ registration token can only be minted once the forge is running.
    the HTTP-01 note in §9: the wildcard has to be grey-clouded while the cert is
    issued, then switched back to proxied. In the host's
    *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
-3. **Runner token.** `services.forgejoRunner.enable = true;` is already set in
-   `hosts/home-server/default.nix`, so the only step is enrolling a token for
-   *this* instance — the committed one belongs to whatever forge minted it and
-   will be rejected by a freshly installed one.
+3. **Runner UUID + token.** `services.forgejoRunner.enable = true;` is already
+   set in `hosts/home-server/default.nix`, so the only step is enrolling the
+   pair this instance issued. Both are forge-specific — the committed ones
+   belong to whatever forge created them and a fresh install will reject them,
+   so **replace both together**.
 
-   In Forgejo: Site Administration → Actions → Runners → *Create new runner* →
-   copy the registration token. Then, in the repo:
+   In Forgejo: Site Administration → Actions → Runners → *Create new runner*.
+   The page shows an example `forgejo-runner daemon` invocation; take the
+   `--uuid` value and the token from it. Then, in the repo:
    ```sh
    nix develop
-   sops set secrets/home-server/forgejo.yaml '["forgejo-runner-token"]' '"TOKEN=<registration token>"'
+   sops set secrets/home-server/forgejo.yaml '["forgejo-runner-token"]' '"<token>"'
    ```
-   Note the `TOKEN=` prefix: `tokenFile` is read as an *environment* file, unlike
-   the bare Cloudflare token. Use `sops set` rather than `sops <file>` so the
-   `forgejo-metrics-token` in the same file is left alone.
+   The token is a **bare** value — no `TOKEN=` prefix and no trailing newline
+   (the UI shows `echo -n` for a reason). `sops set` rather than `sops <file>`
+   keeps the `forgejo-metrics-token` in the same file untouched. Put the UUID in
+   `services.forgejoRunner.uuid` in `hosts/home-server/default.nix`; it is not a
+   secret.
 
    Commit, push, and `switch`. The server evaluates its own checkout, so an
    unpushed secret means it rebuilds without the token. Verify with:
    ```sh
-   journalctl -u gitea-runner-forgejo -n 50 --no-pager
-   ls -l /var/lib/gitea-runner/forgejo/.runner
+   systemctl status forgejo-runner
+   journalctl -u forgejo-runner -n 50 --no-pager
    ```
-   `.runner` existing is what proves registration actually succeeded — the unit
-   can sit `active` while retrying a rejected token. The runner then shows as
-   idle in the admin panel.
+   A healthy start logs a successful ping followed by the daemon polling for
+   jobs, and the runner shows as idle in the admin panel. If the log instead
+   loops on `runner registration token not found`, the UUID/token pair does not
+   match the forge — re-copy both from the admin UI. Byte length is worth
+   checking if it looks right but still fails:
+   ```sh
+   sudo wc -c /run/secrets/forgejo-runner-token   # 40, not 41
+   ```
 4. **GitHub backup mirror**, per repository: Settings → Mirror Settings → *Push
    Mirror*, target
    `https://<github-user>:<PAT>@github.com/<user>/<repo>.git`, interval `8h`.
@@ -354,7 +363,7 @@ Worth knowing:
 - **Forgejo:** `systemctl status forgejo` and `curl -fsS
   http://10.100.0.1:4000/api/healthz`; `systemctl list-timers forgejo-dump` shows
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the
-  runner is enabled, `systemctl status gitea-runner-forgejo` plus a trivial
+  `systemctl status forgejo-runner` plus a trivial
   `.forgejo/workflows/hello.yml` in a scratch repo proves the podman job path.
 - **Paperless:** `systemctl status paperless-web` and `curl -fsS -o /dev/null -w
   '%{http_code}\n' http://10.100.0.1:28981/accounts/login/` (expect `200`); the
