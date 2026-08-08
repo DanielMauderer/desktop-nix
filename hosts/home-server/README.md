@@ -29,7 +29,10 @@ Headless services host — the only non-desktop machine. Install guide:
   exporter's textfile collector with update-pipeline metrics — pending reboot,
   autoUpgrade result, nixpkgs staleness), and the container groundwork for
   docker-compose / Ansible-managed services. WAN surface is exactly UDP 51820 +
-  TCP 80/443.
+  TCP 80/443. Also a **fixed IPv6 interface ID** for the wired link
+  (`ipv6-interface-id.nix`): the router's exposed-host entry is pinned to a
+  hand-entered interface ID, so the address tail must not follow the ISP's
+  nightly prefix rotation — change the token there and in the FRITZ!Box together.
 - **Disk:** disko SSD root; ZFS data pool on the HBA drives.
 
 `hardware.nix` carries the ZFS `hostId`, the LTS kernel, HBA modules and zram.

@@ -269,3 +269,12 @@ matters lives here; the rest is in the Nix code and `git log`.
   file and a systemd credential does not exist at build time; the nixosTest
   recovers the lost coverage by asserting every target is healthy on a running
   instance.
+
+- **The home-server's NetworkManager profile is an `/etc` keyfile, not
+  `networking.networkmanager.ensureProfiles`.** The profile pins the IPv6
+  interface ID (`ipv6.token`) that the router's exposed-host entry is keyed on,
+  so it has to be in force from the link's first activation. `ensureProfiles`
+  writes to `/run` from a unit ordered *after* `NetworkManager.service`, by which
+  time NM has auto-generated its own profile and come up on a stable-privacy
+  address; a keyfile in `/etc/NetworkManager/system-connections` is there before
+  NM starts.

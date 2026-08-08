@@ -2,6 +2,7 @@ _: {
   imports = [
     ./ssh.nix
     ./wireguard.nix
+    ./ipv6-interface-id.nix
     ./reverse-proxy.nix
     ./cloudflare-ddns.nix
     ./containers.nix
