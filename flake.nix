@@ -340,6 +340,13 @@
                   text = cfg.environment.etc."alloy/config.alloy".text;
                 in
                 lib.hasInfix ''job_name        = "client-node"'' text
+                # …and the relabel rule that makes that name stick.
+                # `prometheus.exporter.unix` puts its own `job` on the targets
+                # ("integrations/unix"), and a target's label beats the scrape's
+                # `job_name` — so `job_name` alone is not the job label the
+                # samples arrive with, and checking it alone passed while every
+                # client series landed under the exporter's name.
+                && lib.hasInfix ''target_label = "job"'' text
                 && lib.hasInfix ''labels = { job = "client-journal" }'' text
                 && lib.hasInfix ''regex         = "[0-4]"'' text
                 # The hostname has to reach both pipelines, or a metric and a log

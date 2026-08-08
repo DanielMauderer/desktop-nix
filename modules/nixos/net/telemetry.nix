@@ -79,6 +79,17 @@ let
     discovery.relabel "local" {
       targets = prometheus.exporter.unix.local.targets
 
+      // `job` has to be set HERE, not by the scrape's job_name below.
+      // `prometheus.exporter.unix` ships its targets with a job label already
+      // on them ("integrations/unix"), and a label the target carries beats the
+      // scrape's job_name — so without this rule every client series arrives as
+      // job="integrations/unix". Nothing errors: the samples land in Prometheus,
+      // clients.json queries job="client-node" and draws nothing.
+      rule {
+        target_label = "job"
+        replacement  = "client-node"
+      }
+
       rule {
         target_label = "instance"
         replacement  = "${host}"
