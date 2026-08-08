@@ -17,10 +17,11 @@ _: {
     ../../modules/home/neovim
   ];
 
-  # Forgejo Actions runner. Off until the registration token is minted in the
-  # Forgejo admin UI and enrolled into secrets/home-server/forgejo.yaml — see the
-  # "Forgejo" section of INSTALL.md. Forgejo itself is always on.
-  # services.forgejoRunner.enable = true;
+  # Forgejo Actions runner. Requires `forgejo-runner-token` in
+  # secrets/home-server/forgejo.yaml (minted in the Forgejo admin UI — see the
+  # "Forgejo" section of INSTALL.md); the secret is enrolled, so this is on.
+  # Forgejo itself is always on.
+  services.forgejoRunner.enable = true;
 
   # SSH is key-only (PasswordAuthentication is off in modules/nixos/server/ssh.nix),
   # so the admin's public key must be enrolled here. Replace the placeholder.

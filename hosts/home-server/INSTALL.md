@@ -29,8 +29,9 @@ The secrets-first work is done and in git:
   Forgejo one holds `forgejo-metrics-token`, a random value that gates Forgejo's
   `/metrics` (it rides on the listener NPM publishes); nobody needs to read it —
   Forgejo and Prometheus both get it as a systemd credential — so it needs no
-  install step. `forgejo-runner-token` goes in the same file if the (default-off)
-  Actions runner is ever enabled.
+  install step. The same file holds `forgejo-runner-token`, which *does* need
+  one: a registration token is only valid for the forge that minted it, so a new
+  install has to replace it (step 5).
 
 ## 1. Check before you install
 
@@ -97,12 +98,19 @@ registration token can only be minted once the forge is running.
    the first account — it becomes the instance admin. Self-registration is off,
    so every later account is admin-created. (Plain HTTP over WireGuard, same as
    the NPM admin UI; `:4000` is not reachable from the WAN or the LAN.) From a
-   console instead of the VPN, the equivalent is:
-   ```sh
-   sudo -u forgejo forgejo admin user create --admin \
+   console instead of the VPN, the equivalent is the admin CLI. The `forgejo`
+   binary is not in the system PATH — it exists only in the unit's — so take it
+   from the unit, and pass the work dir explicitly or the CLI guesses paths
+   relative to `$PWD` and can write a stray config (fish syntax):
+   ```fish
+   set forgejo (systemctl cat forgejo | grep -oP '^ExecStart=\K\S+')
+   sudo -u forgejo env FORGEJO_WORK_DIR=/var/lib/forgejo FORGEJO_CUSTOM=/var/lib/forgejo/custom \
+     $forgejo admin user create --admin \
      --username maudi --email you@example.com --random-password \
      --config /var/lib/forgejo/custom/conf/app.ini
    ```
+   `admin user list` with the same prefix shows existing accounts;
+   `admin user change-password --username maudi --random-password` resets one.
 2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
    domain `git.mauderer.work`, forward to `http://10.88.0.1:4000` (the podman
    bridge gateway — i.e. this host, as seen from the NPM container), websockets
@@ -111,20 +119,30 @@ registration token can only be minted once the forge is running.
    the HTTP-01 note in §9: the wildcard has to be grey-clouded while the cert is
    issued, then switched back to proxied. In the host's
    *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
-3. **Runner token.** In Forgejo: Site Administration → Actions → Runners →
-   *Create new runner* → copy the registration token. Then, in the repo:
+3. **Runner token.** `services.forgejoRunner.enable = true;` is already set in
+   `hosts/home-server/default.nix`, so the only step is enrolling a token for
+   *this* instance — the committed one belongs to whatever forge minted it and
+   will be rejected by a freshly installed one.
+
+   In Forgejo: Site Administration → Actions → Runners → *Create new runner* →
+   copy the registration token. Then, in the repo:
    ```sh
    nix develop
-   sops secrets/home-server/forgejo.yaml
+   sops set secrets/home-server/forgejo.yaml '["forgejo-runner-token"]' '"TOKEN=<registration token>"'
    ```
-   with the content — note the `TOKEN=` prefix, this is an *environment* file,
-   unlike the bare Cloudflare token:
-   ```yaml
-   forgejo-runner-token: TOKEN=<registration token>
+   Note the `TOKEN=` prefix: `tokenFile` is read as an *environment* file, unlike
+   the bare Cloudflare token. Use `sops set` rather than `sops <file>` so the
+   `forgejo-metrics-token` in the same file is left alone.
+
+   Commit, push, and `switch`. The server evaluates its own checkout, so an
+   unpushed secret means it rebuilds without the token. Verify with:
+   ```sh
+   journalctl -u gitea-runner-forgejo -n 50 --no-pager
+   ls -l /var/lib/gitea-runner/forgejo/.runner
    ```
-   Uncomment `services.forgejoRunner.enable = true;` in
-   `hosts/home-server/default.nix`, commit, and `switch`. The runner should show
-   as idle in the admin panel.
+   `.runner` existing is what proves registration actually succeeded — the unit
+   can sit `active` while retrying a rejected token. The runner then shows as
+   idle in the admin panel.
 4. **GitHub backup mirror**, per repository: Settings → Mirror Settings → *Push
    Mirror*, target
    `https://<github-user>:<PAT>@github.com/<user>/<repo>.git`, interval `8h`.

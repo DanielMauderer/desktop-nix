@@ -27,8 +27,10 @@ let
   vpnSubnet = "10.100.0.0/24";
 
   # podman's default network, from virtualisation.podman.defaultNetwork: bridge
-  # podman0, gateway 10.88.0.1. The NPM container lives here, and so do Actions
-  # job containers (forgejo-runner.nix pins them to the same network).
+  # podman0, gateway 10.88.0.1. The NPM container lives here. Actions job
+  # containers do *not* — forgejo-runner.nix leaves `container.network` unset so
+  # podman builds a throwaway network per job; those jobs reach the forge over
+  # its public URL, not this rule.
   podmanSubnet = "10.88.0.0/16";
 
   domain = "git.mauderer.work";
