@@ -23,6 +23,11 @@
         publicKey = "e0AoY1JO+IHL3GEms8gYeVwZv8HGjcZQGLBeanDNeRY=";
         allowedIPs = [ "10.100.0.3/32" ];
       }
+      {
+        # phone
+        publicKey = "o1LPn3uqdy10BNDF99guNTKGjDQ4palODeH+FHkMORk=";
+        allowedIPs = [ "10.100.0.4/32" ];
+      }
     ];
   };
 

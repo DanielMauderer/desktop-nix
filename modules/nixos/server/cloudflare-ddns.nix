@@ -24,7 +24,20 @@
 # Cloudflare must be able to reach the box over IPv6 on 80/443 for the proxy to
 # have an origin: the firewall already allows both (allowedTCPPorts covers v6),
 # but the upstream router has to forward inbound IPv6 to this host.
-{ config, ... }:
+#
+# `vpn.mauderer.work` is the WireGuard endpoint (see net/home-server-client.nix).
+# WireGuard is UDP; Cloudflare's proxy only carries HTTP/S, so the proxied
+# wildcard above resolves it to a Cloudflare edge address that drops the UDP.
+# The endpoint therefore needs its OWN grey-cloud (DNS-only) AAAA pointing at the
+# WAN address. `--proxied` is a per-run flag in the upstream tool, so this can't
+# join the `domains` list above — it runs as a second instance below, unproxied,
+# with its own cache. A specific `vpn` record shadows the wildcard for that name.
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 {
   # API token, decrypted to /run/secrets at activation (keyless CI: the encrypted
   # file just has to exist). The file must hold the BARE token — no
@@ -63,5 +76,36 @@
   systemd.services.cloudflare-dyndns = {
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
+  };
+
+  # Second instance: the grey-cloud (unproxied) AAAA for the WireGuard endpoint.
+  # Mirrors the upstream unit (DynamicUser + LoadCredential + legacy-token guard)
+  # but with its own StateDirectory/cache so the two runs don't clobber each
+  # other, and `-no-4 -6` with NO `--proxied`.
+  systemd.services.cloudflare-dyndns-vpn = {
+    description = "CloudFlare Dynamic DNS Client (grey-cloud WireGuard endpoint)";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    startAt = "*:0/5";
+
+    serviceConfig = {
+      Type = "simple";
+      DynamicUser = true;
+      StateDirectory = "cloudflare-dyndns-vpn";
+      LoadCredential = [ "apiToken:${config.sops.secrets.cloudflare-api-token.path}" ];
+    };
+
+    script = ''
+      export CLOUDFLARE_API_TOKEN_FILE=''${CREDENTIALS_DIRECTORY}/apiToken
+      token=$(< "''${CLOUDFLARE_API_TOKEN_FILE}")
+      if [[ $token == CLOUDFLARE_API_TOKEN* ]]; then
+        echo "Error: api token starts with 'CLOUDFLARE_API_TOKEN='. Store just the token." >&2
+        exit 1
+      fi
+      exec ${lib.getExe pkgs.cloudflare-dyndns} \
+        --cache-file /var/lib/cloudflare-dyndns-vpn/ip.cache \
+        -no-4 -6 vpn.mauderer.work
+    '';
   };
 }
