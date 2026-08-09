@@ -2784,6 +2784,22 @@
 
             # The server's own series keep the `node` job, so host.json's pinned
             # selectors still resolve and the two hosts never merge.
+            #
+            # Its arrival has to be waited for, unlike the client's. Prometheus
+            # spreads a target's first scrape over the interval — the delay is a
+            # hash of the target's labels against the wall clock, so it is up to
+            # a full 30s here and effectively random per boot. The client's
+            # samples do not go through that path at all: Alloy scrapes every 5s
+            # and remote_writes immediately, so they are already in the TSDB by
+            # the time the wait above returns. Asserting the set straight away
+            # therefore read {client-node} on the unlucky half of the runs, which
+            # is how this test failed on main — same idiom, same reason, as the
+            # target-health wait in test-observability.
+            server.wait_until_succeeds(
+                promql('node_load1{job="node"}')
+                + "| jq -e '.data.result | length > 0'",
+                timeout=90,
+            )
             server.succeed(
                 promql('count by (job) (node_load1)')
                 + "| jq -e '[.data.result[].metric.job] | sort == "
