@@ -31,5 +31,6 @@ _: {
   # so the admin's public key must be enrolled here. Replace the placeholder.
   users.users.maudi.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAm+h4JjyhM3plsb2UFpq4FuaFvy00uzVr3fpYWVnALH maudi@desktop"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMJ4O/SkjRdmZevXvA3L9ou9rdx1fCbBPAQU1MykZwHR maudi@private-laptop"
   ];
 }
