@@ -3002,10 +3002,37 @@
             # exporter. For the TLS and DNS jobs every target string is
             # identical (127.0.0.1:443 / the resolver), so this is also what
             # keeps the two public hosts from collapsing into one series.
+            #
+            # A DNS instance carries its record type, because a name can be
+            # probed for more than one: the uptime dashboard legends on
+            # `instance` alone, so vpn.mauderer.work's two probes would
+            # otherwise render as two identically-labelled rows.
             instances = sorted(t["labels"]["instance"] for t in probes)
             for host in ["ntfy.mauderer.work", "git.mauderer.work"]:
-                assert instances.count(host) == 2, (host, instances)
+                # One TLS probe (the bare hostname) and one DNS probe.
+                assert instances.count(host) == 1, (host, instances)
+                assert instances.count(f"{host} (AAAA)") == 1, (host, instances)
+
+            # The WireGuard endpoint is the opposite shape: no TLS probe at all
+            # (grey-cloud, nothing terminates TLS behind it) and both address
+            # families probed. The A record is the one an IPv4-only client needs
+            # and the one that did not exist while the line was DS-Lite, so it
+            # is pinned here rather than left to the eval assertion alone.
+            assert instances.count("vpn.mauderer.work (A)") == 1, instances
+            assert instances.count("vpn.mauderer.work (AAAA)") == 1, instances
+            assert "vpn.mauderer.work" not in instances, instances
+
             assert not any(i.startswith("127.0.0.1:9115") for i in instances), instances
+
+            # The endpoint's A-record module is loadable, the same check the TLS
+            # module gets above: blackbox answers 400 for a module it does not
+            # know, so `curl -f` succeeding is the assertion. It cannot resolve
+            # anything in the VM, so the probe's own result is not asserted on.
+            dns = machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9115/probe"
+                "?module=dns_vpn_mauderer_work_a&target=1.1.1.1:53'"
+            )
+            assert "probe_success" in dns, dns
           '';
         };
 
