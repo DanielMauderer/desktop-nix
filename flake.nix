@@ -293,6 +293,32 @@
             assertion = !cfg.services.homeServerTelemetry.enable || cfg.services.homeServerClient.enable;
           }
           {
+            # WireGuard resolves `Endpoint` once, at interface-up, and then keeps
+            # sending to that address — so a host pointed at a *name* behind the
+            # server's dynamic WAN address silently strands itself after every
+            # ISP reconnect. home-server-client.nix adds a re-resolve timer for
+            # exactly that case, and deliberately not for the other: a host that
+            # tunnels to an address literal (the desktop, on the server's LAN)
+            # has nothing to resolve, and the unit would be a timer waking every
+            # minute to do nothing. Stated as an equivalence so neither half can
+            # drift — including the desktop keeping the config it has today.
+            name = "wg0 endpoint re-resolve timer exists exactly for hostname endpoints";
+            assertion =
+              !cfg.services.homeServerClient.enable
+              || (
+                let
+                  inherit (cfg.services.homeServerClient) endpoint;
+                  # POSIX ERE, as in home-server-client.nix: `[[]`/`[]]` rather
+                  # than `\[`/`\]`, which builtins.match rejects outright.
+                  isLiteral =
+                    builtins.match "[0-9]+(\\.[0-9]+){3}:[0-9]+" endpoint != null
+                    || builtins.match "[[][0-9a-fA-F:]+[]]:[0-9]+" endpoint != null;
+                in
+                (cfg.systemd.timers ? wg0-reresolve) != isLiteral
+                && (cfg.systemd.services ? wg0-reresolve) != isLiteral
+              );
+          }
+          {
             # telemetry.nix's exposure claim: the data path is entirely outbound.
             # The client pushes (`remote_write`) and never serves — no exporter
             # listener to admit, and no `receive_http`, which is the server's half
@@ -387,6 +413,47 @@
           {
             name = "WireGuard UDP port open on the WAN";
             assertion = builtins.elem 51820 cfg.networking.firewall.allowedUDPPorts;
+          }
+          {
+            # The endpoint record is the only way a roaming client finds the
+            # box, and every property of it is one flag away from being wrong in
+            # a way nothing on the server would notice. Unproxied, because
+            # Cloudflare's edge does not carry UDP; dual-stack, because an
+            # IPv4-only client (mobile data, hotel wifi) has no other way to
+            # reach it and an AAAA-only record simply strands it; and separate
+            # from the proxied instance, which stays AAAA-only on purpose.
+            name = "the WireGuard endpoint record is published unproxied on both address families";
+            assertion =
+              let
+                unit = cfg.systemd.services.cloudflare-dyndns-vpn or null;
+                script = unit.script or "";
+              in
+              unit != null
+              && lib.hasInfix "-4 -6 vpn.mauderer.work" script
+              && !(lib.hasInfix "--proxied" script)
+              # …and the proxied instance is still the AAAA-only one, so the two
+              # records cannot quietly swap roles.
+              && cfg.services.cloudflare-dyndns.proxied
+              && !cfg.services.cloudflare-dyndns.ipv4
+              && cfg.services.cloudflare-dyndns.ipv6;
+          }
+          {
+            # A stalled updater on either family is invisible from inside the
+            # box — the tunnel keeps working for whoever is already connected —
+            # so the public-resolver probes are the only signal. Both record
+            # types have to be asked for by name: one module querying AAAA
+            # would pass happily while the A record does not exist at all,
+            # which is precisely the state that leaves IPv4-only clients out.
+            name = "both records of the WireGuard endpoint are probed against a public resolver";
+            assertion =
+              let
+                conf = builtins.readFile cfg.services.prometheus.exporters.blackbox.configFile;
+                jobs = map (j: j.job_name) cfg.services.prometheus.scrapeConfigs;
+              in
+              lib.hasInfix "dns_vpn_mauderer_work_a:" conf
+              && lib.hasInfix "dns_vpn_mauderer_work_aaaa:" conf
+              && builtins.elem "probe-dns-vpn-mauderer-work-a" jobs
+              && builtins.elem "probe-dns-vpn-mauderer-work-aaaa" jobs;
           }
           {
             name = "reverse-proxy HTTP/HTTPS (80/443) open on the WAN";
@@ -2935,10 +3002,37 @@
             # exporter. For the TLS and DNS jobs every target string is
             # identical (127.0.0.1:443 / the resolver), so this is also what
             # keeps the two public hosts from collapsing into one series.
+            #
+            # A DNS instance carries its record type, because a name can be
+            # probed for more than one: the uptime dashboard legends on
+            # `instance` alone, so vpn.mauderer.work's two probes would
+            # otherwise render as two identically-labelled rows.
             instances = sorted(t["labels"]["instance"] for t in probes)
             for host in ["ntfy.mauderer.work", "git.mauderer.work"]:
-                assert instances.count(host) == 2, (host, instances)
+                # One TLS probe (the bare hostname) and one DNS probe.
+                assert instances.count(host) == 1, (host, instances)
+                assert instances.count(f"{host} (AAAA)") == 1, (host, instances)
+
+            # The WireGuard endpoint is the opposite shape: no TLS probe at all
+            # (grey-cloud, nothing terminates TLS behind it) and both address
+            # families probed. The A record is the one an IPv4-only client needs
+            # and the one that did not exist while the line was DS-Lite, so it
+            # is pinned here rather than left to the eval assertion alone.
+            assert instances.count("vpn.mauderer.work (A)") == 1, instances
+            assert instances.count("vpn.mauderer.work (AAAA)") == 1, instances
+            assert "vpn.mauderer.work" not in instances, instances
+
             assert not any(i.startswith("127.0.0.1:9115") for i in instances), instances
+
+            # The endpoint's A-record module is loadable, the same check the TLS
+            # module gets above: blackbox answers 400 for a module it does not
+            # know, so `curl -f` succeeding is the assertion. It cannot resolve
+            # anything in the VM, so the probe's own result is not asserted on.
+            dns = machine.succeed(
+                "curl -fsS 'http://127.0.0.1:9115/probe"
+                "?module=dns_vpn_mauderer_work_a&target=1.1.1.1:53'"
+            )
+            assert "probe_success" in dns, dns
           '';
         };
 

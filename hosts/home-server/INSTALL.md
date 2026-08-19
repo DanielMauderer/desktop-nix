@@ -43,6 +43,17 @@ The secrets-first work is done and in git:
 - **sops master age key** is in the password manager.
 - **DNS:** `vpn.mauderer.work` must be a **DNS-only (grey-cloud)** Cloudflare
   record → the WAN IP. Cloudflare's proxy does not carry WireGuard's UDP/51820.
+  `cloudflare-ddns.nix` creates and refreshes **both the A and the AAAA** every
+  5 min, so neither has to be seeded by hand — but if a record already exists,
+  check the cloud icon next to it is grey. A proxied one silently breaks the VPN.
+- **Router:** inbound **UDP 51820 forwarded to this host on both address
+  families**. IPv6 goes through the FRITZ!Box's *exposed host* entry, which is
+  pinned to the interface ID in `ipv6-interface-id.nix`; IPv4 needs an ordinary
+  port-forward rule to the box's LAN address, and only works at all on a line
+  with a real public IPv4 (DS-Lite has none — that is what the A record and the
+  forwarding were both waiting on). The A record can be published and correct
+  while the forward is missing, which looks exactly like "the VPN is broken", so
+  verify both.
 
 ## 2. Boot the target into an installer
 
@@ -344,6 +355,23 @@ Worth knowing:
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
+- **VPN endpoint DNS.** `systemctl status cloudflare-dyndns-vpn` (and its
+  5-minute timer), then check what the world actually sees — asking a public
+  resolver, not this box's:
+  ```sh
+  dig +short A    vpn.mauderer.work @1.1.1.1    # the WAN IPv4
+  dig +short AAAA vpn.mauderer.work @1.1.1.1    # the WAN IPv6
+  ```
+  Both must answer, and the A must match `curl -s https://ipv4.icanhazip.com`
+  run on this box. An empty A is the state that leaves every IPv4-only client
+  outside unable to connect; the `probe-dns-vpn-mauderer-work-a` blackbox job
+  watches for it continuously and trips `hs-probe-failing` after 15 minutes.
+- **VPN reachability.** DNS being right does not mean the packets arrive — the
+  probes all run on this box (see `blackbox.nix`). Test from a network that is
+  genuinely outside, on each family: put a phone on mobile data (IPv4-only for
+  most carriers) and bring its tunnel up. If the handshake never completes while
+  the A record is correct, the missing piece is the router's IPv4 port-forward
+  for UDP 51820, not anything in this repo.
 - SSH reachable **only over the VPN** (port 22 closed on the WAN — there is no
   LAN fallback); from an enabled client `ssh home-server` has no TOFU prompt
   (host key pinned).

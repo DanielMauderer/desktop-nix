@@ -127,7 +127,34 @@ matters lives here; the rest is in the Nix code and `git log`.
   dynamic, so the record is refreshed every 5 min using a sops-held Cloudflare
   token scoped to the zone. Requires IPv6 privacy
   extensions off (`networking.tempAddresses = "disabled"`), otherwise the
-  discovered address is a rotating temporary one.
+  discovered address is a rotating temporary one. The proxied records stay
+  AAAA-only even now that the line has a public IPv4: Cloudflare's edge already
+  answers v4 visitors, so an A record there would only add a second *origin*
+  address, and the proxy would then be free to reach the origin over IPv4 —
+  which needs inbound 80/443 forwarded on v4 as well, or those names start
+  returning 522. That flip is one option (`ipv4 = true`) once the forwarding
+  exists and has been verified.
+- **The WireGuard endpoint record is grey-cloud and dual-stack (A + AAAA)** —
+  `vpn.mauderer.work`, published by a second `cloudflare-dyndns` instance with
+  its own cache. Grey-cloud because Cloudflare's proxy carries HTTP/S only and
+  would resolve the name to an edge address that drops UDP/51820; the flag is
+  per-run, so it cannot share the instance above. Dual-stack because the ISP now
+  hands out a real (still dynamic) IPv4 instead of DS-Lite, which is what makes
+  port forwarding possible at all — and an AAAA-only endpoint is invisible to
+  every IPv4-only client (mobile data, hotel and guest wifi), which is the larger
+  half of "the VPN is unreachable from outside". Both families come from one run,
+  so half a dual-stack endpoint fails the unit rather than quietly stranding one
+  set of clients, and `blackbox.nix` probes a public resolver for each record
+  separately.
+- **WireGuard clients re-resolve a hostname endpoint on a timer** —
+  `net/home-server-client.nix`. `Endpoint` is resolved once, when the interface
+  comes up, and the kernel then holds an address rather than a name: after an ISP
+  reconnect at the far end the tunnel is not "down" in any way wg-quick notices,
+  it is just silent. A 1-minute oneshot re-resolves and re-sets the endpoint, but
+  only when the peer's last handshake is older than 150 s — a healthy peer's
+  endpoint must not be touched, since WireGuard may have learned a better one
+  from the peer's own roaming. Only for hostname endpoints; a host tunnelling to
+  a literal (the desktop, on the server's LAN) gets no unit.
 - **Shared database = native `services.postgresql`, socket-only, pinned major** —
   home-server. One cluster for services added later rather than another embedded
   SQLite per service; it ships empty, and a service claims a database from its own
