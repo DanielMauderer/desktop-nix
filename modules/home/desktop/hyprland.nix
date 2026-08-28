@@ -50,9 +50,10 @@ let
   # Media/brightness keys must fire while the session is locked and repeat on
   # hold, matching the old binde/locked behaviour.
   mediaKey = bind' "{ locked = true, repeating = true }";
-  # Mouse binds (old `bindm`) are drag binds in the Lua API; `mouse:` in the key
-  # string is what marks them as mouse binds.
-  dragBind = bind' "{ drag = true }";
+  # Mouse binds (old `bindm`). `mouse = true` is what routes the bind through the
+  # pointer-button path; `{ drag = true }` parses but leaves the bind inert, so
+  # SUPER+drag falls through to the client's own titlebar drag.
+  dragBind = bind' "{ mouse = true }";
 
   direction = key: dir: bind "SUPER + ${key}" "hl.dsp.focus({ direction = ${lua dir} })";
   resize =
