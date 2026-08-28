@@ -45,6 +45,13 @@ in
     }
 
     {
+      # We make nixvim's nixpkgs input follow ours (one nixpkgs in the closure),
+      # so state the source explicitly rather than letting nixvim warn that its
+      # pinned default was overridden by the `follows`.
+      programs.nixvim.nixpkgs.source = inputs.nixpkgs;
+    }
+
+    {
       # Only the parsers actually used, not nixvim's default of *all* grammars
       # (~300 derivations added to every host closure).
       programs.nixvim.plugins.treesitter.grammarPackages =

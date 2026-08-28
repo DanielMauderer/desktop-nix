@@ -1,10 +1,13 @@
 { pkgs, ... }:
 {
+  programs.delta = {
+    enable = true;
+    enableGitIntegration = true;
+  };
+
   programs.git = {
     enable = true;
     package = pkgs.git;
-
-    delta.enable = true;
 
     settings = {
       user.name = "Daniel Mauderer";
