@@ -10,6 +10,7 @@ home-server, which gets the same shell and nothing else).
 | `fastfetch.nix`| fastfetch system info.                                         |
 | `lazygit.nix`  | lazygit (delta as the diff pager).                             |
 | `git.nix`      | git identity (Daniel Mauderer) + config, delta pager.          |
+| `jujutsu.nix`  | jj (jujutsu) VCS + `jjui` TUI — identity, stacked-branch setup. |
 
 `default.nix` also adds the CLI tools (eza, bat, fd, ripgrep, fzf, tree, btop,
 delta), the starship prompt (stylix-themed), zoxide fish integration, the

@@ -303,3 +303,12 @@ matters lives here; the rest is in the Nix code and `git log`.
   directly would mean exposing that browser to the VPN, which `metrics.nix` argues
   against. The cost is that "is this host awake" has no `up` to read and is
   answered by the age of its newest sample.
+
+- **jj is added alongside git, not in place of it.** `jujutsu.nix` configures jj
+  for colocated repos (`jj git init --colocate`), so `git.nix` still governs the
+  backend and lazygit keeps working on the same checkout; jj carries its own
+  identity because it does not read git's. Its `~/.config/jj/config.toml` is a
+  store symlink, so `jj config set --user` fails — the module is the place to
+  edit, and `~/.config/jj/conf.d/` the local escape hatch. The TUI is `jjui`
+  rather than `lazyjj` for its bookmark-move and interactive rebase targets,
+  which is what stacked branches actually need.

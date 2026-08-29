@@ -41,6 +41,7 @@ _: {
       gp = "git push";
       gl = "git log --oneline";
       lg = "lazygit";
+      lj = "jjui";
 
       # Directory navigation
       ".." = "cd ..";

@@ -6,6 +6,7 @@
     ./fastfetch.nix
     ./lazygit.nix
     ./git.nix
+    ./jujutsu.nix
   ];
 
   home = {
