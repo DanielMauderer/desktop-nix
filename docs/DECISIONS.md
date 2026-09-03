@@ -238,6 +238,16 @@ matters lives here; the rest is in the Nix code and `git log`.
   is rendered into the store. Every rule sets `noDataState = OK` — the default
   is `NoData`, which alerts on an absent series, and these rules are written so
   that absence *is* the healthy state.
+- **A unit that retries on its own is alerted on per retry interval, not after
+  ten minutes** — `alerts.nix`. `hs-unit-failed` excludes the self-retrying units
+  by name, and both `cloudflare-dyndns` instances (5-minute timer) and
+  `nixos-upgrade` (nightly) get a rule of their own asking "failed now, *and*
+  still failed one retry interval ago" with an `offset`. A failure the next run
+  clears is not something anyone can act on by the time the phone buzzes, and a
+  notification that is never actionable is one that trains the phone to be
+  ignored. The interval is in the query rather than in `for`, because a retry
+  passes through `activating` — where the failed series reads 0 — and that
+  resets Grafana's pending timer.
 - **Blackbox probes go to `127.0.0.1:443` with the real hostname as SNI, not to
   the public hostname** — `blackbox.nix`. Probing `https://ntfy.mauderer.work`
   from this box would depend on the router hairpinning, and would silently
