@@ -14,7 +14,9 @@
 # POSTs. It involves no scrape, no evaluation interval and no database, so it
 # still works when the observability stack is the thing that broke. The two are
 # complementary and the overlap (both can report a failed `nixos-upgrade`) is
-# deliberate.
+# deliberate — though no longer simultaneous: this half still pushes on the
+# first failed run, with the journal lines that say why, while the Grafana rule
+# waits to see whether the next night's run failed too.
 #
 # ## Why the credential is a password and not a token
 #
@@ -105,6 +107,71 @@ let
 
   ntfyUrl = "${ntfyLocal}/${alertTopic}?${ntfyParams}";
 
+  # Units that retry on a timer of their own, and are therefore carved out of
+  # the general `hs-unit-failed` rule below into rules of their own.
+  #
+  # The general rule reports a unit that has been failed for ten minutes, which
+  # is the right question for a unit that stays down until somebody fixes it.
+  # For a unit that has another go on its own it is the wrong one: the failure
+  # is over before it can be acted on, so every notification is stale by the
+  # time it arrives — and a notification that is never actionable is one the
+  # phone learns to ignore. What matters for these is whether the *retry* also
+  # failed, which is what the dedicated rules ask.
+  #
+  # Both lists are checked against the running config by an assertion in
+  # flake.nix: a name here that matches no unit would silently hand that unit
+  # back to the general rule, which is the noise these rules exist to remove.
+
+  # Every five minutes, from a timer (upstream's, and `startAt` on the second
+  # instance — see server/cloudflare-ddns.nix). A single failed run is the
+  # normal shape of the ISP dropping the line: the discovery service has no
+  # route, the run exits non-zero, and the run five minutes later publishes the
+  # new prefix and clears it.
+  dyndnsUnits = [
+    "cloudflare-dyndns.service"
+    "cloudflare-dyndns-vpn.service"
+  ];
+
+  # Daily, from `system.autoUpgrade` (core/updates.nix) with 45 minutes of
+  # jitter. One failed run is usually a transient upstream — a substituter
+  # timing out, a broken nixpkgs revision that the next lock bump moves past —
+  # and cannot be acted on before the next run anyway, since `allowReboot =
+  # false` means the fix is a rebuild rather than an intervention.
+  upgradeUnits = [ "nixos-upgrade.service" ];
+
+  retryingUnits = dyndnsUnits ++ upgradeUnits;
+
+  # A `name` selector for a set of units. `=~`/`!~` are anchored in RE2, so the
+  # alternation matches whole unit names.
+  #
+  # Escaped twice, and both halves are load-bearing. `escapeRegex` is for RE2,
+  # where an unescaped `.` matches any character; `escape [ "\\" ]` is for the
+  # PromQL string literal the regex is written inside, whose escape sequences
+  # follow Go's — a lone `\.` there is not a regex escape but a parse error,
+  # and a rule that fails to parse does not go quiet, it alerts
+  # (`execErrState = "Error"`).
+  unitsRe = names: lib.concatMapStringsSep "|" (n: lib.escape [ "\\" ] (lib.escapeRegex n)) names;
+
+  # "Failed now, and still failed one retry interval ago." Both halves read the
+  # same metric with the same selector, so the `and` matches label set for label
+  # set and the answer is per unit.
+  #
+  # The window is in the query rather than in `for`, because Grafana's pending
+  # timer is reset by any evaluation that returns no series — and each retry
+  # takes the unit through `activating`, where the failed series is 0. A `for`
+  # long enough to cover several retries would be reset by every one of them and
+  # the alert would never fire at all. An `offset` has no such state: it is two
+  # instant reads of the TSDB, so a retry in between is exactly what it is
+  # measuring rather than something that resets it.
+  sustainedFailure =
+    { units, offset }:
+    let
+      failed =
+        suffix:
+        ''node_systemd_unit_state{job="node",state="failed",name=~"${unitsRe units}"}${suffix} == 1'';
+    in
+    "(${failed ""}) and (${failed " offset ${offset}"})";
+
   # Every rule is one instant PromQL query whose *presence* is the alert. There
   # is no threshold expression anywhere below, because each `expr` is written so
   # that it returns no series at all when things are fine — `up == 0` matches
@@ -124,6 +191,7 @@ let
       title,
       expr,
       for ? "10m",
+      window ? 600,
       summary,
     }:
     {
@@ -134,9 +202,11 @@ let
           refId = "A";
           # The window only has to cover one scrape interval (30s) for an
           # instant query; 10 minutes leaves room for a target that scrapes
-          # slowly without changing what is evaluated.
+          # slowly without changing what is evaluated. A query that reaches
+          # further back with `offset` passes its own `window` rather than
+          # relying on that slack.
           relativeTimeRange = {
-            from = 600;
+            from = window;
             to = 0;
           };
           datasourceUid = "prometheus";
@@ -175,10 +245,53 @@ let
       # which is the outcome the push design exists to avoid. Every rule below
       # that reads a node/smartctl metric is pinned for the same reason; the
       # dashboards in dashboards/ are pinned to match.
+      #
+      # `name!~` excludes the self-retrying units; the two rules after this one
+      # are their replacement, and the exclusion is what keeps this rule from
+      # firing first and making them pointless.
       uid = "hs-unit-failed";
       title = "systemd unit failed";
-      expr = "node_systemd_unit_state{job=\"node\",state=\"failed\"} == 1";
+      expr = ''node_systemd_unit_state{job="node",state="failed",name!~"${unitsRe retryingUnits}"} == 1'';
       summary = "{{ $labels.name }} is in the failed state.";
+    }
+    {
+      # An hour is twelve retries. Nothing transient survives that: either the
+      # line is still down or the token has been revoked, and both are worth
+      # knowing about because the AAAA records are stale from here on — the
+      # wildcard is the origin behind Cloudflare's proxy and `vpn.` is the
+      # WireGuard endpoint, so a prefix change that never gets published takes
+      # the VPN out with it.
+      uid = "hs-dyndns-unit-failed";
+      title = "Dynamic DNS has been failing for an hour";
+      expr = sustainedFailure {
+        units = dyndnsUnits;
+        offset = "1h";
+      };
+      window = 3600 + 600;
+      # The timeframe is the query's, not a pending window's; see the comment on
+      # `sustainedFailure`.
+      for = "0s";
+      summary = "{{ $labels.name }} has been failed for an hour. It retries every 5 minutes, so this is not a blip — the published AAAA records are stale.";
+    }
+    {
+      # A day is one retry. Offset by 24h rather than the 24h45m the jitter
+      # allows for: the run itself sits in `activating` for as long as it takes
+      # to build, so by the time the second failure lands the sample a day back
+      # is comfortably inside the first failure rather than near its edge.
+      #
+      # This is the short-horizon half of a pair. `hs-nixpkgs-stale` is the
+      # other: it catches an update pipeline that has stopped moving for a week
+      # regardless of *why* — including the case where nothing fails because
+      # nothing runs.
+      uid = "hs-upgrade-unit-failed";
+      title = "System upgrade has failed two nights running";
+      expr = sustainedFailure {
+        units = upgradeUnits;
+        offset = "24h";
+      };
+      window = 86400 + 600;
+      for = "0s";
+      summary = "{{ $labels.name }} failed again after a day. The nightly update has stopped landing, so the box is no longer picking up the lock bumps.";
     }
     {
       uid = "hs-root-filling";

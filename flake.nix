@@ -836,6 +836,46 @@
               !(builtins.any unscoped exprs);
           }
           {
+            # The retry-aware half of the same rule. `hs-unit-failed` excludes
+            # by name every unit that retries on its own timer, and one rule per
+            # retry interval asks the narrower question ("failed now, and still
+            # failed one interval ago") instead. Two ways that goes wrong and
+            # neither is visible at runtime: a name in the exclusion that
+            # matches no unit on this host, and an exclusion that drifts from
+            # the set the dedicated rules cover — which hands the unit back to
+            # the ten-minute rule and restores exactly the noise the split
+            # removed. Both are checked by reading the names back out of the
+            # generated PromQL, since that is where they end up.
+            name = "the retry-aware unit rules name real units and match the general rule's exclusion";
+            assertion =
+              let
+                rules = lib.concatMap (g: g.rules) (
+                  cfg.services.grafana.provision.alerting.rules.settings.groups or [ ]
+                );
+                exprsOf = r: map (d: d.model.expr or "") r.data;
+                unitRules = lib.filter (r: builtins.any (lib.hasInfix "node_systemd_unit_state") (exprsOf r)) rules;
+                # `name!~"a\\.service|b\\.service"` -> [ "a.service" "b.service" ].
+                # The names are escaped once for RE2 and again for the
+                # PromQL string literal around it, so dropping the
+                # backslash pairs is what undoes both.
+                namesIn =
+                  op: e:
+                  let
+                    m = builtins.match ''.*name${op}"([^"]+)".*'' e;
+                  in
+                  lib.optionals (m != null) (
+                    map (lib.replaceStrings [ "\\\\" ] [ "" ]) (lib.splitString "|" (lib.head m))
+                  );
+                gather = op: lib.unique (lib.concatMap (r: lib.concatMap (namesIn op) (exprsOf r)) unitRules);
+                excluded = gather "!~";
+                covered = gather "=~";
+                exists = n: builtins.hasAttr (lib.removeSuffix ".service" n) cfg.systemd.services;
+              in
+              covered != [ ]
+              && lib.all exists covered
+              && lib.sort (a: b: a < b) excluded == lib.sort (a: b: a < b) covered;
+          }
+          {
             # Same shape as the Grafana and Paperless rules below: admitted on
             # the tunnel interface only, with "WAN TCP surface is exactly 80/443"
             # as the other half. The ingest is unauthenticated, so the interface
@@ -2601,6 +2641,15 @@
                 machine.succeed(grafana_api("/api/v1/provisioning/alert-rules"))
             )
             assert len(rules) >= 10, rules
+            # The retry-aware split. A missing uid here means the units
+            # that retry on their own timer have fallen back to the
+            # ten-minute rule, which is the noise the split removed.
+            uids = {r["uid"] for r in rules}
+            assert {
+                "hs-unit-failed",
+                "hs-dyndns-unit-failed",
+                "hs-upgrade-unit-failed",
+            } <= uids, uids
             # Grafana's default is NoData, which *alerts* when a series is
             # absent — and absence is the healthy state for every rule here by
             # construction, so the default would make the whole group fire
