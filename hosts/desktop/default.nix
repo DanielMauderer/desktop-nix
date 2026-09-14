@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ config, lib, pkgs, ... }:
 {
   imports = [
     ../../modules/nixos/base
@@ -42,8 +42,74 @@
     };
   };
 
-  # Dual-head desktop; mkBefore so it matches ahead of the laptop-internal fallback.
+  # The Vega HDMI codec drives both heads (pin 0x3 = Acer on DP-3, pin 0xb = the
+  # Samsung QBQ90S on DP-1), but PipeWire's ALSA card profiles only ever activate
+  # one HDMI pin at a time — picking the TV silently took the monitor's sink away.
+  # The codec has an independent converter per pin, so both PCMs can run at once.
+  # Keep the card profile (Acer, with ELD/route handling) and bolt the TV on as a
+  # second static node, so both show up as separate selectable outputs.
+  #
+  # Caveat: a static node ignores ELD, so this sink exists and swallows audio even
+  # when the TV is off. "10" is the PCM for pin 0xb — it changes if the TV moves to
+  # another port (check `aplay -l`). `hw:HDMI` not `hw:0`: the card index moves.
+  services.pipewire.extraConfig.pipewire."91-hdmi-split".context.objects = [
+    {
+      factory = "adapter";
+      args = {
+        "factory.name" = "api.alsa.pcm.sink";
+        "node.name" = "alsa_output.hdmi-samsung-tv";
+        "node.description" = "Samsung TV (HDMI)";
+        "media.class" = "Audio/Sink";
+        "api.alsa.path" = "hw:HDMI,10";
+        "audio.channels" = 2;
+        "audio.position" = [
+          "FL"
+          "FR"
+        ];
+      };
+    }
+  ];
+
+  # Desktop head layout; mkBefore so these match ahead of the laptop-internal
+  # fallback. kanshi needs a profile per *exact* set of connected outputs, hence
+  # the separate desktop+tv one — without it nothing matched while the TV was
+  # plugged in and Hyprland fell back to its auto left-to-right placement.
   home-manager.users.maudi.services.kanshi.settings = lib.mkBefore [
+    {
+      profile = {
+        name = "desktop+tv";
+        outputs = [
+          {
+            criteria = "DP-3"; # Acer XF272U, 27" 1440p
+            mode = "2560x1440@144";
+            position = "0,0";
+          }
+          {
+            criteria = "DP-2"; # Acer G276HL, 27" 1080p
+            mode = "1920x1080@60";
+            position = "2560,0";
+          }
+          {
+            criteria = "DP-1"; # Samsung QBQ90S, geometry comes from the mirror below
+            status = "enable";
+          }
+        ];
+        # kanshi cannot mirror, so the TV is pointed at DP-3 from Hyprland. 0.56 is
+        # Lua-only and dropped `hyprctl keyword monitor` ("unknown request"), so
+        # this goes through the Lua API. 2560x1440 is in the TV's mode list, which
+        # makes the mirrored image 1:1 instead of letterboxed inside 4K.
+        #
+        # A script, not an inline exec line: kanshi re-escapes quotes and spaces
+        # for sh(1), and hyprctl then mangles the resulting Lua table literal.
+        # It only sets runtime state: a Hyprland config reload drops the mirror
+        # until the next topology change re-fires this.
+        exec = toString (
+          pkgs.writeShellScript "kanshi-mirror-tv" ''
+            exec ${config.programs.hyprland.package}/bin/hyprctl eval 'hl.monitor{output="DP-1",mode="2560x1440@60",position="auto",scale=1,mirror="DP-3"}'
+          ''
+        );
+      };
+    }
     {
       profile = {
         name = "desktop";

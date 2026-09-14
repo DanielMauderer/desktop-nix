@@ -1,4 +1,5 @@
-# kanshi applies the first profile whose outputs are all connected. Host-specific
+# kanshi applies the first profile whose outputs exactly match the connected set
+# (every profile output connected, and no extra output connected). Host-specific
 # multi-output profiles live in hosts/<name>/ and are mkBefore-prepended so they
 # match before this generic single-panel fallback.
 _: {
