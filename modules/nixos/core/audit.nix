@@ -1,4 +1,11 @@
-_: {
+{ config, lib, ... }:
+let
+  plugins = config.security.auditd.plugins;
+  rootOwned = {
+    mode = "0640";
+  };
+in
+{
   security = {
     auditd.enable = true;
     audit.enable = true;
@@ -24,6 +31,19 @@ _: {
     ];
   };
 
+  # auditd 4.2 refuses any config file it does not see as root-owned and
+  # group/other-unwritable. The NixOS module links them straight into the store,
+  # which is root-owned on real hardware but not through the virtiofs store
+  # export in nixosTests. A `mode` turns each entry into a real root:root copy
+  # in /etc, which satisfies the check everywhere.
+  environment.etc = {
+    "audit/auditd.conf" = rootOwned;
+  }
+  // lib.mapAttrs' (n: _: lib.nameValuePair "audit/plugins.d/${n}.conf" rootOwned) plugins
+  // lib.mapAttrs' (n: _: lib.nameValuePair "audit/audisp-${n}.conf" rootOwned) (
+    lib.filterAttrs (_: v: v.settings != null) plugins
+  );
+
   # Persist the journal across reboots ("auto" is fragile on a fresh install).
-  services.journald.storage = "persistent";
+  services.journald.settings.Journal.Storage = "persistent";
 }

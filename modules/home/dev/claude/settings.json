@@ -11,18 +11,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/clippy-stop.sh",
-            "timeout": 180,
-            "statusMessage": "Running pedantic clippy…"
-          }
-        ]
-      }
     ]
   },
   "statusLine": {
