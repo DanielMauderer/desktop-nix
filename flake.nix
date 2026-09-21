@@ -1876,9 +1876,13 @@
                   assertion = cfg.virtualisation.waydroid.enable;
                 }
                 {
-                  name = "kanshi: dual-head profile before fallback";
+                  # Order is load-bearing: kanshi takes the first profile whose
+                  # outputs exactly match, so the three-head TV profile precedes
+                  # the two-head one, and the single-panel fallback stays last.
+                  name = "kanshi: TV and dual-head profiles before fallback";
                   assertion =
                     kanshiProfileNames cfg == [
+                      "desktop+tv"
                       "desktop"
                       "laptop-internal"
                     ];
