@@ -1,41 +1,19 @@
-# Global language toolchains (daily drivers + the neovim LSP/treesitter stack);
-# everything pinned goes in per-project devShells via direnv/nix-direnv.
+# Per-user dev environment. Deliberately holds **no language toolchain**: a
+# global cargo/go/node/python/cc silently shadows the one a project pins, and
+# which copy wins is invisible at the prompt. Toolchains come from the project's
+# own flake devShell, loaded on `cd` by direnv.
 { pkgs, ... }:
 {
   imports = [ ./claude.nix ];
 
   home.packages = with pkgs; [
-    # Rust
-    cargo
-    rustc
-    rustfmt
-    clippy
-    cargo-nextest
-    bacon # background cargo check/clippy/test watcher
-
-    # Go
-    go
-
-    # Node
-    nodejs
-
-    # Python
-    python3
-    uv
-
-    # C toolchain
-    gcc
-    gnumake
-
-    # Git tooling
-    git-spice # `gs` — stacked-PR workflow
     gh
-
     claude-code
   ];
 
-  # Per-project devShells load automatically on `cd` (fish integration is
-  # wired because programs.fish is enabled).
+  # The only thing that puts a toolchain on PATH: per-project devShells, loaded
+  # automatically on `cd` (fish integration is wired because programs.fish is
+  # enabled).
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
