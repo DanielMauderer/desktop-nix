@@ -16,14 +16,16 @@
 - System packages: add to the relevant module under `~/desktop-nix/modules/nixos/`,
   then `sudo nixos-rebuild switch --flake ~/desktop-nix` (the `update` alias).
 - User CLI tools: home-manager modules under `~/desktop-nix/modules/home/`.
-- Per-project toolchains: Nix devShells + direnv. Scaffold one with
-  `nix flake init -t ~/desktop-nix#<rust|go|node|python>` then `direnv allow`.
-- GUI apps: Flatpak (`flatpak install`).
+- Per-project toolchains: **always** a Nix devShell + direnv, never a global
+  install. Add a `flake.nix` with the toolchain in `mkShell` and an `.envrc`
+  containing `use flake`, then `direnv allow`. Nothing language-specific
+  (cargo, go, node, python, cc) is on the global PATH — by design, so a
+  project's pinned version can never be shadowed.
 
 ## Dev Environment
 - Editor: Neovim (configured declaratively with nixvim in `modules/home/neovim/`)
-- Version control UI: Neogit / fugitive inside Neovim; lazygit (`lg`)
-- Rust watcher: `bacon` (run in a split or via the `cw` alias)
+- Version control UI: Neogit / fugitive inside Neovim; lazygit (`lg`); jj +
+  jjui (`lj`) for stacked branches
 - Containers: Podman (aliased as `docker`)
 - Primary language: Rust
 

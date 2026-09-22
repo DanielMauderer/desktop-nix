@@ -1631,42 +1631,6 @@
             ])
             ++ preCommitCheck.enabledPackages;
         };
-
-        # Per-language project shells. `nix develop ~/desktop-nix#rust`, or
-        # scaffold with `nix flake init -t ~/desktop-nix#rust`.
-        rust = pkgs.mkShell {
-          packages = with pkgs; [
-            cargo
-            rustc
-            rustfmt
-            clippy
-            cargo-nextest
-            bacon
-            rust-analyzer
-          ];
-        };
-        go = pkgs.mkShell {
-          packages = with pkgs; [
-            go
-            gopls
-            gotools
-            gofumpt
-          ];
-        };
-        node = pkgs.mkShell {
-          packages = with pkgs; [
-            nodejs
-            typescript-language-server
-          ];
-        };
-        python = pkgs.mkShell {
-          packages = with pkgs; [
-            python3
-            uv
-            ruff
-            python3Packages.python-lsp-server
-          ];
-        };
       };
 
       checks.${system} = {
@@ -1702,48 +1666,6 @@
             }
             ''
               find ${./.} -name '*.nix' -print0 | xargs -0 nixfmt --check
-              touch $out
-            '';
-
-        # Dev devShell smoke checks: each toolchain compiles/runs a trivial
-        # hello-world offline, so a broken per-language shell fails the check.
-        dev-node-check = pkgs.runCommand "dev-node-check" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
-          node -e 'process.exit(0)'
-          touch $out
-        '';
-
-        dev-python-check = pkgs.runCommand "dev-python-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
-          python3 -c 'assert 1 + 1 == 2'
-          touch $out
-        '';
-
-        dev-go-check = pkgs.runCommand "dev-go-check" { nativeBuildInputs = [ pkgs.go ]; } ''
-          export HOME="$TMPDIR" GOCACHE="$TMPDIR/go-cache" GOPROXY=off GOFLAGS=-mod=mod
-          cat > hello.go <<'EOF'
-          package main
-          import "fmt"
-          func main() { fmt.Println("hello") }
-          EOF
-          go run hello.go
-          touch $out
-        '';
-
-        dev-rust-check =
-          pkgs.runCommand "dev-rust-check"
-            {
-              nativeBuildInputs = [
-                pkgs.cargo
-                pkgs.rustc
-                pkgs.cargo-nextest
-                pkgs.gcc # cc — rustc needs a linker to build the test binary
-              ];
-            }
-            ''
-              export HOME="$TMPDIR" CARGO_HOME="$TMPDIR/cargo"
-              # `cargo new --lib` ships a passing `it_works` test; just build+run it.
-              cargo new --lib --vcs none hello
-              cd hello
-              cargo nextest run --offline
               touch $out
             '';
 
@@ -3201,26 +3123,5 @@
       };
 
       nixosConfigurations = hosts;
-
-      # devShell templates for `nix flake init -t ~/desktop-nix#<lang>`. Each
-      # drops a flake.nix + .envrc (`use flake`) so direnv loads the toolchain.
-      templates = {
-        rust = {
-          path = ./templates/rust;
-          description = "Rust devShell (cargo, clippy, nextest, bacon, rust-analyzer)";
-        };
-        go = {
-          path = ./templates/go;
-          description = "Go devShell (go, gopls, gotools, gofumpt)";
-        };
-        node = {
-          path = ./templates/node;
-          description = "Node devShell (nodejs LTS + typescript-language-server)";
-        };
-        python = {
-          path = ./templates/python;
-          description = "Python devShell (python3, uv, ruff, python-lsp-server)";
-        };
-      };
     };
 }

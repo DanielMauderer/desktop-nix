@@ -1,35 +1,41 @@
 # dev
 
-Per-user dev environment — wired in by `base` on every workstation. Replaces the
-old Silverblue `dev-tools` toolbox with nix-native tooling. This module owns the
-**language toolchains**; the `neovim` module keeps only editor tooling (LSP,
-formatters, DAP). They always load together.
+Per-user dev environment — wired in by `base` on every workstation. It owns
+`gh`, `claude-code`, direnv, and the personal Claude Code config.
 
-| File         | Configures                                                        |
-|--------------|------------------------------------------------------------------|
-| `default.nix`| Global toolchains: Rust (`cargo rustc rustfmt clippy` + `cargo-nextest`, `bacon`), Go, Node (LTS), Python (`python3` + `uv`), C (`gcc gnumake`), git tooling (`git-spice`, `gh`), `claude-code`; plus direnv + nix-direnv. |
-| `claude.nix` | Links the personal Claude config (`claude/`) into `~/.claude`.    |
+It deliberately owns **no language toolchain**. The `neovim` module keeps editor
+tooling (LSP, formatters, DAP) on Neovim's own wrapper PATH; everything else
+comes from the project you are standing in.
+
+| File         | Configures                                                      |
+|--------------|-----------------------------------------------------------------|
+| `default.nix`| `gh`, `claude-code`, and direnv + nix-direnv.                    |
+| `claude.nix` | Links the personal Claude config (`claude/`) into `~/.claude`.   |
 
 ## Where tools come from
 
-- **Global daily drivers** — always on PATH (this module).
-- **Editor tooling** (LSP/formatters/DAP) — `modules/home/neovim`.
+- **Per-project, pinned** — Nix devShells via direnv. The only source of a
+  compiler, interpreter or package manager.
+- **Editor tooling** (LSP/formatters/DAP) — `modules/home/neovim`, on nvim's
+  wrapper PATH only.
 - **Containers** — Podman (`modules/nixos/dev`), `docker` shim + `podman-compose`.
-- **Per-project, pinned** — Nix devShells via direnv.
 
-## Project devshells (replaces `toolbox enter`)
+## No global toolchains
 
-```fish
-cd my-project
-nix flake init -t ~/desktop-nix#rust   # or #go / #node / #python
-direnv allow                            # loads the toolchain on cd, every time
-```
-Or without scaffolding: `nix develop ~/desktop-nix#rust`. To add a tool
-*everywhere*, edit the module and rebuild; for a one-off use `nix shell nixpkgs#<pkg>`.
+There is no global `cargo`, `go`, `node`, `python3` or `cc`. A global copy
+shadows the version a project pins, and PATH order decides which one wins with
+nothing at the prompt to say so — debugging that is why they were removed.
+
+Give a project its own `flake.nix` with the toolchain in `mkShell`, plus an
+`.envrc` containing `use flake`, then `direnv allow`; direnv loads it on `cd`,
+every time. For a genuine one-off, `nix shell nixpkgs#<pkg>`.
 
 ## Claude Code
 
 `claude/` is linked as individual files into `~/.claude` (`settings.json`,
-`statusline.sh`, `CLAUDE.md`, `hooks/`, `commands/`); the rest of `~/.claude` stays
-writable machine-local state. The rustfmt PostToolUse hook and the clippy Stop
-hook use the Rust toolchain on PATH. Edit the tracked files and rebuild to change it.
+`CLAUDE.md`); the rest of `~/.claude` stays writable machine-local state. Edit
+the tracked files and rebuild to change it.
+
+Nothing here registers hooks: a hook lives in the global config but fires in
+every project, so a Rust formatter runs in an Angular repo. Anything
+language-specific belongs in that repo's own `.claude/`.

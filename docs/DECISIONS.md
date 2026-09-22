@@ -50,6 +50,15 @@ matters lives here; the rest is in the Nix code and `git log`.
   image. `theme-sync-wallpaper` copies Noctalia's chosen wallpaper to the stylix
   source and rebuilds, so both track one picture without runtime file collisions.
 
+## Dev environment
+- **No language toolchain is installed globally** — no `cargo`, `go`, `node`,
+  `python3` or `cc` on the interactive PATH. Every toolchain comes from the
+  project's own flake devShell via direnv, because a global copy silently
+  shadows the version a project pins and PATH order decides the winner with
+  nothing at the prompt to say which. The per-language devShells and `nix flake
+  init` templates this repo used to export went with them: unused once every
+  repo carried its own flake.
+
 ## Editor
 - **Neovim is declarative via nixvim** (revises the earlier "keep lazy.nvim as-is"
   choice): no Lua files or runtime plugin clones, plugins from nixpkgs, look/feel
@@ -311,4 +320,5 @@ matters lives here; the rest is in the Nix code and `git log`.
   store symlink, so `jj config set --user` fails — the module is the place to
   edit, and `~/.config/jj/conf.d/` the local escape hatch. The TUI is `jjui`
   rather than `lazyjj` for its bookmark-move and interactive rebase targets,
-  which is what stacked branches actually need.
+  which is what stacked branches actually need. `git-spice` was retired when jj
+  took over that job — two stacking tools for one workflow is one too many.

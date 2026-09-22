@@ -13,20 +13,8 @@ _: {
 
       docker = "podman";
 
-      # npm / nx
-      nf = "npm run format";
-      nl = "npm run lint";
-      nt = "npm run test";
-      nx = "npx nx";
-
-      # Rust / cargo
-      cb = "cargo build";
-      cbr = "cargo build --release";
-      cch = "cargo check"; # not 'cc' — avoid shadowing the C compiler
-      ck = "cargo clippy --all-targets";
-      ct = "cargo nextest run";
-      cr = "cargo run";
-      cw = "bacon"; # background cargo check/clippy/test watcher
+      # No language-specific aliases (cargo, npm, …): those tools only exist
+      # inside a project's devShell, so the aliases belong there too.
 
       # System management. Rebuilds from the local flake checkout, host by hostname.
       update = "sudo nixos-rebuild switch --flake ~/desktop-nix";
@@ -35,7 +23,6 @@ _: {
       suspend = "systemctl suspend";
 
       # Git
-      gs = "git-spice";
       ga = "git add";
       gc = "git checkout";
       gp = "git push";
