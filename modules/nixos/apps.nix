@@ -27,5 +27,6 @@
     inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
     pkgs.mpv
     pkgs.imv
+    pkgs.imhex
   ];
 }
