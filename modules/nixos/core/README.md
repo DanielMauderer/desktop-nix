@@ -6,6 +6,7 @@ The machine-agnostic baseline, imported by **every** host (workstations via
 | File            | Configures                                                       |
 |-----------------|-----------------------------------------------------------------|
 | `boot.nix`      | systemd-boot, ESP at `/boot`, generation retention.             |
+| `firmware.nix`  | fwupd/LVFS device firmware updates (applied manually).           |
 | `locale.nix`    | Timezone, locale, console.                                       |
 | `networking.nix`| NetworkManager, hostname plumbing.                              |
 | `nix.nix`       | Flakes, nix settings, GC, substituters/caches.                  |

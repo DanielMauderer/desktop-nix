@@ -233,6 +233,10 @@
           assertion = cfg.networking.firewall.enable;
         }
         {
+          name = "fwupd enabled for device firmware updates";
+          assertion = cfg.services.fwupd.enable;
+        }
+        {
           name = "auditd enabled for security-event logging";
           assertion = cfg.security.auditd.enable && cfg.security.audit.enable;
         }

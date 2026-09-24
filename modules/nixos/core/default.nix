@@ -2,6 +2,7 @@ _: {
   imports = [
     ./audit.nix
     ./boot.nix
+    ./firmware.nix
     ./hardening.nix
     ./locale.nix
     ./networking.nix
