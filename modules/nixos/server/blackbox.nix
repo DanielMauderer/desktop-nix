@@ -31,9 +31,16 @@
 #     without depending on DNS or on the router hairpinning. If a proxy host is
 #     misconfigured in NPM's UI (which is where proxy hosts live — they are not
 #     in Nix), this is what notices.
-#   * **DNS.** cloudflare-ddns.nix republishes the box's IPv6 into Cloudflare
-#     every five minutes. Asking a public resolver for the record is how a
-#     stalled updater becomes visible; nothing else here would show it.
+#   * **DNS.** cloudflare-ddns.nix republishes the box's public addresses into
+#     Cloudflare every five minutes. Asking a public resolver for the record is
+#     how a stalled updater becomes visible; nothing else here would show it.
+#     This is the closest thing here to a check on VPN reachability: the
+#     WireGuard endpoint `vpn.mauderer.work` is probed for **both A and AAAA**,
+#     because it is the one name with no proxy in front of it — if either record
+#     is missing or stale, clients on that address family cannot even work out
+#     where to send the handshake, and nothing on this box would notice. It is
+#     still only the DNS half; whether UDP 51820 actually arrives needs a prober
+#     somewhere else, per the caveat above.
 #
 # ## Certificate verification is real here
 #
@@ -57,6 +64,38 @@ let
     "ntfy.mauderer.work" # ntfy.nix
     "git.mauderer.work" # forgejo.nix
   ];
+
+  # The WireGuard endpoint. Not in `publicHosts`: it is a grey-cloud (DNS-only)
+  # record with nothing terminating TLS behind it, so it gets DNS probes and no
+  # HTTP/TLS probe. Literal, in sync with cloudflare-ddns.nix and
+  # net/home-server-client.nix.
+  vpnHost = "vpn.mauderer.work";
+
+  # Which record types each name has to resolve to. The proxied names are
+  # AAAA-only (cloudflare-ddns.nix publishes no A for them, deliberately); the
+  # endpoint is dual-stack, and both halves matter — an IPv4-only client can
+  # only find it through the A record, an IPv6 one only through the AAAA, so a
+  # single missing record silently strands one set of clients.
+  dnsChecks =
+    map (host: {
+      inherit host;
+      type = "AAAA";
+    }) publicHosts
+    ++ [
+      {
+        host = vpnHost;
+        type = "A";
+      }
+      {
+        host = vpnHost;
+        type = "AAAA";
+      }
+    ];
+
+  # A name/type pair identifies a DNS probe: `vpn.mauderer.work` needs two
+  # modules and two jobs, one per record type, so the type is part of both names.
+  dnsKey = c: "${lib.replaceStrings [ "." ] [ "_" ] c.host}_${lib.toLower c.type}";
+  dnsSlug = c: "${lib.replaceStrings [ "." ] [ "-" ] c.host}-${lib.toLower c.type}";
 
   # Loopback health endpoints, one per service that has one. These overlap with
   # the scrape targets in metrics.nix on purpose: `up` says "the metrics
@@ -108,21 +147,23 @@ let
   # the resolver to ask and the name being asked about lives in the module as
   # `query_name` — the reverse of the http prober, where the target is the
   # thing itself. That is why this cannot be one module with a list of targets.
-  dnsModule = host: {
-    name = "dns_${lib.replaceStrings [ "." ] [ "_" ] host}";
+  dnsModule = c: {
+    name = "dns_${dnsKey c}";
     value = {
       prober = "dns";
       timeout = "10s";
       dns = {
-        query_name = host;
-        # cloudflare-ddns.nix publishes AAAA only (IPv6, Cloudflare-proxied).
-        query_type = "AAAA";
+        query_name = c.host;
+        query_type = c.type;
         transport_protocol = "udp";
         valid_rcodes = [ "NOERROR" ];
         # NOERROR with an empty answer section is what a deleted record looks
-        # like, and it is indistinguishable from success without this: require
-        # at least one record back.
-        validate_answer_rrs.fail_if_not_matches_regexp = [ ".*IN\\s+AAAA\\s+.*" ];
+        # like — and, for the endpoint's A record, what "the updater has never
+        # published one" looks like. Both are indistinguishable from success
+        # without this: require at least one record of the asked-for type back.
+        # `IN\s+A\s+` does not match an `IN\tAAAA\t…` answer, so the A probe
+        # genuinely fails on an AAAA-only name rather than passing on its sibling.
+        validate_answer_rrs.fail_if_not_matches_regexp = [ ".*IN\\s+${c.type}\\s+.*" ];
       };
     };
   };
@@ -144,7 +185,7 @@ let
 
     }
     // lib.listToAttrs (map tlsModule publicHosts)
-    // lib.listToAttrs (map dnsModule publicHosts);
+    // lib.listToAttrs (map dnsModule dnsChecks);
   };
 
   # The standard blackbox relabel dance, which is why these jobs cannot use the
@@ -212,25 +253,25 @@ in
       targets = lib.attrValues internalTargets;
     })
   ]
-  ++ lib.concatMap (
+  ++ map (
     host:
-    let
-      slug = lib.replaceStrings [ "." ] [ "-" ] host;
-      key = lib.replaceStrings [ "." ] [ "_" ] host;
-    in
-    [
-      (probeJob {
-        name = "probe-tls-${slug}";
-        module = "tls_${key}";
-        targets = [ "https://127.0.0.1:${toString proxyHttpsPort}/" ];
-        instance = host;
-      })
-      (probeJob {
-        name = "probe-dns-${slug}";
-        module = "dns_${key}";
-        targets = [ dnsResolver ];
-        instance = host;
-      })
-    ]
-  ) publicHosts;
+    probeJob {
+      name = "probe-tls-${lib.replaceStrings [ "." ] [ "-" ] host}";
+      module = "tls_${lib.replaceStrings [ "." ] [ "_" ] host}";
+      targets = [ "https://127.0.0.1:${toString proxyHttpsPort}/" ];
+      instance = host;
+    }
+  ) publicHosts
+  ++ map (
+    c:
+    probeJob {
+      name = "probe-dns-${dnsSlug c}";
+      module = "dns_${dnsKey c}";
+      targets = [ dnsResolver ];
+      # The record type is part of `instance`, not only of `job`: the endpoint
+      # is probed twice and the uptime dashboard's DNS panel legends on
+      # `instance` alone, so without it the two rows read identically.
+      instance = "${c.host} (${c.type})";
+    }
+  ) dnsChecks;
 }

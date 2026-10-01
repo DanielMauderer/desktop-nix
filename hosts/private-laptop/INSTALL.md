@@ -82,6 +82,14 @@ ssh home-server                    # no host/IP/TOFU prompt
 ls /mnt/home-server                # triggers the automount
 ```
 
+This host tunnels to the *name* `vpn.mauderer.work`, whose address changes with
+every reconnect at the server's end, so it also runs `wg0-reresolve.timer` — a
+minutely check that re-resolves the endpoint once the peer's last handshake is
+older than 150 s. `systemctl list-timers wg0-reresolve` should list it, and
+`journalctl -u wg0-reresolve` is where a tunnel that keeps going quiet after the
+server reconnects will show up. Nothing is logged while the tunnel is healthy;
+the unit exits early.
+
 ## 2c. Second WireGuard tunnel (`wg1`, from the provider wg.conf)
 
 Independent of the home-server tunnel: `wg1` carries a full tunnel, `wg0` keeps

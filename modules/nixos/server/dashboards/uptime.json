@@ -105,7 +105,7 @@
     {
       "type": "stat",
       "title": "Public DNS",
-      "description": "An AAAA lookup for each public hostname against a public resolver. cloudflare-ddns republishes the box's IPv6 every five minutes; this is what shows a stalled updater or a deleted record.",
+      "description": "One lookup per hostname and record type against a public resolver. cloudflare-ddns republishes the box's addresses every five minutes; this is what shows a stalled updater or a deleted record. The proxied web names are AAAA-only; the WireGuard endpoint vpn.mauderer.work is checked for both A and AAAA, since a missing record on either family strands the clients on it.",
       "gridPos": { "h": 5, "w": 8, "x": 16, "y": 3 },
       "id": 3,
       "datasource": { "type": "prometheus", "uid": "prometheus" },

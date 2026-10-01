@@ -33,6 +33,13 @@ Headless services host — the only non-desktop machine. Install guide:
   (`ipv6-interface-id.nix`): the router's exposed-host entry is pinned to a
   hand-entered interface ID, so the address tail must not follow the ISP's
   nightly prefix rotation — change the token there and in the FRITZ!Box together.
+- **Public addressing:** the line is dual-stack with a **dynamic address on both
+  families**, so everything public is kept current by `cloudflare-ddns.nix`. The
+  web names (`mauderer.work`, `*.mauderer.work`) are proxied and AAAA-only;
+  `vpn.mauderer.work`, the WireGuard endpoint, is DNS-only and carries **both an
+  A and an AAAA** so a client on an IPv4-only network can reach it. That needs
+  inbound UDP 51820 forwarded on both families at the router — the IPv6 half via
+  the exposed-host entry, the IPv4 half as an ordinary port-forward.
 - **Disk:** disko SSD root; ZFS data pool on the HBA drives.
 
 `hardware.nix` carries the ZFS `hostId`, the LTS kernel, HBA modules and zram.
