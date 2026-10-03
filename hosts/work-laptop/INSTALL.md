@@ -5,13 +5,17 @@ Work laptop. **LUKS2 + ext4** full-disk encryption, WireGuard VPN, CI-gated
 
 ## 0. Before you wipe
 
-Back up anything not in this repo or the cloud:
-- Browser profile/bookmarks; `~/.ssh/` (incl. work identity files); git signing
-  key; `~/.gnupg/`; Jira/GitLab tokens from `~/.config`; `~/.docker/config.json`;
-  unpushed work branches; corporate CAs (`/etc/pki/ca-trust/source/anchors/`).
-- **WireGuard private key** — export from the old machine / VPN portal; you paste
-  it into sops in §3.
-- Confirm the **sops master age key** is in the password manager (recovery root).
+Already in this repo, encrypted to the master key only (`&work_laptop` is added
+at §2): `secrets/work-laptop/vpn.yaml` (the full work WireGuard config, from
+the Fedora NM `wg0` connection) and `secrets/work-laptop/user.yaml`
+(`~/.ssh/id_ed25519` and the whole `~/.npmrc`). Keep company details (hosts,
+IPs, registry IDs) inside sops — never in plaintext here. **Push them before wiping.**
+
+Back up anything else not in this repo or the cloud: browser profile/bookmarks,
+`~/.config/glab-cli/` token, `~/.docker/config.json`, unpushed work branches.
+- ⛔ Prove the **sops master age key** from the password manager decrypts them —
+  it is the only key that can until §2:
+  `SOPS_AGE_KEY='AGE-SECRET-KEY-…' sops decrypt secrets/work-laptop/vpn.yaml >/dev/null && echo ok`
 
 Capture hardware:
 ```sh
@@ -44,53 +48,30 @@ cat /etc/ssh/ssh_host_ed25519_key.pub | nix run nixpkgs#ssh-to-age
 # → replace age1PLACEHOLDERworklaptop… in .sops.yaml (full scheme: modules/nixos/core/README.md)
 ```
 
-## 3. WireGuard VPN
+## 3. Enable the secrets (work VPN, SSH key, `.npmrc`)
+
+`secrets/work-laptop/*.yaml` hold the VPN config, SSH key and `.npmrc`. Once the
+host key is in `.sops.yaml`:
 
 ```sh
 cd ~/desktop-nix
-sops edit secrets/work-laptop/wireguard.yaml   # wireguard-key: <paste private key>
-sops updatekeys secrets/work-laptop/wireguard.yaml
-```
-In `hosts/work-laptop/default.nix` uncomment the `sops.secrets.wireguard-key` and
-`networking.wg-quick.interfaces.wg0` blocks, add `config` to the module signature
-(`{ lib, pkgs, config, ... }:`), and fill in the peer (endpoint, server pubkey,
-allowed IPs, assigned address, DNS). Then:
-```sh
-sudo nixos-rebuild switch --flake ~/desktop-nix#work-laptop
-sudo wg show          # interface + peer should appear
-```
-
-## 3b. Second WireGuard tunnel (`wg1`, from the provider wg.conf)
-
-Independent of the home-server tunnel: `wg1` carries a full tunnel, `wg0` keeps
-`10.100.0.0/24` (more specific, so it wins). Each device needs its **own**
-keypair — the far end tracks one endpoint per public key, so a key shared
-between machines means the last one to handshake steals the session.
-
-```sh
-cd ~/desktop-nix
-# 1. Private key out of the provider config, into a per-host sops secret.
-#    (The creation rule secrets/work-laptop/*.yaml already covers this filename.)
-sops edit secrets/work-laptop/vpn.yaml       # vpn-wg-key: <the PrivateKey line of wg.conf>
+export SOPS_AGE_KEY='AGE-SECRET-KEY-…'   # master key, from the password manager
 sops updatekeys secrets/work-laptop/vpn.yaml
-shred -u /path/to/wg.conf             # once its non-secret fields are copied over
+sops updatekeys secrets/work-laptop/user.yaml
 ```
 
-Then in `hosts/work-laptop/default.nix`, fill `services.vpnClient` from the same
-`wg.conf` — `address` = `Address`, `endpoint` = `Endpoint`, `publicKey` =
-the peer's `PublicKey` — and uncomment `enable = true`. Non-defaults if the conf
-disagrees: `allowedIPs` (defaults to a full tunnel) and `dns` (left empty on
-purpose — setting it lets wg-quick rewrite `resolv.conf` and fight
-systemd-resolved). Then:
+Set `enrolled = true;` at the top of `hosts/work-laptop/default.nix`, then:
 
 ```sh
 sudo nixos-rebuild switch --flake ~/desktop-nix#work-laptop
-sudo systemctl start wg-quick-wg1     # autostart is off by default
-sudo wg show wg1                      # handshake within ~25 s
-curl -s https://ifconfig.me           # exits via the tunnel
-sudo systemctl stop wg-quick-wg1      # back to normal routing
-ping 10.100.0.1                       # wg0 still up alongside it
+ls -l ~/.ssh/id_ed25519 ~/.npmrc          # symlinks into /run/secrets, owned by maudi
+sudo systemctl start wg-quick-wg1         # autostart is off by default
+sudo wg show wg1                          # handshake within ~25 s
 ```
+
+The tunnel is a full IPv4 tunnel (`wg1`); `wg0` stays reserved for the
+home-server client. The old NM connection also set a VPN DNS server; if internal
+names don't resolve, add a `DNS =` line to `vpn-wg-conf` (`sops edit`).
 
 ## 4. Verify — "ready for Monday" gates (⛔ before wiping the old SSD)
 
