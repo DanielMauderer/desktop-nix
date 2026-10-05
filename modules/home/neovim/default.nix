@@ -83,6 +83,7 @@ in
           typescript
           vim
           vimdoc
+          wgsl
           yaml
         ];
     }
