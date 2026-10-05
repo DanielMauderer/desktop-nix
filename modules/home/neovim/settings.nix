@@ -27,6 +27,7 @@
     clang-tools # clangd + clang-format
     vscode-langservers-extracted # html / cssls / jsonls
     yaml-language-server # yamlls
+    wgsl-analyzer # wgsl_analyzer
     rust-analyzer # for rustaceanvim (excludes itself from lspconfig)
     # Formatters
     stylua # lua
@@ -1243,6 +1244,7 @@
           },
         },
       },
+      wgsl_analyzer = {},
     }
     vim.lsp.config("*", { capabilities = capabilities })
     for server_name, server_config in pairs(servers) do
