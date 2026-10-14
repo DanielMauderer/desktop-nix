@@ -63,16 +63,19 @@ in
         };
 
         # Idle: lock at 5 min, suspend after (per-host). Replaces swayidle.
+        # Native actions, not commands: `action` defaults to "command", which
+        # runs `command` through /bin/sh, and Noctalia no longer resolves the
+        # old `noctalia:` prefix there — that string silently never locked.
         idle.behavior = {
           lock = {
             enabled = true;
             timeout = 300;
-            command = "noctalia:session lock";
+            action = "lock";
           };
           suspend = {
             enabled = true;
             timeout = config.local.idleSuspendSeconds;
-            command = "systemctl suspend";
+            action = "lock_and_suspend";
           };
         };
 

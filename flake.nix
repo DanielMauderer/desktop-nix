@@ -1994,9 +1994,14 @@
                 "test -e /home/maudi/.config/systemd/user/graphical-session.target.wants/noctalia.service"
             )
             machine.succeed("test -e /home/maudi/.config/noctalia/config.toml")
-            # Theming (wallpaper-derived) and idle (auto-suspend) settings landed.
+            # Theming (wallpaper-derived) and idle (auto-lock/suspend) settings landed.
             machine.succeed("grep -q 'source = \"wallpaper\"' /home/maudi/.config/noctalia/config.toml")
-            machine.succeed("grep -q 'systemctl suspend' /home/maudi/.config/noctalia/config.toml")
+            # Idle behaviors must use native actions: without `action` Noctalia
+            # runs `command` through /bin/sh, so a lock string that isn't a real
+            # shell command fails silently and the screen never locks.
+            machine.succeed("grep -q 'action = \"lock\"' /home/maudi/.config/noctalia/config.toml")
+            machine.succeed("grep -q 'action = \"lock_and_suspend\"' /home/maudi/.config/noctalia/config.toml")
+            machine.fail("grep -q 'noctalia:' /home/maudi/.config/noctalia/config.toml")
 
             # Plugins: the declarative path source is wired (no runtime git clone)
             # and the Nix Monitor widget is placed in the bar.
