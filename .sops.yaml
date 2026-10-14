@@ -15,7 +15,7 @@ keys:
   - &master age14wm2hq628h44z306hxc4wx5454waewqxmya04q8tudtfqu59kqmqzeuyx4
   # Per-host keys: ssh-to-age of each /etc/ssh/ssh_host_ed25519_key.pub.
   - &private_laptop age10gjj6tf0cpadle54ng7jv9kllel5jvz6aanj6lmfugflpuwmeq3qcmg437
-  - &work_laptop age1naykl7sse3psqy96z9kwea70jztgnp52qqsqaauck966gyu5pyuqcvdtac
+  - &work_laptop age1409lxcnp8v06rlyukrwdntqa2s7zmz87k3nuz2qpdkxqzql32ymq22rj0f
   - &desktop age1uhav7r22gq0ayyt8kkuwsxv8rptrc7hnnwtjndtndyk2trgxy4fslqste3
   - &home_server age15j2scnr49w7n2788fusqpdglpc9kx5avurrumwkas6wr77rkfchsg8sram
   # Fixture/test key: PUBLIC half of the known key the test-secrets nixosTest

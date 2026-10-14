@@ -109,6 +109,9 @@
           name = "gitleaks";
           package = pkgs.gitleaks;
           entry = "${pkgs.gitleaks}/bin/gitleaks dir --no-banner --redact .";
+          # git-hooks.nix's built-in gitleaks hook (re-added upstream) supplies
+          # `git --staged ...` args that would be appended to this entry.
+          args = [ ];
           pass_filenames = false;
         };
       };
