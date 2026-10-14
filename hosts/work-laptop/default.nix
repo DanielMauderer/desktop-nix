@@ -3,7 +3,7 @@ let
   # Flip after the host age key is enrolled and `sops updatekeys` has run on
   # secrets/work-laptop/*.yaml (INSTALL.md §2) — until then this box can't
   # decrypt them, and secret activation would fail.
-  enrolled = false;
+  enrolled = true;
 in
 {
   imports = [
@@ -11,8 +11,7 @@ in
     ../../modules/nixos/desktop
     ../../modules/nixos/net
     ./hardware.nix
-    # Uncomment after running `nixos-generate-config --no-filesystems` at install:
-    # ./hardware/hardware-configuration.nix
+    ./hardware/hardware-configuration.nix
   ];
 
   networking.hostName = "work-laptop";

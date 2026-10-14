@@ -24,6 +24,9 @@ _: {
           content = {
             type = "luks";
             name = "cryptroot";
+            # Install-time only: nixos-anywhere uploads the passphrase here
+            # (--disk-encryption-keys). Boot still prompts as usual.
+            passwordFile = "/tmp/secret.key";
             settings.allowDiscards = true;
             content = {
               type = "filesystem";
