@@ -13,6 +13,7 @@ Work laptop — heavy development, policy-bound. Install guide:
 - **Monitors:** kanshi profiles `work-laptop-docked-dual` (DP-5 + DP-6, internal
   off) and `work-laptop-docked-hdmi` (eDP-1 + HDMI-A-1); undocked falls back to
   `laptop-internal`.
+- **Work apps:** `teams-for-linux` (host-only, via home-manager).
 
 ## How this host differs (hardening)
 

@@ -1,4 +1,9 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # Flip after the host age key is enrolled and `sops updatekeys` has run on
   # secrets/work-laptop/*.yaml (INSTALL.md §2) — until then this box can't
@@ -46,6 +51,10 @@ in
   };
   # sops-nix would otherwise create ~/.ssh root-owned for the key symlink.
   systemd.tmpfiles.rules = lib.mkIf enrolled [ "d /home/maudi/.ssh 0700 maudi users -" ];
+
+  # Teams, work-only: Electron wrapper around the web client (Microsoft's
+  # native Linux client is discontinued).
+  home-manager.users.maudi.home.packages = [ pkgs.teams-for-linux ];
 
   # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
   home-manager.users.maudi.local.idleSuspendSeconds = 1800;
