@@ -11,6 +11,9 @@
     claude-code
   ];
 
+  # Personal opt-out, not a project setting — keeps `ng` from prompting.
+  home.sessionVariables.NG_CLI_ANALYTICS = "false";
+
   # The only thing that puts a toolchain on PATH: per-project devShells, loaded
   # automatically on `cd` (fish integration is wired because programs.fish is
   # enabled).

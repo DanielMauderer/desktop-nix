@@ -22,13 +22,15 @@
         package = pkgs.nerd-fonts.jetbrains-mono;
         name = "JetBrainsMono Nerd Font";
       };
+      # Not Cantarell: Chromium/Electron can't load its variable OTF, so
+      # `system-ui` (the GTK font) fell back to FreeMono in Teams & co.
       sansSerif = {
-        package = pkgs.cantarell-fonts;
-        name = "Cantarell";
+        package = pkgs.noto-fonts;
+        name = "Noto Sans";
       };
       serif = {
-        package = pkgs.cantarell-fonts;
-        name = "Cantarell";
+        package = pkgs.noto-fonts;
+        name = "Noto Sans";
       };
       sizes = {
         applications = 11;
