@@ -149,6 +149,16 @@ matters lives here; the rest is in the Nix code and `git log`.
   of failing. Cluster on the SSD with a nightly `pg_dumpall` to the pool, the same
   split as Forgejo. Forgejo and Paperless were deliberately **not** migrated —
   they work, and a migration buys nothing until something needs concurrency.
+- **Greenhouse app = native units from tag-pinned flake inputs** — home-server.
+  Replaces the Ansible + podman deployment. The app repos expose `packages`; the
+  inputs do **not** follow nixpkgs, so the Rust/Angular builds change only on a
+  tag bump rather than on every daily lock update. The SPA sits on a
+  loopback-only native nginx behind NPM, which stays the only public proxy.
+- **Greenhouse app = native units from tag-pinned flake inputs** — home-server.
+  Replaces the Ansible + podman deployment. The app repos expose `packages`; the
+  inputs do **not** follow nixpkgs, so the Rust/Angular builds change only on a
+  tag bump rather than on every daily lock update. The SPA sits on a
+  loopback-only native nginx behind NPM, which stays the only public proxy.
 - **Document archive = native `services.paperless`, SQLite, VPN-only** —
   home-server. `:28981` is admitted on `wg0` only and deliberately *not* given an
   NPM proxy host, so unlike Forgejo it has no WAN surface: a paper archive is the

@@ -27,9 +27,9 @@ Headless services host — the only non-desktop machine. Install guide:
   itself VPN-only on `10.100.0.1:3030`; Loki's `:3100` is open to the podman
   bridge, LAN and VPN so deployments can push; an hourly oneshot feeds the node
   exporter's textfile collector with update-pipeline metrics — pending reboot,
-  autoUpgrade result, nixpkgs staleness), and the container groundwork for
-  docker-compose / Ansible-managed services. WAN surface is exactly UDP 51820 +
-  TCP 80/443. Also a **fixed IPv6 interface ID** for the wired link
+  autoUpgrade result, nixpkgs staleness), the container groundwork for
+  docker-compose services, and the **greenhouse** app (`greenhouse.nix`). WAN
+  surface is exactly UDP 51820 + TCP 80/443. Also a **fixed IPv6 interface ID** for the wired link
   (`ipv6-interface-id.nix`): the router's exposed-host entry is pinned to a
   hand-entered interface ID, so the address tail must not follow the ISP's
   nightly prefix rotation — change the token there and in the FRITZ!Box together.

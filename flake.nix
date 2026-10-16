@@ -85,6 +85,13 @@
       url = "github:rachartier/tiny-code-action.nvim/0d040ed81f7953118b81cd12681fcdfcac069803";
       flake = false;
     };
+
+    # Greenhouse app (modules/nixos/server/greenhouse.nix), pinned to release
+    # tags: bump the tag to deploy. Deliberately NOT following nixpkgs, so the
+    # Rust/Angular builds only change on a tag bump instead of rebuilding in CI
+    # and on the server with every daily lock update.
+    greenhouse-backend.url = "github:OpenGreenhouseManager/greenhouse_backend/v1.1.0";
+    greenhouse-web.url = "github:OpenGreenhouseManager/greenhouse_web/v1.1.0";
   };
 
   outputs =
@@ -1617,6 +1624,58 @@
           diskSize = 4096;
         };
       };
+
+      # Greenhouse test node: the app module on the real postgresql.nix (so peer
+      # auth with DynamicUser roles is exercised for real) plus a bare loopback
+      # Prometheus for its scrape job. Every secret goes to the fixture — the
+      # Sentry DSNs to the empty one, since an invalid DSN aborts startup.
+      greenhouseTestNode = {
+        imports = [
+          inputs.sops-nix.nixosModules.sops
+          ./modules/nixos/server/postgresql.nix
+          ./modules/nixos/server/greenhouse.nix
+        ];
+        _module.args.inputs = inputs;
+
+        environment.etc."test-age-key.txt" = {
+          text = testAgeKey + "\n";
+          mode = "0400";
+        };
+        sops = {
+          age = {
+            sshKeyPaths = lib.mkForce [ ];
+            keyFile = "/etc/test-age-key.txt";
+          };
+          gnupg.sshKeyPaths = lib.mkForce [ ];
+          secrets = lib.mapAttrs (name: _: {
+            sopsFile = lib.mkForce ./secrets/fixtures/test.yaml;
+            key = if lib.hasSuffix "-sentry-dsn" name then "fixture_empty" else "fixture_secret";
+          }) (lib.filterAttrs (n: _: lib.hasPrefix "greenhouse-" n) hosts.home-server.config.sops.secrets);
+        };
+
+        # Same neutralisation as postgresqlTestNode.
+        services.postgresqlBackup.location = lib.mkForce "/var/lib/postgresql-dump";
+        systemd.services.postgresql-dump-dirs = {
+          requires = lib.mkForce [ ];
+          after = lib.mkForce [ ];
+          before = lib.mkForce [ ];
+          requiredBy = lib.mkForce [ ];
+        };
+
+        services.prometheus = {
+          enable = true;
+          listenAddress = "127.0.0.1";
+        };
+
+        environment.systemPackages = [
+          pkgs.curl
+          pkgs.jq
+        ];
+        virtualisation = {
+          memorySize = 2048;
+          diskSize = 4096;
+        };
+      };
     in
     {
       formatter.${system} = pkgs.nixfmt;
@@ -2877,6 +2936,39 @@
             for host in ["ntfy.mauderer.work", "git.mauderer.work"]:
                 assert instances.count(host) == 2, (host, instances)
             assert not any(i.startswith("127.0.0.1:9115") for i in instances), instances
+          '';
+        };
+
+        # Greenhouse end to end: every service up on its role via peer auth, the
+        # bootstrap account usable through nginx's /api proxy, the SPA fallback,
+        # and device_service scraped by Prometheus.
+        test-greenhouse = testLib.makeTest {
+          name = "greenhouse";
+          nodes.machine = greenhouseTestNode;
+          testScript = ''
+            machine.wait_for_unit("multi-user.target")
+            for port in [5001, 5002, 5003, 5004, 5101, 5102]:
+                machine.wait_until_succeeds(f"curl -fsS http://127.0.0.1:{port}/health", timeout=120)
+
+            machine.wait_for_unit("greenhouse-bootstrap-users.service")
+
+            # Login through nginx -> web_api -> auth_service -> Postgres. The
+            # fixture value is both the admin's username and password.
+            headers = machine.succeed(
+                "curl -fsS -D - -o /dev/null -X POST http://127.0.0.1:8080/api/login "
+                "-H 'Content-Type: application/json' "
+                "-d '{\"username\":\"sops-fixture-canary-7a3f\",\"password\":\"sops-fixture-canary-7a3f\"}'"
+            )
+            assert "auth-token=" in headers.lower(), headers
+
+            # Deep links fall back to the SPA's index.html.
+            machine.succeed("curl -fsS http://127.0.0.1:8080/smart_devices | grep -q '<base href=\"/\"'")
+
+            machine.wait_until_succeeds(
+                "curl -fsS -G http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=up{job=\"greenhouse\"}' "
+                "| jq -e '.data.result[0].value[1] == \"1\"'",
+                timeout=120,
+            )
           '';
         };
 

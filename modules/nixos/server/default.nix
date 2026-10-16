@@ -11,6 +11,7 @@ _: {
     ./paperless.nix
     ./ntfy.nix
     ./postgresql.nix
+    ./greenhouse.nix
     ./metrics.nix
     ./nixos-metrics.nix
     ./backup-metrics.nix
