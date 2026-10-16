@@ -52,49 +52,51 @@ in
   # sops-nix would otherwise create ~/.ssh root-owned for the key symlink.
   systemd.tmpfiles.rules = lib.mkIf enrolled [ "d /home/maudi/.ssh 0700 maudi users -" ];
 
-  # Teams, work-only: Electron wrapper around the web client (Microsoft's
-  # native Linux client is discontinued).
-  home-manager.users.maudi.home.packages = [ pkgs.teams-for-linux ];
+  home-manager.users.maudi = {
+    # Teams, work-only: Electron wrapper around the web client (Microsoft's
+    # native Linux client is discontinued).
+    home.packages = [ pkgs.teams-for-linux ];
 
-  # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
-  home-manager.users.maudi.local.idleSuspendSeconds = 1800;
+    # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
+    local.idleSuspendSeconds = 1800;
 
-  # Docked-at-desk (dual external) or docked-at-home (internal + HDMI); mkBefore
-  # so a docked profile matches before the generic laptop-internal fallback.
-  home-manager.users.maudi.services.kanshi.settings = lib.mkBefore [
-    {
-      profile = {
-        name = "work-laptop-docked-dual";
-        outputs = [
-          {
-            criteria = "eDP-1";
-            status = "disable";
-          }
-          {
-            criteria = "DP-5";
-            position = "0,0";
-          }
-          {
-            criteria = "DP-6";
-            position = "2560,0";
-          }
-        ];
-      };
-    }
-    {
-      profile = {
-        name = "work-laptop-docked-hdmi";
-        outputs = [
-          {
-            criteria = "eDP-1";
-            position = "0,0";
-          }
-          {
-            criteria = "HDMI-A-1";
-            position = "1920,0";
-          }
-        ];
-      };
-    }
-  ];
+    # Docked-at-desk (dual external) or docked-at-home (internal + HDMI); mkBefore
+    # so a docked profile matches before the generic laptop-internal fallback.
+    services.kanshi.settings = lib.mkBefore [
+      {
+        profile = {
+          name = "work-laptop-docked-dual";
+          outputs = [
+            {
+              criteria = "eDP-1";
+              status = "disable";
+            }
+            {
+              criteria = "DP-5";
+              position = "0,0";
+            }
+            {
+              criteria = "DP-6";
+              position = "2560,0";
+            }
+          ];
+        };
+      }
+      {
+        profile = {
+          name = "work-laptop-docked-hdmi";
+          outputs = [
+            {
+              criteria = "eDP-1";
+              position = "0,0";
+            }
+            {
+              criteria = "HDMI-A-1";
+              position = "1920,0";
+            }
+          ];
+        };
+      }
+    ];
+  };
 }
