@@ -24,6 +24,22 @@ let
   pluginRoot = pkgs.runCommand "noctalia-plugins" { } ''
     mkdir -p "$out"
     cp -r ${inputs.noctalia-community-plugins}/nix-monitor "$out/nix-monitor"
+    chmod -R u+w "$out/nix-monitor"
+    # Upstream compares against a nixpkgs branch head, which is always ahead of
+    # the CI-gated release lock autoUpgrade follows — a permanent false
+    # "Update available". Compare against the nixpkgs rev release pins instead.
+    substituteInPlace "$out/nix-monitor/nix_monitor_service.luau" \
+      --replace-fail '"git ls-remote https://github.com/NixOS/nixpkgs " .. branch .. " 2>/dev/null' \
+                     '"${releaseNixpkgsRev} 2>/dev/null'
+  '';
+
+  # The flake system.autoUpgrade builds (modules/nixos/core/updates.nix).
+  releaseFlake = "github:DanielMauderer/desktop-nix/release";
+
+  # Prints the nixpkgs rev locked on the release branch.
+  releaseNixpkgsRev = pkgs.writeShellScript "release-nixpkgs-rev" ''
+    ${lib.getExe pkgs.curl} -fsSL https://raw.githubusercontent.com/DanielMauderer/desktop-nix/release/flake.lock \
+      | ${lib.getExe pkgs.jq} -r '.nodes[.nodes.root.inputs.nixpkgs].locked.rev'
   '';
 in
 {
@@ -97,13 +113,14 @@ in
           ];
         };
 
-        # Plugin-level settings (own top-level table, keyed by plugin id). Nix
-        # Monitor compares the system's nixpkgs revision against a remote branch:
-        # point it at the branch this flake tracks, and wire its panel's Update
-        # button to the same rebuild command as the `update` shell alias.
+        # Plugin-level settings (own top-level table, keyed by plugin id). The
+        # remote check is patched (pluginRoot) to read release's locked nixpkgs
+        # rev, so `branch` is only a panel label now. The Update button builds
+        # the same flake as autoUpgrade, never the local checkout, whose lock
+        # can lag behind and would roll the system back.
         plugin_settings."avivbintangaringga/nix-monitor" = {
           branch = "nixos-unstable";
-          update_command = "sudo nixos-rebuild switch --flake ${config.home.homeDirectory}/desktop-nix";
+          update_command = "sudo nixos-rebuild switch --flake ${releaseFlake}";
         };
 
         # Place the plugin widget in the bar's right group, just before
