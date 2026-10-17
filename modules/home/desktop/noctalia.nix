@@ -54,6 +54,10 @@ in
   };
 
   config = {
+    # Noctalia is the launcher, so rofi is unused. stylix's rofi target still
+    # writes the renamed `programs.rofi.font` and triggers an eval warning.
+    stylix.targets.rofi.enable = false;
+
     programs.noctalia = {
       enable = true;
       # User service started with the Hyprland graphical session.
@@ -101,7 +105,7 @@ in
         # `enabled` is the opt-in list of active plugin ids (author/plugin), not a
         # boolean; the source must also be enabled to be scanned.
         plugins = {
-          auto_update = false;
+          auto_update = "none";
           enabled = [ "avivbintangaringga/nix-monitor" ];
           source = [
             {
