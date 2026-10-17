@@ -68,6 +68,15 @@ jobs:
     name: ${{ matrix.check }}
     needs: [discover-checks, warm-cache]
     runs-on: ubuntu-latest
+    # The chaotic cache, so test-gaming pulls the CachyOS kernel instead of
+    # compiling it (~3 h). Set via NIX_CONFIG, not nix_conf: nix-quick-install
+    # and `cachix use` share ~/.config/nix/nix.conf, and the plain
+    # `substituters =` line cachix appends resets earlier extra-substituters.
+    # NIX_CONFIG is applied after every config file.
+    env:
+      NIX_CONFIG: |
+        extra-substituters = https://nyx-cache.chaotic.cx/
+        extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
     strategy:
       fail-fast: false
       matrix:
@@ -85,16 +94,12 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
           sudo docker image prune --all --force >/dev/null 2>&1 || true
           df -h /
-      # The nix_conf enables nixos-test so the VM tests run, and the chaotic
-      # cache so the test-gaming
-      # nixosTest pulls the CachyOS kernel as a substitute instead of compiling it.
+      # nixos-test so the VM tests run.
       - uses: nixbuild/nix-quick-install-action@v30
         with:
           nix_conf: |
             experimental-features = nix-command flakes
             extra-system-features = nixos-test
-            extra-substituters = https://nyx-cache.chaotic.cx/
-            extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
       # Pull-only: warm-cache is the one job that pushes. The Actions cache
       # (cache-nix-action) was dropped: its per-key /nix tarballs, gc-trimmed to
       # fit the 10 GB quota, never retained the Hyprland/Noctalia builds.
@@ -112,6 +117,12 @@ jobs:
     name: Build ${{ matrix.host }}
     needs: warm-cache
     runs-on: ubuntu-latest
+    # The desktop closure includes the CachyOS kernel; see the check job for
+    # why the chaotic cache goes through NIX_CONFIG.
+    env:
+      NIX_CONFIG: |
+        extra-substituters = https://nyx-cache.chaotic.cx/
+        extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
     strategy:
       fail-fast: false
       matrix:
@@ -129,14 +140,9 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
           sudo docker image prune --all --force >/dev/null 2>&1 || true
           df -h /
-      # The desktop closure includes the CachyOS kernel; pull it (and the rest
-      # of chaotic) from the chaotic cache instead of building it.
       - uses: nixbuild/nix-quick-install-action@v30
         with:
-          nix_conf: |
-            experimental-features = nix-command flakes
-            extra-substituters = https://nyx-cache.chaotic.cx/
-            extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
+          nix_conf: experimental-features = nix-command flakes
       # Pull-only: warm-cache is the one job that pushes.
       - uses: cachix/cachix-action@v17
         with:
