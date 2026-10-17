@@ -2071,7 +2071,7 @@
                 "grep -q 'avivbintangaringga/nix-monitor:nix-monitor' /home/maudi/.config/noctalia/config.toml"
             )
             machine.succeed("grep -q 'noctalia-plugins' /home/maudi/.config/noctalia/config.toml")
-            machine.succeed("grep -q 'auto_update = false' /home/maudi/.config/noctalia/config.toml")
+            machine.succeed("grep -q 'auto_update = \"none\"' /home/maudi/.config/noctalia/config.toml")
             # Noctalia scans the SUBDIRS of the source location for plugin.toml, so
             # each plugin must sit in its own dir under it, manifest + entry present.
             # The manifest must also declare `plugin_api` — without it current
