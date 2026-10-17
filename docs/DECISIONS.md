@@ -322,3 +322,12 @@ matters lives here; the rest is in the Nix code and `git log`.
   rather than `lazyjj` for its bookmark-move and interactive rebase targets,
   which is what stacked branches actually need. `git-spice` was retired when jj
   took over that job — two stacking tools for one workflow is one too many.
+
+- **CI shares builds through a public Cachix cache, not the Actions cache.**
+  Hyprland and Noctalia follow our nixpkgs, so no upstream cache has them, and
+  every CI runner compiled them (~70 min jobs). A `warm-cache` job builds just
+  those packages and pushes them to `desktop-nix.cachix.org` (free 5 GB tier);
+  all other jobs and the hosts' `nix.settings` only pull from it. Host
+  closures are never pushed, because the cache is public. `cache-nix-action`
+  was dropped: its per-key `/nix` tarballs, trimmed to fit the 10 GB quota,
+  never kept the expensive builds.

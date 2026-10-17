@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  # cache-nix-action's purge deletes stale cache entries via the Actions API.
-  actions: write
 
 jobs:
   # Enumerate the flake's checks so the `check` job below can fan them out over
@@ -33,13 +31,42 @@ jobs:
         run: |
           echo "checks=$(nix eval --json .#checks.x86_64-linux --apply builtins.attrNames)" >> "$GITHUB_OUTPUT"
 
+  # Build the packages no upstream cache has — Hyprland (with its hypr* libs,
+  # aquamarine, glaze and the portal) and Noctalia, both following our nixpkgs —
+  # once, and push them to the public desktop-nix Cachix cache. Every other job
+  # waits for this and pulls them, instead of ~12 runners each compiling them
+  # (~20-25 min apiece). Only these package closures are pushed (cachix skips
+  # what cache.nixos.org already has); host configs never are, as the cache is
+  # public. Only the first run after a lock bump compiles; warm runs take ~1-2 min.
+  warm-cache:
+    name: warm cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@v30
+        with:
+          nix_conf: experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v17
+        with:
+          name: desktop-nix
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      # These derivations are identical on every workstation host, so one
+      # host's attributes cover all of them.
+      - run: |
+          nix build -L --no-link \
+            .#nixosConfigurations.private-laptop.config.programs.hyprland.package \
+            .#nixosConfigurations.private-laptop.config.programs.hyprland.portalPackage \
+            .#nixosConfigurations.private-laptop.config.home-manager.users.maudi.programs.noctalia.package
+
   # One runner per check, all in parallel. This replaces a single `nix flake
   # check -L` that built every host toplevel and booted all eight VM tests
   # serially on one 2-core runner (~52 min). VMs cannot boot concurrently on one
   # runner, so fanning out drops wall-clock to roughly the slowest single check.
   check:
     name: ${{ matrix.check }}
-    needs: discover-checks
+    needs: [discover-checks, warm-cache]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,10 +85,8 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
           sudo docker image prune --all --force >/dev/null 2>&1 || true
           df -h /
-      # nix-quick-install (not the Determinate daemon installer): cache-nix-action
-      # below restores /nix directly, which only works with this single-user
-      # store layout. The nix_conf carries what extra-conf used to:
-      # nixos-test so the VM tests run, and the chaotic cache so the test-gaming
+      # The nix_conf enables nixos-test so the VM tests run, and the chaotic
+      # cache so the test-gaming
       # nixosTest pulls the CachyOS kernel as a substitute instead of compiling it.
       - uses: nixbuild/nix-quick-install-action@v30
         with:
@@ -70,24 +95,13 @@ jobs:
             extra-system-features = nixos-test
             extra-substituters = https://nyx-cache.chaotic.cx/
             extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
-      # Per-check cache entry, mirroring the per-host build cache below: each
-      # check caches independently (exact-key hit lets an unchanged check be
-      # skipped entirely), with a cross-check fallback restore so a check whose
-      # entry is missing still seeds from a sibling. gc-max-store-size is trimmed
-      # to 2G because many more entries now share the repo's 10 GB Actions-cache
-      # quota; GitHub's LRU eviction absorbs any overflow and evicted paths
-      # re-substitute from cache.nixos.org / the chaotic cache rather than rebuild.
-      - uses: nix-community/cache-nix-action@v6
+      # Pull-only: warm-cache is the one job that pushes. The Actions cache
+      # (cache-nix-action) was dropped: its per-key /nix tarballs, gc-trimmed to
+      # fit the 10 GB quota, never retained the Hyprland/Noctalia builds.
+      - uses: cachix/cachix-action@v17
         with:
-          primary-key: nix-check-${{ matrix.check }}-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
-          restore-prefixes-first-match: |
-            nix-check-${{ matrix.check }}-${{ runner.os }}-
-            nix-check-
-          gc-max-store-size-linux: 2G
-          purge: true
-          purge-prefixes: nix-check-${{ matrix.check }}-${{ runner.os }}-
-          purge-created: 0
-          purge-primary-key: never
+          name: desktop-nix
+          skipPush: true
       # Building the check derivation is equivalent to what `nix flake check`
       # does for it; formatting/lint are themselves checks (nixfmt-check etc.),
       # so the union of all matrix legs is the same gate as local
@@ -96,6 +110,7 @@ jobs:
 
   build-hosts:
     name: Build ${{ matrix.host }}
+    needs: warm-cache
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -114,7 +129,6 @@ jobs:
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
           sudo docker image prune --all --force >/dev/null 2>&1 || true
           df -h /
-      # See the check job for why nix-quick-install + cache-nix-action.
       # The desktop closure includes the CachyOS kernel; pull it (and the rest
       # of chaotic) from the chaotic cache instead of building it.
       - uses: nixbuild/nix-quick-install-action@v30
@@ -123,23 +137,10 @@ jobs:
             experimental-features = nix-command flakes
             extra-substituters = https://nyx-cache.chaotic.cx/
             extra-trusted-public-keys = nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
-      # Per-host cache entries: a single shared key let whichever job finished
-      # first (home-server, the smallest closure) save the cache, so the big
-      # closures were never cached (run 28596800090). Each host now saves its
-      # own entry (gc-trimmed to 4G, zstd-compressed to roughly a quarter of
-      # that in the cache), with a cross-host fallback restore so a host whose
-      # entry is missing still seeds from a sibling. purge keeps one entry per
-      # host; GitHub's LRU eviction absorbs any overflow of the 10 GB quota.
-      - uses: nix-community/cache-nix-action@v6
+      # Pull-only: warm-cache is the one job that pushes.
+      - uses: cachix/cachix-action@v17
         with:
-          primary-key: nix-build-${{ matrix.host }}-${{ runner.os }}-${{ hashFiles('flake.lock', '**/*.nix') }}
-          restore-prefixes-first-match: |
-            nix-build-${{ matrix.host }}-${{ runner.os }}-
-            nix-build-
-          gc-max-store-size-linux: 4G
-          purge: true
-          purge-prefixes: nix-build-${{ matrix.host }}-${{ runner.os }}-
-          purge-created: 0
-          purge-primary-key: never
+          name: desktop-nix
+          skipPush: true
       - name: Build toplevel
         run: nix build .#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel -L
