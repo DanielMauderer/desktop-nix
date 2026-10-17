@@ -4,9 +4,9 @@
 # container, its network model and its volumes.
 #
 # Networking: the container runs in the HOST network namespace (`--network=host`),
-# not with published ports. This is not a convenience — the box is IPv6-only
-# inbound (DS-Lite; see cloudflare-ddns.nix), and podman's port publishing does
-# not reach it. `ports = [ "80:80" ]` becomes an nftables DNAT rule in the `ip`
+# not with published ports. This is not a convenience — the web services are
+# reachable over IPv6 only (the proxied records are AAAA; see
+# cloudflare-ddns.nix), and podman's port publishing does not reach that. `ports = [ "80:80" ]` becomes an nftables DNAT rule in the `ip`
 # family only; with no IPv6-enabled podman network there is no `ip6` counterpart.
 # Measured from the LAN: `10.100.0.1:80` answered 200 while the host's global
 # IPv6 refused the connection instantly. Since the only public record is an AAAA,
@@ -40,9 +40,10 @@
 # proxy without change.
 #
 # DNS: `*.mauderer.work` is a *proxied* (orange-cloud) AAAA record kept current by
-# cloudflare-ddns.nix. Because inbound IPv4 does not exist here, the orange cloud
-# is what gives IPv4 visitors any path in at all — grey-cloud is a debugging
-# state, not a steady one. Certificates should therefore be issued by **DNS-01**
+# cloudflare-ddns.nix. The web names have no A record, so the orange cloud is
+# what gives IPv4 visitors a path in — grey-cloud is a debugging state, not a
+# steady one. (The line now has a public IPv4, but it serves only the WireGuard
+# endpoint; the router forwards no IPv4 80/443.) Certificates should therefore be issued by **DNS-01**
 # (NPM: Certificates → Add → DNS Challenge → Cloudflare), which needs no inbound
 # connectivity and is the only option for a wildcard. Note that NPM reads those
 # credentials from its own UI-entered state on the pool, *not* from the

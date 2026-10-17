@@ -13,8 +13,8 @@
 # NXDOMAIN. The same asymmetry applies to certificates — a `*.mauderer.work` cert
 # does not cover the apex either, so both names have to be on it.
 #
-# Only AAAA: `ipv4 = false` (the tool is invoked with `-no-4`). Nothing publishes
-# an A record for this zone.
+# The proxied records are AAAA only (`ipv4 = false`): Cloudflare's edge already
+# answers IPv4 visitors, so the origin only needs to be reachable over IPv6.
 #
 # Interaction with reverse-proxy.nix: because this record is *proxied*, requests
 # to `*.mauderer.work` arrive from Cloudflare's edge rather than from the client,
@@ -32,6 +32,11 @@
 # WAN address. `--proxied` is a per-run flag in the upstream tool, so this can't
 # join the `domains` list above — it runs as a second instance below, unproxied,
 # with its own cache. A specific `vpn` record shadows the wildcard for that name.
+#
+# That instance publishes an A record too (`-4 -6`). The line has a real public
+# IPv4 (the ISP moved it off DS-Lite; dynamic, not static), so a client on an
+# IPv4-only network can reach WireGuard directly. The router must forward
+# UDP/51820 to this host over IPv4 as well as IPv6.
 {
   config,
   pkgs,
@@ -78,10 +83,10 @@
     wants = [ "network-online.target" ];
   };
 
-  # Second instance: the grey-cloud (unproxied) AAAA for the WireGuard endpoint.
-  # Mirrors the upstream unit (DynamicUser + LoadCredential + legacy-token guard)
-  # but with its own StateDirectory/cache so the two runs don't clobber each
-  # other, and `-no-4 -6` with NO `--proxied`.
+  # Second instance: the grey-cloud (unproxied) A + AAAA for the WireGuard
+  # endpoint. Mirrors the upstream unit (DynamicUser + LoadCredential +
+  # legacy-token guard) but with its own StateDirectory/cache so the two runs
+  # don't clobber each other, and `-4 -6` with NO `--proxied`.
   systemd.services.cloudflare-dyndns-vpn = {
     description = "CloudFlare Dynamic DNS Client (grey-cloud WireGuard endpoint)";
     after = [ "network-online.target" ];
@@ -105,7 +110,7 @@
       fi
       exec ${lib.getExe pkgs.cloudflare-dyndns} \
         --cache-file /var/lib/cloudflare-dyndns-vpn/ip.cache \
-        -no-4 -6 vpn.mauderer.work
+        -4 -6 vpn.mauderer.work
     '';
   };
 }

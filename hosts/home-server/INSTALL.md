@@ -43,6 +43,8 @@ The secrets-first work is done and in git:
 - **sops master age key** is in the password manager.
 - **DNS:** `vpn.mauderer.work` must be a **DNS-only (grey-cloud)** Cloudflare
   record → the WAN IP. Cloudflare's proxy does not carry WireGuard's UDP/51820.
+  `cloudflare-dyndns-vpn` keeps both the A and the AAAA current; the router must
+  forward UDP/51820 to the server over IPv4 **and** IPv6.
 
 ## 2. Boot the target into an installer
 

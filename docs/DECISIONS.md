@@ -111,6 +111,11 @@ matters lives here; the rest is in the Nix code and `git log`.
   wildcard. The Cloudflare credential is entered in NPM's UI and lives in
   container state on the pool — the `cloudflare-api-token` sops secret is
   `cloudflare-dyndns`'s, not NPM's, though the same zone scope fits both.
+- **Real public IPv4 (no longer DS-Lite), used only for WireGuard.** The ISP
+  moved the line to dual-stack with a dynamic public IPv4. `vpn.mauderer.work`
+  gets a grey-cloud A record next to its AAAA so IPv4-only networks reach the
+  VPN; the web names stay proxied AAAA-only, so the reasoning above still holds
+  for them.
 - **Self-hosted forge = native `services.forgejo`** (SQLite, state on the SSD,
   nightly `forgejo dump` to the ZFS pool) behind the NPM proxy — the first native
   web service on the box; everything else there is a container. GitHub is demoted
