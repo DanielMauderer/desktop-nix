@@ -68,6 +68,17 @@ in
       ];
     };
 
+    # wg-quick resolves the endpoint once and exits on failure (no network yet,
+    # or a router's DNS-rebind filter at home), leaving wg0 down for good.
+    # Retry until it resolves; oneshot units support Restart=on-failure.
+    systemd.services.wg-quick-wg0 = {
+      unitConfig.StartLimitIntervalSec = 0;
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = 30;
+      };
+    };
+
     # Pin the server's host key so `ssh home-server` has no TOFU prompt.
     programs.ssh.knownHosts."home-server" = {
       hostNames = [
