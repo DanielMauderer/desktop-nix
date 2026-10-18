@@ -92,6 +92,10 @@
     # and on the server with every daily lock update.
     greenhouse-backend.url = "github:OpenGreenhouseManager/greenhouse_backend/v1.1.0";
     greenhouse-web.url = "github:OpenGreenhouseManager/greenhouse_web/v1.1.0";
+    # Weather station datasource (modules/nixos/server/weather-station.nix). Same
+    # policy (no nixpkgs follows), but pinned to a commit: the only tag, v1.0.0,
+    # predates the repo's flake. Switch to a tag once one exists.
+    weather-station-wrapper.url = "github:OpenGreenhouseManager/weather_station_wrapper/8efabd08f0cacd99bcd7a3453d57eed2f6796c13";
   };
 
   outputs =
@@ -157,6 +161,8 @@
           modules = [
             ./hosts/home-server/default.nix
             ./hosts/home-server/disk.nix
+            # Added here, not imported from modules/nixos/server (see lib/mkHost.nix).
+            inputs.weather-station-wrapper.nixosModules.default
           ];
         };
       };

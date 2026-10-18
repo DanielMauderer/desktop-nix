@@ -330,7 +330,24 @@ Worth knowing:
   notification route (SMTP or a webhook, plus a sops-held credential) that hasn't
   been chosen.
 
-## 9. Verify
+## 9. Weather station (greenhouse datasource)
+
+`weather-station-wrapper.service` needs the Ambient Weather keys before the
+first build. Without the file, the build fails at the sops check:
+
+```sh
+nix develop
+sops secrets/home-server/weather-station.yaml
+# weather-station-api-key: <api key>
+# weather-station-application-key: <application key>
+```
+
+Both are **bare** values. The service listens on loopback `:6001` only. Add it
+in the greenhouse UI as a device at `http://127.0.0.1:6001`. Runtime config
+(`POST /config`) lives in `/var/lib/private/weather-station-wrapper/config.json`.
+On every start, the port, keys and base URL are reset from Nix.
+
+## 10. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.

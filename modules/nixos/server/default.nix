@@ -12,6 +12,7 @@ _: {
     ./ntfy.nix
     ./postgresql.nix
     ./greenhouse.nix
+    ./weather-station.nix
     ./metrics.nix
     ./nixos-metrics.nix
     ./backup-metrics.nix

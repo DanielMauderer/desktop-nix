@@ -28,7 +28,8 @@ Headless services host — the only non-desktop machine. Install guide:
   bridge, LAN and VPN so deployments can push; an hourly oneshot feeds the node
   exporter's textfile collector with update-pipeline metrics — pending reboot,
   autoUpgrade result, nixpkgs staleness), the container groundwork for
-  docker-compose services, and the **greenhouse** app (`greenhouse.nix`). WAN
+  docker-compose services, and the **greenhouse** app (`greenhouse.nix`), and its loopback-only Ambient
+  **weather station** datasource (`weather-station.nix`). WAN
   surface is exactly UDP 51820 + TCP 80/443. Also a **fixed IPv6 interface ID** for the wired link
   (`ipv6-interface-id.nix`): the router's exposed-host entry is pinned to a
   hand-entered interface ID, so the address tail must not follow the ISP's

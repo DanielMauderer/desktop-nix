@@ -778,6 +778,22 @@
         "type": "github"
       }
     },
+    "nixpkgs_5": {
+      "locked": {
+        "lastModified": 1792094642,
+        "narHash": "sha256-zp8ToDMnqZcu4o4IH9pdwXFXGp7yLm/M0dEnNWnyd7I=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "fe13242281a67641c0102cdb1087f0ebe586c7df",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixvim": {
       "inputs": {
         "flake-parts": "flake-parts",
@@ -918,6 +934,7 @@
         "sops-nix": "sops-nix",
         "stylix": "stylix",
         "tiny-code-action": "tiny-code-action",
+        "weather-station-wrapper": "weather-station-wrapper",
         "zen-browser": "zen-browser"
       }
     },
@@ -1121,6 +1138,25 @@
         "owner": "rachartier",
         "repo": "tiny-code-action.nvim",
         "rev": "0d040ed81f7953118b81cd12681fcdfcac069803",
+        "type": "github"
+      }
+    },
+    "weather-station-wrapper": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_5"
+      },
+      "locked": {
+        "lastModified": 1792349324,
+        "narHash": "sha256-64gLGY0PYa04WI25KYaA7jX15334UgOzUWlI++AmFuk=",
+        "owner": "OpenGreenhouseManager",
+        "repo": "weather_station_wrapper",
+        "rev": "8efabd08f0cacd99bcd7a3453d57eed2f6796c13",
+        "type": "github"
+      },
+      "original": {
+        "owner": "OpenGreenhouseManager",
+        "repo": "weather_station_wrapper",
+        "rev": "8efabd08f0cacd99bcd7a3453d57eed2f6796c13",
         "type": "github"
       }
     },
