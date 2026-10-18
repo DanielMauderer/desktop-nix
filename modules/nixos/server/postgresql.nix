@@ -55,6 +55,21 @@ in
     # scheduled major upgrade (dump/restore or pg_upgrade, cluster off).
     package = pkgs.postgresql_18;
 
+    # Collation from postgres' own builtin provider, not glibc. A libc-provider
+    # cluster records the glibc collation version at initdb, and every glibc
+    # bump in a lock update (2.42 -> 2.44, Oct 2026) then turns CREATE DATABASE
+    # into a hard "template1 has a collation version mismatch" error — which
+    # breaks postgresql-setup's ensureDatabases, takes postgresql.target and
+    # every dependent unit down with it, and fails the whole autoUpgrade switch.
+    # builtin C.UTF-8 is versioned by postgres itself (codepoint sort), so the
+    # cluster no longer depends on the system glibc. Only read at initdb: an
+    # existing cluster must be dumped, wiped and restored to pick it up.
+    initdbArgs = [
+      "--encoding=UTF8"
+      "--locale-provider=builtin"
+      "--locale=C.UTF-8"
+    ];
+
     # No databases or roles yet — this is a server, not a service. A service
     # that wants one declares it from its *own* module, two lines, e.g.:
     #

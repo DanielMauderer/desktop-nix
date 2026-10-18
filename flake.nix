@@ -1066,6 +1066,12 @@
               && lib.versions.major cfg.services.postgresql.package.version == "18";
           }
           {
+            # A libc-provider cluster breaks on every glibc collation bump
+            # (CREATE DATABASE errors out, the autoUpgrade switch fails).
+            name = "PostgreSQL cluster collates with the builtin provider, not glibc";
+            assertion = lib.elem "--locale-provider=builtin" cfg.services.postgresql.initdbArgs;
+          }
+          {
             # `enableTCPIP = false` is not sufficient on its own: upstream
             # renders listen_addresses = "localhost" for it, which still binds
             # 127.0.0.1:5432. Empty means no TCP listener at all — which is what
@@ -2997,6 +3003,15 @@
             # dataDir follows the pinned major, so the cluster is where the
             # SSD-split assertion says it is.
             machine.succeed("test -d /var/lib/postgresql/18")
+
+            # initdbArgs actually reached initdb: the template every
+            # ensureDatabases copies from uses the builtin provider ('b'), so
+            # its collation version no longer tracks glibc.
+            prov = machine.succeed(
+                "sudo -u postgres psql -tAc "
+                "\"SELECT datlocprovider FROM pg_database WHERE datname = 'template1'\""
+            ).strip()
+            assert prov == "b", "template1 locale provider is not builtin: " + prov
 
             # Peer auth bites: a system user with no matching role cannot connect,
             # which is what makes a passwordless socket-only server safe.

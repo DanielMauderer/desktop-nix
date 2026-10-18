@@ -151,7 +151,8 @@ matters lives here; the rest is in the Nix code and `git log`.
   the socket means no database password exists to keep in sops. The package is
   pinned (`postgresql_18`) rather than inherited from the `stateVersion` ladder:
   an unpinned major that moves silently initialises a *new empty cluster* instead
-  of failing. Cluster on the SSD with a nightly `pg_dumpall` to the pool, the same
+  of failing. Collation uses the **builtin `C.UTF-8` provider**, not glibc, so a
+  glibc bump can't break `CREATE DATABASE` and fail the autoUpgrade. Cluster on the SSD with a nightly `pg_dumpall` to the pool, the same
   split as Forgejo. Forgejo and Paperless were deliberately **not** migrated —
   they work, and a migration buys nothing until something needs concurrency.
 - **Greenhouse app = native units from tag-pinned flake inputs** — home-server.
