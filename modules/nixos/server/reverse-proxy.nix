@@ -74,6 +74,10 @@ in
       domain = "*.${domain}";
       extraDomainNames = [ domain ];
       dnsProvider = "cloudflare";
+      # lego's propagation check otherwise asks the system resolver (the
+      # FRITZ!Box), which caches the challenge name's NXDOMAIN and never sees
+      # the TXT record, so the order times out. Ask a public resolver instead.
+      dnsResolver = "1.1.1.1:53";
       # Handed over via LoadCredential, so the root-owned sops file works as is.
       credentialFiles.CF_DNS_API_TOKEN_FILE = config.sops.secrets.cloudflare-api-token.path;
       group = config.services.nginx.group;
