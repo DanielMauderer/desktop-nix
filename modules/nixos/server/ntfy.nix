@@ -1,5 +1,5 @@
 # Push notifications: native `services.ntfy-sh`, served publicly as
-# https://ntfy.mauderer.work through the Nginx Proxy Manager container. Anything
+# https://ntfy.mauderer.work through the native nginx reverse proxy (reverse-proxy.nix). Anything
 # on this box (or off it) can reach the phone with a single HTTP POST, so
 # scripts, systemd units and Actions jobs get a notification channel without a
 # third-party service in the path.
@@ -10,9 +10,9 @@
 # auth block below.
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
-#   2586  HTTP, admitted only from the podman bridge subnet (the NPM container,
-#         which proxies it) and from the VPN. TLS terminates in NPM, so this
-#         speaks plain HTTP and must never reach the WAN.
+#   2586  HTTP, admitted only from the podman bridge subnet and the VPN; the
+#         public path is reverse-proxy.nix over loopback. TLS terminates in
+#         nginx, so this speaks plain HTTP and must never reach the WAN.
 #   9686  Prometheus metrics, on a *separate* listener bound to 127.0.0.1 and
 #         never firewalled open at all — the same posture as the exporters in
 #         metrics.nix. The separation is the point: see the note on
@@ -38,8 +38,7 @@
 { lib, ... }:
 let
   # Keep in sync with forgejo.nix — same VPN subnet as wireguard.nix, same podman
-  # bridge (virtualisation.podman.defaultNetwork: podman0, gateway 10.88.0.1)
-  # that the NPM container lives on.
+  # bridge (virtualisation.podman.defaultNetwork: podman0, gateway 10.88.0.1).
   vpnSubnet = "10.100.0.0/24";
   podmanSubnet = "10.88.0.0/16";
 
@@ -66,7 +65,7 @@ in
       # who may connect, the same arrangement as Forgejo's :4000.
       listen-http = "0.0.0.0:${toString httpPort}";
 
-      # TLS terminates at NPM, so every request arrives from the bridge gateway.
+      # TLS terminates at nginx, so every request arrives from loopback.
       # Without this, rate limiting and per-visitor accounting would see one
       # "visitor" (the proxy) for the whole internet.
       behind-proxy = true;
@@ -110,7 +109,7 @@ in
       # Prometheus metrics on their own loopback listener, scraped by
       # metrics.nix. Deliberately NOT `enable-metrics = true`, which is the
       # obvious option and the wrong one: that serves /metrics from the *main*
-      # listener, and the main listener is what NPM proxies to the WAN as
+      # listener, and the main listener is what reverse-proxy.nix publishes as
       # ntfy.mauderer.work. `metrics-listen-http` moves the endpoint to a
       # separate socket instead, and ntfy then serves it *only* there — so the
       # public vhost has no /metrics at all and the exposure story stays "the

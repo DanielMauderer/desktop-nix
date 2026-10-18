@@ -27,7 +27,7 @@ The secrets-first work is done and in git:
   `secrets/home-server/{cloudflare,paperless,grafana,forgejo,ntfy}.yaml`. The Grafana
   one ships with a random password nobody has seen — replace it in step 8. The
   Forgejo one holds `forgejo-metrics-token`, a random value that gates Forgejo's
-  `/metrics` (it rides on the listener NPM publishes); nobody needs to read it —
+  `/metrics` (it rides on the listener nginx publishes); nobody needs to read it —
   Forgejo and Prometheus both get it as a systemd credential — so it needs no
   install step. The same file holds `forgejo-runner-token`, which *does* need
   one: a registration token is only valid for the forge that minted it, so a new
@@ -99,7 +99,7 @@ registration token can only be minted once the forge is running.
 1. **First admin user.** Over the VPN, browse `http://10.100.0.1:4000` and create
    the first account — it becomes the instance admin. Self-registration is off,
    so every later account is admin-created. (Plain HTTP over WireGuard, same as
-   the NPM admin UI; `:4000` is not reachable from the WAN or the LAN.) From a
+   Grafana on `:3030`; `:4000` is not reachable from the WAN or the LAN.) From a
    console instead of the VPN, the equivalent is the admin CLI. The `forgejo`
    binary is not in the system PATH — it exists only in the unit's — so take it
    from the unit, and pass the work dir explicitly or the CLI guesses paths
@@ -113,14 +113,9 @@ registration token can only be minted once the forge is running.
    ```
    `admin user list` with the same prefix shows existing accounts;
    `admin user change-password --username maudi --random-password` resets one.
-2. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
-   domain `git.mauderer.work`, forward to `http://10.88.0.1:4000` (the podman
-   bridge gateway — i.e. this host, as seen from the NPM container), websockets
-   on, then request a Let's Encrypt cert. No *new* DNS record is needed — the
-   wildcard AAAA from `cloudflare-ddns.nix` already covers the name — but see
-   the HTTP-01 note in §9: the wildcard has to be grey-clouded while the cert is
-   issued, then switched back to proxied. In the host's
-   *Advanced* tab set `client_max_body_size 0;` so large pushes aren't truncated.
+2. **Publish it.** Nothing to do: `git.mauderer.work` is a vhost in
+   `reverse-proxy.nix` on the wildcard certificate, and the wildcard AAAA from
+   `cloudflare-ddns.nix` already covers the name.
 3. **Runner UUID + token.** `services.forgejoRunner.enable = true;` is already
    set in `hosts/home-server/default.nix`, so the only step is enrolling the
    pair this instance issued. Both are forge-specific — the committed ones
@@ -173,7 +168,7 @@ Two limits worth knowing:
 
 Paperless comes up with the rest of the system — there is no bootstrap step and
 nothing to publish. Unlike Forgejo it is **VPN-only by design**: do *not* add a
-proxy host for it in NPM, that is what would give it a WAN surface.
+vhost for it in `reverse-proxy.nix`, that is what would give it a WAN surface.
 
 1. **Log in.** With the VPN up, browse `http://10.100.0.1:28981`. The user is
    `admin`; the password is the sops secret created with the repo:
@@ -214,16 +209,9 @@ ntfy comes up with the rest of the system, but it starts **closed**: with
 health endpoint is answered with 403. That is deliberate — unlike Paperless this
 one *is* published, so it has to be shut the moment it becomes reachable.
 
-1. **Publish it.** In the NPM admin UI (`http://10.100.0.1:81`) add a proxy host:
-   domain `ntfy.mauderer.work`, forward to `http://10.88.0.1:2586` (the podman
-   bridge gateway — this host as the NPM container sees it), **websockets on**
-   (the phone apps hold a WebSocket; without this they silently never connect),
-   then request a Let's Encrypt cert. As with Forgejo, no *new* DNS record is
-   needed — the wildcard AAAA from `cloudflare-ddns.nix` already covers the name
-   — but the cert still has to be issued against a **grey-clouded** wildcard
-   (§9), and the wildcard is shared, so that toggle briefly takes every
-   `*.mauderer.work` host off the Cloudflare proxy. Do it once, issue both
-   certs, switch back.
+1. **Publish it.** Nothing to do: `ntfy.mauderer.work` is a vhost in
+   `reverse-proxy.nix` (websockets on — the phone apps hold one), on the
+   wildcard certificate.
 2. **Create the accounts**, on the server, **as root**. `ntfy` reads
    `/etc/ntfy/server.yml` and edits the auth database directly, and the database
    lives under `/var/lib/private` because the unit uses `DynamicUser` — so
@@ -293,8 +281,8 @@ Worth knowing:
 ## 8. Observability (metrics, logs, dashboards)
 
 Prometheus, Loki, Grafana Alloy and Grafana come up with the rest of the system.
-Like Paperless, Grafana is **VPN-only by design** — do *not* add a proxy host for
-it in NPM.
+Like Paperless, Grafana is **VPN-only by design** — do *not* add a vhost for
+it in `reverse-proxy.nix`.
 
 1. **Set the Grafana admin password.** The repo ships a random one that nobody
    has seen; replace it with your own before the first login:
@@ -351,17 +339,15 @@ Worth knowing:
   (host key pinned).
 - `zpool status` / `zfs list` show the data pool; `showmount -e <server>` lists
   the export; `nft list ruleset` shows only UDP 51820 + TCP 80/443 open on the
-  WAN (SSH 22, the NPM admin UI 81, Paperless 28981, Grafana 3030, Loki 3100 and
+  WAN (SSH 22, Paperless 28981, Grafana 3030, Loki 3100 and
   NFS 2049 stay off the WAN).
-- **Reverse proxy:** `podman ps` lists the `npm` container. Over the VPN, browse
-  `http://10.100.0.1:81` (default login `admin@example.com` / `changeme` — change
-  it on first use) to add proxy hosts and request Let's Encrypt certs. HTTP-01
-  validation has to reach NPM directly, so set the `*.mauderer.work` wildcard to
-  **DNS-only (grey-cloud)** first, issue the certs, then switch it back to
-  proxied. Behind the orange cloud the challenge is answered by Cloudflare's
-  edge, which cannot serve a token NPM has not been given. The wildcard covers
-  every published host, so grey-clouding it takes them all off the proxy for the
-  duration — issue new certs in one pass rather than one host at a time.
+- **Reverse proxy:** `systemctl status nginx acme-mauderer.work` — the wildcard
+  certificate is issued by DNS-01 with the `cloudflare-api-token` sops secret, so
+  the Cloudflare records stay **proxied** throughout; nothing to toggle.
+  `journalctl -u acme-mauderer.work` shows issuance and each renewal. Set
+  Cloudflare's SSL/TLS mode to **Full (strict)**. Until the first issuance
+  finishes nginx serves a self-signed placeholder and Cloudflare answers 526 for
+  a few minutes.
 - **Forgejo:** `systemctl status forgejo` and `curl -fsS
   http://10.100.0.1:4000/api/healthz`; `systemctl list-timers forgejo-dump` shows
   the nightly dump, which lands in `/hdd_pool_1/services/forgejo/dump`. Once the

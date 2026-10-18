@@ -57,8 +57,8 @@ let
   postgresPort = 9187; # postgresql.nix — the exporter is declared next to the db
 
   # forgejo.nix. The one scrape target on this box that is not loopback-bound:
-  # Forgejo serves /metrics from its main listener, which NPM proxies to the
-  # WAN. It is therefore the one target that needs a credential — see the
+  # Forgejo serves /metrics from its main listener, which reverse-proxy.nix
+  # publishes to the WAN. It is therefore the one target that needs a credential — see the
   # forgejoJob note below.
   forgejoPort = 4000;
 

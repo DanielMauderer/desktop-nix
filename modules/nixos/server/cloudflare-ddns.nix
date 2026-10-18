@@ -18,8 +18,8 @@
 #
 # Interaction with reverse-proxy.nix: because this record is *proxied*, requests
 # to `*.mauderer.work` arrive from Cloudflare's edge rather than from the client,
-# and NPM's HTTP-01 challenges traverse the proxy. That works, but DNS-01 is the
-# robust option for a proxied wildcard — see the header of reverse-proxy.nix.
+# and the reverse proxy's certificate is issued by DNS-01 with this module's token —
+# see the header of reverse-proxy.nix.
 #
 # Cloudflare must be able to reach the box over IPv6 on 80/443 for the proxy to
 # have an origin: the firewall already allows both (allowedTCPPorts covers v6),

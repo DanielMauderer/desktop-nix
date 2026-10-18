@@ -6,8 +6,8 @@
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
 #   8080       nginx, bound to 127.0.0.1: the static SPA plus `/api` proxied to
-#              web_api. NPM reaches it over loopback — its proxy host for the
-#              greenhouse domain must point at http://127.0.0.1:8080.
+#              web_api. reverse-proxy.nix publishes it as
+#              greenhouse.mauderer.work over loopback.
 #   5001-5004, 5101-5102
 #              the services. They bind 0.0.0.0 (hard-coded upstream) but no
 #              firewall rule admits them, so only loopback reaches them. Note
@@ -152,7 +152,7 @@ in
       }) dbRoles;
     };
 
-    # Static SPA + same-origin /api, loopback only; NPM stays the public proxy.
+    # Static SPA + same-origin /api, loopback only; reverse-proxy.nix is the public side.
     nginx = {
       enable = true;
       virtualHosts.greenhouse = {

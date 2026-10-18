@@ -20,17 +20,16 @@
 #
 # What they do prove is the half that actually breaks here:
 #
-#   * **certificates.** NPM owns the Let's Encrypt certificates and renews them
-#     itself, inside a container, on a schedule nothing in this repo can see. An
-#     expiry countdown is the only warning before a renewal that quietly stopped
-#     working takes a public hostname offline.
-#   * **proxy routing.** The public probes go to 127.0.0.1:443 — NPM publishes
+#   * **certificates.** security.acme renews the wildcard certificate on a systemd
+#     timer, but a DNS-01 renewal that fails (token revoked, API change) does so
+#     quietly. An expiry countdown is the only warning before a renewal that
+#     stopped working takes a public hostname offline.
+#   * **proxy routing.** The public probes go to 127.0.0.1:443 — nginx binds
 #     :443 on all interfaces (reverse-proxy.nix), so loopback reaches it — with
 #     the real hostname supplied as SNI and as the Host header. That traverses
 #     the entire proxy chain, TLS termination and backend routing included,
-#     without depending on DNS or on the router hairpinning. If a proxy host is
-#     misconfigured in NPM's UI (which is where proxy hosts live — they are not
-#     in Nix), this is what notices.
+#     without depending on DNS or on the router hairpinning. If a vhost or its
+#     upstream is broken, this is what notices.
 #   * **DNS.** cloudflare-ddns.nix republishes the box's IPv6 into Cloudflare
 #     every five minutes. Asking a public resolver for the record is how a
 #     stalled updater becomes visible; nothing else here would show it.
@@ -40,22 +39,23 @@
 # `insecure_skip_verify` is deliberately *not* set. Connecting to 127.0.0.1
 # while asking for a certificate valid for `ntfy.mauderer.work` works because
 # `tls_config.server_name` drives both SNI and the name the certificate is
-# checked against — so the probe fails if NPM starts serving the wrong
+# checked against — so the probe fails if nginx starts serving the wrong
 # certificate for that hostname, which is exactly the fault worth catching.
 { lib, pkgs, ... }:
 let
   blackboxPort = 9115;
 
-  # reverse-proxy.nix publishes the NPM container's :443 on all interfaces.
+  # reverse-proxy.nix binds nginx's :443 on all interfaces.
   proxyHttpsPort = 443;
 
-  # The hostnames NPM terminates TLS for, each with its own Let's Encrypt
-  # certificate. Kept as literals in sync with forgejo.nix and ntfy.nix, the
-  # same convention metrics.nix uses for its siblings' ports — adding a proxy
-  # host in NPM's UI without adding it here means it simply is not watched.
+  # The hostnames nginx terminates TLS for (all on the one wildcard
+  # certificate). Kept as literals in sync with reverse-proxy.nix's vhosts, the
+  # same convention metrics.nix uses for its siblings' ports — adding a vhost
+  # without adding it here means it simply is not watched.
   publicHosts = [
     "ntfy.mauderer.work" # ntfy.nix
     "git.mauderer.work" # forgejo.nix
+    "greenhouse.mauderer.work" # greenhouse.nix
   ];
 
   # Loopback health endpoints, one per service that has one. These overlap with
@@ -83,13 +83,13 @@ let
       http = {
         method = "GET";
         # The target URL names 127.0.0.1, so without these two the request
-        # would arrive at NPM with no usable SNI and be routed by the default
-        # host. Together they make it indistinguishable from a real client's
+        # would arrive at nginx with no usable SNI and hit the catch-all
+        # vhost. Together they make it indistinguishable from a real client's
         # request except for the network path.
         headers.Host = host;
         tls_config.server_name = host;
         # A redirect to the canonical URL is a healthy answer, and several of
-        # these do redirect. What is being probed is that NPM routes and the
+        # these do redirect. What is being probed is that nginx routes and the
         # backend responds, not that the first response is a 200.
         valid_status_codes = [
           200

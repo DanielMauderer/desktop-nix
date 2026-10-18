@@ -409,31 +409,28 @@
               && builtins.elem 443 cfg.networking.firewall.allowedTCPPorts;
           }
           {
-            name = "reverse-proxy runs the Nginx Proxy Manager container";
-            assertion = cfg.virtualisation.oci-containers.containers ? npm;
-          }
-          {
-            name = "NPM admin UI (81) never exposed on the WAN";
-            assertion = !(builtins.elem 81 cfg.networking.firewall.allowedTCPPorts);
-          }
-          {
-            name = "NPM admin UI (81) admitted on the wg0 VPN interface";
-            assertion = builtins.elem 81 cfg.networking.firewall.interfaces.wg0.allowedTCPPorts;
-          }
-          {
-            # The reason this replaced the old "published on 10.100.0.1 only"
-            # assertion: podman's publish DNAT is IPv4-only without an
-            # IPv6-enabled network, and this box is IPv6-only inbound, so
-            # published ports left :80/:443 refusing over v6 — ACME and the
-            # Cloudflare origin both. In the host netns the input chain governs
-            # nginx directly, which is why the wg0 rule above is now the control.
-            # Publishing anything again would silently reinstate the bypass.
-            name = "NPM runs in the host netns and publishes no ports (DNAT would bypass the firewall)";
+            name = "reverse-proxy is native nginx with a DNS-01 wildcard certificate";
             assertion =
               let
-                npm = cfg.virtualisation.oci-containers.containers.npm;
+                cert = cfg.security.acme.certs."mauderer.work" or { };
               in
-              builtins.elem "--network=host" (npm.extraOptions or [ ]) && (npm.ports or [ ]) == [ ];
+              cfg.services.nginx.enable
+              && (cert.domain or null) == "*.mauderer.work"
+              && (cert.dnsProvider or null) == "cloudflare";
+          }
+          {
+            name = "every public vhost uses the wildcard certificate and forces HTTPS";
+            assertion = lib.all (v: v.useACMEHost == "mauderer.work" && v.forceSSL) (
+              lib.attrValues (
+                lib.filterAttrs (n: _: lib.hasSuffix ".mauderer.work" n) cfg.services.nginx.virtualHosts
+              )
+            );
+          }
+          {
+            # The DNS record is a wildcard: without this, any unconfigured
+            # *.mauderer.work name lands on whichever vhost nginx loaded first.
+            name = "nginx has a catch-all vhost that rejects unknown names";
+            assertion = cfg.services.nginx.virtualHosts.catch-all.rejectSSL or false;
           }
           {
             # The Actions runner deliberately holds this socket, but it does so
@@ -446,12 +443,6 @@
                 mounts = lib.concatMap (c: c.volumes) (lib.attrValues cfg.virtualisation.oci-containers.containers);
               in
               !(lib.any (v: lib.hasInfix "docker.sock" v || lib.hasInfix "podman.sock" v) mounts);
-          }
-          {
-            name = "NPM container runs with no-new-privileges hardening";
-            assertion = builtins.elem "--security-opt=no-new-privileges" (
-              cfg.virtualisation.oci-containers.containers.npm.extraOptions or [ ]
-            );
           }
           {
             name = "ZFS filesystem support enabled";
@@ -498,7 +489,7 @@
           }
           {
             # Forgejo is the only service here whose /metrics rides on a
-            # listener NPM proxies to the WAN, so the token is what keeps repo
+            # listener nginx proxies to the WAN, so the token is what keeps repo
             # counts and the exact version off the public internet. Both halves
             # are asserted: that metrics are on at all (otherwise the scrape job
             # in metrics.nix is a permanently-down target), and that the token
@@ -575,7 +566,7 @@
           }
           {
             # Unlike Forgejo there is no public hostname for the archive: no
-            # nginx vhost, no NPM proxy host, nothing for TLS to terminate on.
+            # nginx vhost, no reverse-proxy vhost, nothing for TLS to terminate on.
             # Adding one would silently undo the VPN-only property.
             name = "Paperless is not published through a reverse proxy";
             assertion = !cfg.services.paperless.configureNginx && cfg.services.paperless.domain == null;
@@ -999,7 +990,7 @@
           }
           {
             # The counterpart of the Paperless exposure assertion, one step
-            # weaker on purpose: ntfy IS public, but only through NPM. Its port
+            # weaker on purpose: ntfy IS public, but only through nginx. Its port
             # must still never join the globally-open set — the "WAN TCP surface
             # is exactly 80/443" assertion above is what enforces that.
             name = "ntfy listens on 2586 and never on the WAN directly";
@@ -1043,7 +1034,7 @@
           }
           {
             # `enable-metrics` would serve /metrics from the main listener —
-            # the one NPM publishes as ntfy.mauderer.work. The dedicated
+            # the one nginx publishes as ntfy.mauderer.work. The dedicated
             # listener is the whole point, so both halves are stated: the
             # public one off, the loopback one on. Anything but a 127.0.0.1
             # bind here silently puts the endpoint on the LAN or the WAN.
@@ -1567,7 +1558,7 @@
       #
       # Kept out of observabilityTestNode deliberately. That test asserts every
       # scrape target is healthy, and these probes are aimed at things a VM does
-      # not have — NPM on :443, the public DNS records, the service health
+      # not have — nginx on :443, the public DNS records, the service health
       # endpoints — so they are *expected* to fail there and would turn a
       # meaningful assertion into one that has to carve out exceptions.
       #
@@ -2168,7 +2159,7 @@
 
             # The metrics endpoint is on, and gated. Both directions are checked
             # because only the pair is meaningful: an endpoint that answers
-            # without the token is a public read of the forge through NPM, and a
+            # without the token is a public read of the forge through nginx, and a
             # token that Forgejo does not actually accept is a permanently-down
             # scrape target that nobody notices.
             machine.fail("curl -fsS http://localhost:4000/metrics")
@@ -2304,7 +2295,7 @@
             machine.fail(f"grep -q upstream-base-url {conf}")
 
             # Metrics live on their own loopback listener and *only* there. The
-            # second half is the one that matters: :2586 is what NPM publishes
+            # second half is the one that matters: :2586 is what nginx publishes
             # as ntfy.mauderer.work, so a /metrics answering there would be a
             # public read. ntfy serves the endpoint on exactly one listener, and
             # this is the check that it is the right one.
@@ -2357,7 +2348,7 @@
             machine.wait_for_open_port(3030)
 
             # The data-dirs oneshots ran: the pool layout exists with the 0755
-            # on the shared parent that npm/forgejo/paperless/loki/grafana all
+            # on the shared parent that forgejo/paperless/loki/grafana all
             # have to leave behind, and 0750 service-owned subtrees.
             # The pool root itself included: the node seeds it 0750 nobody, so
             # this is 755 only because a data-dirs oneshot widened it.

@@ -119,7 +119,7 @@ in
 
   # `location` is on the ZFS pool, and postgresqlBackup declares it through
   # systemd.tmpfiles, which runs before zfs-mount.service. Same fix, and the same
-  # reasoning, as npm-data-dirs / forgejo-dump-dirs / paperless-data-dirs: a
+  # reasoning, as forgejo-dump-dirs / paperless-data-dirs: a
   # oneshot inside the consumer's own dependency chain, so it cannot run before
   # the pool is mounted. The early tmpfiles run still creates a shadow directory
   # under the unmounted /hdd_pool_1; it is hidden by the mount and harmless.
@@ -138,8 +138,8 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
     };
-    # /hdd_pool_1/services is shared with npm, forgejo and paperless, whose
-    # oneshots also touch it with no ordering between the four, so they must all
+    # /hdd_pool_1/services is shared with forgejo, paperless, loki and grafana,
+    # whose oneshots also touch it with no ordering between them, so they must all
     # agree on the result or the last one to run locks the others out of their
     # own subtree. The agreed state is root:root 0755 — world-*traversable*, so
     # each unprivileged service can reach its own directory, while the subtrees

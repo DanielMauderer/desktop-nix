@@ -1,125 +1,98 @@
-# Public reverse proxy for the home-server, run as the Nginx Proxy Manager (NPM)
-# container. Let's Encrypt certs and proxy hosts are managed through NPM's web UI
-# (DNS-01 challenge via Cloudflare — see the DNS note below); Nix owns the
-# container, its network model and its volumes.
+# Public reverse proxy for the home-server: native `services.nginx` with one
+# wildcard Let's Encrypt certificate from `security.acme`. Proxy hosts are the
+# `vhosts` attrset below — adding a public service is one line here (plus one in
+# blackbox.nix's `publicHosts` so it is watched).
 #
-# Networking: the container runs in the HOST network namespace (`--network=host`),
-# not with published ports. This is not a convenience — the web services are
-# reachable over IPv6 only (the proxied records are AAAA; see
-# cloudflare-ddns.nix), and podman's port publishing does not reach that. `ports = [ "80:80" ]` becomes an nftables DNAT rule in the `ip`
-# family only; with no IPv6-enabled podman network there is no `ip6` counterpart.
-# Measured from the LAN: `10.100.0.1:80` answered 200 while the host's global
-# IPv6 refused the connection instantly. Since the only public record is an AAAA,
-# that meant Let's Encrypt's HTTP-01 fetch was refused outright ("Error getting
-# validation data") and Cloudflare had no origin to proxy to.
-# In the host netns nginx binds :80/:443 itself, on both families, with no DNAT.
+# Certificates: `*.mauderer.work` + the apex, issued by **DNS-01** through
+# Cloudflare with the same `cloudflare-api-token` sops secret cloudflare-ddns.nix
+# uses (Zone:DNS:Edit + Zone:Zone:Read). DNS-01 needs no inbound connectivity, so
+# it works with the orange cloud left on — which is not optional: the web names
+# are proxied AAAA-only, and the Cloudflare proxy is the only path for IPv4
+# visitors. It is also the only challenge that can issue a wildcard. lego renews
+# at 30 days left via `acme-mauderer.work.timer`. Cloudflare's SSL mode must be
+# **Full (strict)**: the origin certificate is a real one.
+#
+# Until the first issuance succeeds, the NixOS module serves a self-signed
+# placeholder (acme-selfsigned-*), so nginx starts regardless; Cloudflare answers
+# 526 for those few minutes.
 #
 # Exposure:
-#   80, 443  bound on all interfaces — the public reverse proxy plus the
-#            HTTP-01 ACME challenge path. These are the only extra WAN ports.
-#   81       the admin UI, VPN-only.
-#   Anything NPM binds internally (its Node backend) is no longer confined to a
-#   container netns and lands on the host. None of it is in any firewall rule, so
-#   the input chain drops it everywhere except loopback — check `ss -tlnp` after
-#   a version bump if a new listener appears, and for a port conflict with the
-#   native services on this box.
+#   80, 443  bound on all interfaces, both families — the only extra WAN ports.
+#            :80 only redirects to HTTPS (`forceSSL`); ACME does not need it.
+# Unknown names under the wildcard hit the catch-all vhost, which refuses the
+# TLS handshake instead of falling through to whichever vhost nginx saw first.
 #
-# What keeps :81 off the WAN is now the firewall, and that inverts the rationale
-# this file used to carry. With published ports, podman's DNAT sits in the forward
-# path and bypasses the nixos-fw input chain, so `allowedTCPPorts` could not
-# protect a container port at all and the `10.100.0.1:81:81` publish bind was the
-# only real control. With host networking there is no DNAT: nginx is an ordinary
-# host listener, so the input chain applies to it exactly as it does to sshd, and
-# the wg0-only rule below is the enforcement rather than a statement of intent.
-#
-# Upstreams must be addressed as 127.0.0.1 in NPM's UI, not as the podman bridge
-# gateway (10.88.0.1). The proxy no longer sits on that bridge, and with no
-# container attached to it the interface may not exist at all. Host-local traffic
-# traverses `lo`, which the firewall accepts unconditionally, so the
-# source-restricted rules in forgejo.nix / ntfy.nix / logs.nix keep admitting the
-# proxy without change.
-#
-# DNS: `*.mauderer.work` is a *proxied* (orange-cloud) AAAA record kept current by
-# cloudflare-ddns.nix. The web names have no A record, so the orange cloud is
-# what gives IPv4 visitors a path in — grey-cloud is a debugging state, not a
-# steady one. (The line now has a public IPv4, but it serves only the WireGuard
-# endpoint; the router forwards no IPv4 80/443.) Certificates should therefore be issued by **DNS-01**
-# (NPM: Certificates → Add → DNS Challenge → Cloudflare), which needs no inbound
-# connectivity and is the only option for a wildcard. Note that NPM reads those
-# credentials from its own UI-entered state on the pool, *not* from the
-# `cloudflare-api-token` sops secret that cloudflare-ddns.nix uses — the same
-# token scope (Zone:DNS:Edit + Zone:Zone:Read) works, but it is config outside
-# this flake. Port 80 stays open regardless: ACME no longer needs it, the
-# HTTP→HTTPS redirect does.
-_: {
-  # Public HTTP/HTTPS for the reverse proxy (and HTTP-01 challenges on :80).
+# Upstreams are loopback. Host-local traffic traverses `lo`, which the firewall
+# accepts unconditionally, so the source-restricted rules in forgejo.nix /
+# ntfy.nix need no entry for the proxy.
+{ config, ... }:
+let
+  domain = "mauderer.work";
+
+  proxy = port: extra: {
+    useACMEHost = domain;
+    forceSSL = true;
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:${toString port}";
+      proxyWebsockets = true;
+    }
+    // extra;
+  };
+
+  vhosts = {
+    # forgejo.nix. Large bodies for HTTPS pushes and LFS uploads (NixOS's
+    # default is 10m; Cloudflare's free plan caps a request at 100 MB anyway).
+    "git.${domain}" = proxy 4000 { extraConfig = "client_max_body_size 512m;"; };
+
+    # ntfy.nix. Upstream's recommended nginx settings: subscriptions are
+    # long-lived streams, so no buffering and generous timeouts.
+    "ntfy.${domain}" = proxy 2586 {
+      extraConfig = ''
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_connect_timeout 3m;
+        proxy_send_timeout 3m;
+        proxy_read_timeout 3m;
+        client_max_body_size 0;
+      '';
+    };
+
+    # greenhouse.nix: its own loopback-only nginx vhost (SPA + /api).
+    "greenhouse.${domain}" = proxy 8080 { };
+  };
+in
+{
   networking.firewall.allowedTCPPorts = [
     80
     443
   ];
 
-  # NPM admin UI: VPN-only, never the WAN. In the host netns nginx binds :81 on
-  # all interfaces, so this rule (plus 81's absence from allowedTCPPorts) is what
-  # enforces it — see the header on why that is now sufficient.
-  networking.firewall.interfaces.wg0.allowedTCPPorts = [ 81 ];
-
-  virtualisation.oci-containers.containers.npm = {
-    image = "jc21/nginx-proxy-manager:2.15.1";
-    volumes = [
-      "/hdd_pool_1/services/npm/data:/data"
-      "/hdd_pool_1/services/npm/letsencrypt:/etc/letsencrypt"
-    ];
-    # Anti-escape hardening: block in-container privilege escalation. By omission
-    # there is also no --privileged, no host device passthrough and — crucially —
-    # no docker/podman socket mount (a container with the management socket is
-    # effectively root on the host). Only the two data volumes are bind-mounted.
-    #
-    # --network=host gives up network-namespace isolation for this one container
-    # (see the header): the mount, PID and user namespaces are untouched, and
-    # nothing here was relying on the netns as a boundary — every port it holds
-    # was published to the host anyway.
-    extraOptions = [
-      "--network=host"
-      "--security-opt=no-new-privileges"
-    ];
-  };
-
-  # Bind-mount sources for the container. Podman does not create them: a missing
-  # path makes it exit 125 ("statfs ...: no such file or directory"), which in
-  # turn fails the whole nixos-rebuild switch.
-  #
-  # systemd.tmpfiles did not do the job: with the rules present in
-  # /etc/tmpfiles.d/00-nixos.conf and the pool mounted, a switch still left
-  # data/ and letsencrypt/ absent. This unit sits inside podman-npm's own
-  # dependency chain, which already requires zfs-mount.service, so it cannot run
-  # before the pool is mounted or after the container is started.
-  systemd.services.npm-data-dirs = {
-    requires = [ "zfs-mount.service" ];
-    after = [ "zfs-mount.service" ];
-    before = [ "podman-npm.service" ];
-    requiredBy = [ "podman-npm.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
+  security.acme = {
+    acceptTerms = true;
+    defaults.email = "daniel090798@gmail.com";
+    certs.${domain} = {
+      domain = "*.${domain}";
+      extraDomainNames = [ domain ];
+      dnsProvider = "cloudflare";
+      # Handed over via LoadCredential, so the root-owned sops file works as is.
+      credentialFiles.CF_DNS_API_TOKEN_FILE = config.sops.secrets.cloudflare-api-token.path;
+      group = config.services.nginx.group;
     };
-    # 0755 on the shared `services` parent, not 0750: forgejo-dump-dirs and
-    # paperless-data-dirs create sibling directories there with no ordering
-    # between the three units, so all of them must leave the parent in the same
-    # state. Traversable-but-not-writable lets each unprivileged service reach
-    # its own subtree; the subtrees themselves stay 0750.
-    script = ''
-      mkdir -p /hdd_pool_1/services/npm/data /hdd_pool_1/services/npm/letsencrypt
-      chmod 0755 /hdd_pool_1 /hdd_pool_1/services
-      chmod 0750 /hdd_pool_1/services/npm
-    '';
   };
 
-  # The data lives on the ZFS pool, so start the container only once the pool is
-  # mounted. The former wireguard-wg0 dependency is gone with the publish bind
-  # that needed it: nothing binds a wg0 address any more, so a VPN that failed to
-  # come up would have taken the public proxy down with it for no reason.
-  systemd.services.podman-npm = {
-    after = [ "zfs-mount.service" ];
-    requires = [ "zfs-mount.service" ];
+  services.nginx = {
+    enable = true;
+    recommendedProxySettings = true;
+    recommendedTlsSettings = true;
+    recommendedOptimisation = true;
+    recommendedGzipSettings = true;
+
+    virtualHosts = vhosts // {
+      catch-all = {
+        default = true;
+        rejectSSL = true;
+        locations."/".return = "444";
+      };
+    };
   };
 }

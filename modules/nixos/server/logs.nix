@@ -59,7 +59,7 @@ let
   prometheusPort = 9090;
 
   # Keep in sync with forgejo.nix and nfs.nix — same LAN, same VPN subnet as
-  # wireguard.nix, same podman bridge as the NPM container and Actions jobs.
+  # wireguard.nix, same podman bridge as Actions jobs.
   lanSubnet = "192.168.178.0/24";
   vpnSubnet = "10.100.0.0/24";
   podmanSubnet = "10.88.0.0/16";
@@ -261,7 +261,7 @@ in
       '';
 
       # The client ingest port gets the *interface* tier instead — the same one
-      # grafana.nix, paperless.nix and the NPM admin UI use. Loki needs
+      # grafana.nix and paperless.nix use. Loki needs
       # `extraInputRules` only because it has three source subnets to name; this
       # has exactly one source, the tunnel, and `interfaces.wg0` says so more
       # directly than a source-address match would. Absent from
@@ -280,8 +280,8 @@ in
   };
 
   # Every path above is on the ZFS pool, which systemd.tmpfiles cannot create
-  # because it runs before zfs-mount.service. Same fix as npm-data-dirs,
-  # forgejo-dump-dirs and paperless-data-dirs: a oneshot inside loki.service's
+  # because it runs before zfs-mount.service. Same fix as forgejo-dump-dirs
+  # and paperless-data-dirs: a oneshot inside loki.service's
   # own dependency chain, so it cannot run before the pool is mounted. The
   # requiredBy/before pair also orders loki.service after the mount, so that
   # unit needs no extra ordering of its own.
@@ -294,7 +294,7 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
     };
-    # /hdd_pool_1/services is shared with npm, forgejo, paperless and grafana,
+    # /hdd_pool_1/services is shared with forgejo, paperless and grafana,
     # and none of those oneshots are ordered against each other — so all of them
     # must leave the parent in the same state or the last one to run locks the
     # others out of their own subtree. The agreed state is root:root 0755:

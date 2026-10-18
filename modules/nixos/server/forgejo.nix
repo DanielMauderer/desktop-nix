@@ -1,19 +1,18 @@
 # Self-hosted forge: native `services.forgejo`, SQLite-backed, served publicly as
-# https://git.mauderer.work through the Nginx Proxy Manager container. GitHub is
+# https://git.mauderer.work through the native nginx reverse proxy (reverse-proxy.nix). GitHub is
 # demoted to a push-mirror target (see the per-repo step in INSTALL.md), so this
 # box — not GitHub — is the source of truth for the repositories it hosts.
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
-#   4000  HTTP, admitted only from the podman bridge subnet, because the NPM
-#         container is what proxies it. TLS terminates in NPM, so this speaks
-#         plain HTTP and must never reach the WAN.
+#   4000  HTTP, admitted only from the podman bridge subnet and the VPN; the
+#         public path is reverse-proxy.nix over loopback. TLS terminates in
+#         nginx, so this speaks plain HTTP and must never reach the WAN.
 #   2222  Forgejo's built-in Go SSH server for git clone/push, admitted only from
 #         the LAN and the wg0 VPN. Host sshd (:22, VPN-only) is untouched.
 #
 # Source-restricted nftables rules are used rather than `allowedTCPPorts` for the
 # same reason nfs.nix does it: those ports must never be globally open. Note this
-# is a *host* service, not a published container port, so — unlike NPM's admin UI
-# — the input chain really does apply here.
+# is a *host* service, not a published container port, so the input chain really does apply here.
 #
 # Storage: state stays on the SSD root at the module default /var/lib/forgejo.
 # SQLite and git object churn are latency-bound, and every path under `stateDir`
@@ -27,7 +26,7 @@ let
   vpnSubnet = "10.100.0.0/24";
 
   # podman's default network, from virtualisation.podman.defaultNetwork: bridge
-  # podman0, gateway 10.88.0.1. The NPM container lives here. Actions job
+  # podman0, gateway 10.88.0.1. Actions job
   # containers do *not* — forgejo-runner.nix leaves `container.network` unset so
   # podman builds a throwaway network per job; those jobs reach the forge over
   # its public URL, not this rule.
@@ -57,7 +56,7 @@ in
       server = {
         DOMAIN = domain;
         ROOT_URL = "https://${domain}/";
-        # TLS terminates at NPM; Forgejo itself speaks plain HTTP on the bridge.
+        # TLS terminates at nginx (reverse-proxy.nix); Forgejo speaks plain HTTP.
         PROTOCOL = "http";
         HTTP_ADDR = "0.0.0.0";
         HTTP_PORT = httpPort;
@@ -102,10 +101,10 @@ in
       # The token is not optional here, which makes this the one metrics
       # endpoint on the box that is *not* simply left open. Everything else in
       # metrics.nix binds 127.0.0.1 and is unreachable from anywhere else;
-      # this one rides on :4000, and :4000 is what NPM proxies to the WAN as
+      # this one rides on :4000, and :4000 is what reverse-proxy.nix publishes as
       # git.mauderer.work — so an untokenized /metrics would be a publicly
-      # readable inventory of the forge. NPM's proxy hosts are UI-managed, so
-      # there is no Nix-side way to carve out a path; requiring the token is.
+      # readable inventory of the forge. The vhost could deny the path, but the
+      # token also covers the VPN listener, so it stays the control.
       metrics.ENABLED = true;
     };
 
@@ -139,7 +138,7 @@ in
   # is reachable at http://10.100.0.1:4000 for the bootstrap steps that need it —
   # creating the first admin and minting the runner token — and stays usable if
   # DNS or the cert ever breaks. That path is plain HTTP over WireGuard, the same
-  # posture as NPM's own admin UI on :81. :2222 is git-over-SSH, LAN and VPN only.
+  # posture as Grafana on :3030. :2222 is git-over-SSH, LAN and VPN only.
   networking.firewall.extraInputRules = ''
     ip saddr { ${podmanSubnet}, ${vpnSubnet} } tcp dport ${toString httpPort} accept
     ip saddr { ${lanSubnet}, ${vpnSubnet} } tcp dport ${toString sshPort} accept
@@ -147,7 +146,7 @@ in
 
   # `dump.backupDir` lives on the ZFS pool, and the module declares it via
   # systemd.tmpfiles, which runs too early to see the mount. Same fix as
-  # npm-data-dirs: a oneshot inside the consumer's own dependency chain, so it
+  # paperless-data-dirs: a oneshot inside the consumer's own dependency chain, so it
   # cannot run before the pool is mounted or after the dump has started. The
   # requiredBy/before pair also orders the consumers themselves after the mount,
   # so no extra ordering on those units is needed.
@@ -181,13 +180,12 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
     };
-    # Unlike NPM — a rootful container, which ignores these bits — forgejo runs
-    # unprivileged, so it needs search (x) on *every* parent to reach the dump
+    # Forgejo runs unprivileged, so it needs search (x) on *every* parent to reach the dump
     # directory. `mkdir -p` would leave the parents root:root 0750, which locks
     # it out.
     #
-    # /hdd_pool_1/services is shared with npm and paperless, whose oneshots also
-    # touch it with no ordering between the three, so they must agree on the
+    # /hdd_pool_1/services is shared with paperless, loki, grafana and postgresql,
+    # whose oneshots also touch it with no ordering between them, so they must agree on the
     # result or the last one to run locks the others out. The agreed state is
     # root:root 0755 — world-*traversable* so each unprivileged service can reach
     # its own directory, while the subtrees stay 0750 and owned by their service.

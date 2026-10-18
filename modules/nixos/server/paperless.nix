@@ -4,9 +4,9 @@
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
 #   28981  HTTP, admitted only on the wg0 interface — the same posture as host
-#          sshd in ssh.nix. Deliberately NOT proxied through NPM: unlike Forgejo
-#          there is no public hostname for it, so the archive never answers on
-#          the WAN at all. Do not add a proxy host for it in the NPM UI.
+#          sshd in ssh.nix. Deliberately NOT proxied: unlike Forgejo there
+#          is no public hostname for it, so the archive never answers on the
+#          WAN at all. Do not add a vhost for it in reverse-proxy.nix.
 #
 # The port is left out of `allowedTCPPorts` entirely and admitted per-interface,
 # so the "WAN TCP surface is exactly 80/443" assertion in flake.nix keeps
@@ -102,7 +102,7 @@ in
 
   # Every directory above is on the ZFS pool, and upstream declares them through
   # systemd.tmpfiles, which runs before zfs-mount.service. Same fix as
-  # npm-data-dirs and forgejo-dump-dirs: a oneshot inside the consumers' own
+  # forgejo-dump-dirs: a oneshot inside the consumers' own
   # dependency chain, so it cannot run before the pool is mounted. The
   # requiredBy/before pair also orders the consumers after the mount, so those
   # units need no extra ordering of their own.
@@ -120,8 +120,8 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
     };
-    # /hdd_pool_1/services is shared with npm and forgejo, and all three of these
-    # oneshots touch it with no ordering between them — so they must agree on the
+    # /hdd_pool_1/services is shared with forgejo, loki, grafana and postgresql,
+    # and these oneshots touch it with no ordering between them — so they must agree on the
     # result or the last one to run locks the others out of their own subtree.
     # The agreed state is root:root 0755: world-*traversable* so every unprivileged
     # service can reach its own directory, while each subtree stays 0750 and owned

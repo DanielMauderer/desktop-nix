@@ -39,7 +39,7 @@
 let
   # ntfy.nix. Loopback rather than the public URL: the notifier runs on the same
   # box, so there is no reason for the notification to leave and come back
-  # through NPM — and this path keeps working when DNS or the certificate is the
+  # through nginx — and this path keeps working when DNS or the certificate is the
   # thing that broke.
   ntfyLocal = "http://127.0.0.1:2586";
 
@@ -218,7 +218,7 @@ let
       title = "TLS certificate expiring";
       expr = "(probe_ssl_earliest_cert_expiry - time()) / 86400 < 21";
       for = "1h";
-      summary = "{{ $labels.instance }}'s certificate expires in under 21 days; NPM renews at 30, so renewal has stopped.";
+      summary = "{{ $labels.instance }}'s certificate expires in under 21 days; ACME renews at 30, so renewal has stopped.";
     }
     {
       uid = "hs-probe-failing";

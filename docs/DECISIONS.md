@@ -89,35 +89,30 @@ matters lives here; the rest is in the Nix code and `git log`.
   `performance`. `programs.gamemode` flips the governor per game session instead.
 - **waydroid** (Android container) — private-laptop + desktop; never work-laptop.
 - **server** (WireGuard server, SSH-over-VPN, ZFS, NFS) — home-server only.
-- **Reverse proxy = Nginx Proxy Manager container** (UI-driven LE certs), not
-  native `services.nginx`/`security.acme` — home-server only. It runs with
-  **`--network=host`, publishing no ports**, which reverses the earlier
-  "publish the admin port on `10.100.0.1:81`" model. That model existed because
-  podman's publish DNAT bypasses the input-chain firewall — true, but it also
-  only ever emitted rules in the nftables `ip` family, and this box is IPv6-only
-  inbound (DS-Lite), so `:80`/`:443` refused every v6 connection: Let's Encrypt's
-  HTTP-01 fetch and Cloudflare's origin alike. In the host netns nginx is an
-  ordinary host listener with no DNAT, so `allowedTCPPorts` governs it and the
-  wg0-only rule is what keeps `:81` off the WAN. Cost: this one container gives
-  up its network namespace (mount/PID/user namespaces and the hardening below
-  are untouched), and upstreams must be `127.0.0.1` in NPM's UI rather than the
-  podman bridge gateway. Containers run rootful-but-hardened
-  (`no-new-privileges`); no service container ever mounts the podman/docker
+- **Reverse proxy = native `services.nginx` + `security.acme`** — home-server
+  only. Replaced the Nginx Proxy Manager container: its UI-held proxy hosts and
+  certificates were state outside the flake, and its certs were issued by
+  HTTP-01, which meant grey-clouding the shared wildcard record for every
+  issuance. Vhosts are now an attrset in `reverse-proxy.nix`, upstreams on
+  loopback, and nginx is an ordinary host listener, so the input chain governs
+  `:80`/`:443` with no container DNAT or admin port to guard. Any service container still runs
+  rootful-but-hardened (`no-new-privileges`) and never mounts the podman/docker
   management socket.
-- **Certificates are issued by DNS-01, not HTTP-01** — the corollary of the
-  IPv6-only inbound path. DNS-01 needs no inbound connectivity, survives the
-  orange cloud (which is not optional here: with no public IPv4, the Cloudflare
-  proxy is the only path for v4 visitors), and is the sole option for a
-  wildcard. The Cloudflare credential is entered in NPM's UI and lives in
-  container state on the pool — the `cloudflare-api-token` sops secret is
-  `cloudflare-dyndns`'s, not NPM's, though the same zone scope fits both.
+- **Certificates are one DNS-01 wildcard, not per-host HTTP-01** — the corollary
+  of the IPv6-only inbound path. DNS-01 needs no inbound connectivity, survives
+  the orange cloud (which is not optional here: the web names have no public A
+  record, so the Cloudflare proxy is the only path for v4 visitors), and is the
+  sole option for a wildcard. lego reuses `cloudflare-dyndns`'s
+  `cloudflare-api-token` sops secret (same zone scope). The wildcard also keeps
+  individual hostnames out of the CT logs; a catch-all vhost rejects names
+  without a vhost.
 - **Real public IPv4 (no longer DS-Lite), used only for WireGuard.** The ISP
   moved the line to dual-stack with a dynamic public IPv4. `vpn.mauderer.work`
   gets a grey-cloud A record next to its AAAA so IPv4-only networks reach the
   VPN; the web names stay proxied AAAA-only, so the reasoning above still holds
   for them.
 - **Self-hosted forge = native `services.forgejo`** (SQLite, state on the SSD,
-  nightly `forgejo dump` to the ZFS pool) behind the NPM proxy — the first native
+  nightly `forgejo dump` to the ZFS pool) behind the reverse proxy — the first native
   web service on the box; everything else there is a container. GitHub is demoted
   to a per-repo push-mirror target, not the source of truth. Forgejo's built-in
   git-SSH server on 2222 (LAN/VPN only) rather than host sshd, so keys live in
@@ -159,15 +154,15 @@ matters lives here; the rest is in the Nix code and `git log`.
   Replaces the Ansible + podman deployment. The app repos expose `packages`; the
   inputs do **not** follow nixpkgs, so the Rust/Angular builds change only on a
   tag bump rather than on every daily lock update. The SPA sits on a
-  loopback-only native nginx behind NPM, which stays the only public proxy.
+  loopback-only vhost; `reverse-proxy.nix` publishes it as `greenhouse.mauderer.work`.
 - **Greenhouse app = native units from tag-pinned flake inputs** — home-server.
   Replaces the Ansible + podman deployment. The app repos expose `packages`; the
   inputs do **not** follow nixpkgs, so the Rust/Angular builds change only on a
   tag bump rather than on every daily lock update. The SPA sits on a
-  loopback-only native nginx behind NPM, which stays the only public proxy.
+  loopback-only vhost; `reverse-proxy.nix` publishes it as `greenhouse.mauderer.work`.
 - **Document archive = native `services.paperless`, SQLite, VPN-only** —
   home-server. `:28981` is admitted on `wg0` only and deliberately *not* given an
-  NPM proxy host, so unlike Forgejo it has no WAN surface: a paper archive is the
+  reverse-proxy vhost, so unlike Forgejo it has no WAN surface: a paper archive is the
   one service here with no reason to be public. All of it — database, search
   index, media and the nightly `document_exporter` — lives on the ZFS pool, not
   split SSD/pool like Forgejo, because the documents are irreplaceable and the
@@ -181,10 +176,10 @@ matters lives here; the rest is in the Nix code and `git log`.
   module owned it — an untraversable pool root kills any unprivileged service
   with a `WorkingDirectory` on the pool at systemd's `CHDIR` step. Mode only;
   ownership stays as-is, since `maudi` owns the mountpoint used for the share.
-- **Push notifications = native `services.ntfy-sh`, public through NPM, closed by
+- **Push notifications = native `services.ntfy-sh`, public through the reverse proxy, closed by
   default** — home-server. The exposure call is the opposite of Paperless's and
   for the same reason: a notification that only arrives while the phone is on the
-  VPN is not a push notification, so `:2586` gets an NPM proxy host
+  VPN is not a push notification, so `:2586` gets a reverse-proxy vhost
   (`ntfy.mauderer.work`) and is admitted from the podman bridge and `wg0` only —
   no new WAN ports. Being public is exactly why it ships shut:
   `auth-default-access: deny-all`, no self-signup, `behind-proxy` on so rate
@@ -200,7 +195,7 @@ matters lives here; the rest is in the Nix code and `git log`.
   home-server. Three modules (`metrics.nix`, `logs.nix`, `grafana.nix`), native
   services rather than the usual container, and no new WAN ports. Grafana is on
   `:3030` (3000-3010 is taken, as for Paperless), admitted on `wg0` only and
-  deliberately given no NPM proxy host — a dashboard of the whole box is the last
+  deliberately given no reverse-proxy vhost — a dashboard of the whole box is the last
   thing that should answer on the WAN. Prometheus and the node/smartctl exporters
   bind `127.0.0.1` and are never firewalled open at all: Prometheus scrapes the
   exporters over loopback and Grafana queries Prometheus, so the whole metrics
@@ -266,11 +261,11 @@ matters lives here; the rest is in the Nix code and `git log`.
 - **Blackbox probes go to `127.0.0.1:443` with the real hostname as SNI, not to
   the public hostname** — `blackbox.nix`. Probing `https://ntfy.mauderer.work`
   from this box would depend on the router hairpinning, and would silently
-  produce nothing if it does not. NPM publishes `:443` on all interfaces, so
+  produce nothing if it does not. nginx binds `:443` on all interfaces, so
   loopback reaches it; supplying the hostname through `tls_config.server_name`
   and a `Host` header makes the request indistinguishable from a real client's
   except for the network path, and exercises TLS termination plus backend
-  routing — which matters because proxy hosts live in NPM's UI, not in Nix.
+  routing.
   Certificate verification is left on (`insecure_skip_verify` would make the
   probe pass against the expired certificate it exists to warn about). The
   honest limitation, recorded on the dashboard itself: none of this proves
@@ -284,8 +279,8 @@ matters lives here; the rest is in the Nix code and `git log`.
   + the Unix socket = peer auth, the same argument `postgresql.nix` already makes
   for having no sops entry). **ntfy** gets `metrics-listen-http` on its own
   loopback port rather than `enable-metrics`, which would serve `/metrics` from
-  the listener NPM publishes as `ntfy.mauderer.work`. **Forgejo** can do neither —
-  it has one listener and NPM proxies it — so it is the single scrape target on
+  the listener nginx publishes as `ntfy.mauderer.work`. **Forgejo** can do neither —
+  it has one listener and nginx proxies it — so it is the single scrape target on
   this box that is not loopback-only and therefore the single one carrying a
   credential: a sops-held bearer token handed to Forgejo and to Prometheus as a
   systemd credential, never through `settings` (which is world-readable in the

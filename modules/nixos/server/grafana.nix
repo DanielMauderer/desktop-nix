@@ -4,9 +4,9 @@
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
 #   3030  HTTP, admitted only on the wg0 interface — the same posture as host
 #         sshd in ssh.nix and the archive in paperless.nix. Deliberately NOT
-#         proxied through NPM: there is no public hostname for it, so Grafana
-#         never answers on the WAN at all. Do not add a proxy host for it in the
-#         NPM UI — that would silently undo the VPN-only property.
+#         proxied: there is no public hostname for it, so Grafana never answers
+#         on the WAN at all. Do not add a vhost for it in reverse-proxy.nix —
+#         that would silently undo the VPN-only property.
 #
 # The port is left out of `allowedTCPPorts` entirely and admitted per-interface,
 # so the "WAN TCP surface is exactly 80/443" assertion in flake.nix keeps
@@ -30,7 +30,7 @@
 #     showing host health, logs and stack health rather than an empty Grafana;
 #   * the General folder stays UI-owned, for scratch dashboards and for pasting
 #     in community JSON (e.g. grafana.com #1860, the exhaustive node-exporter
-#     view) — the same division of labour as NPM's UI-managed proxy hosts.
+#     view).
 #
 # The cost of the provisioned half is that those dashboards cannot be saved from
 # the UI (`allowUiUpdates` is false, and the Nix store is read-only anyway). The
@@ -109,7 +109,7 @@ in
         secret_key = "$__file{${config.sops.secrets.grafana-secret-key.path}}";
         # Served as plain HTTP over WireGuard, so the session cookie must not be
         # marked Secure or no browser will send it back. This is the same
-        # posture as NPM's admin UI on :81 and Forgejo's :4000 bootstrap path —
+        # posture as Forgejo's :4000 bootstrap path —
         # acceptable because the transport underneath is the VPN.
         cookie_secure = false;
         disable_gravatar = true;
@@ -194,7 +194,7 @@ in
 
   # `dataDir` is on the ZFS pool, and upstream declares it through
   # systemd.tmpfiles, which runs before zfs-mount.service. Same fix as
-  # npm-data-dirs, forgejo-dump-dirs, paperless-data-dirs and loki-data-dirs: a
+  # forgejo-dump-dirs, paperless-data-dirs and loki-data-dirs: a
   # oneshot inside grafana.service's own dependency chain, so it cannot run
   # before the pool is mounted. The requiredBy/before pair also orders
   # grafana.service after the mount, so that unit needs no extra ordering.
@@ -210,7 +210,7 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
     };
-    # /hdd_pool_1/services is shared with npm, forgejo, paperless and loki, and
+    # /hdd_pool_1/services is shared with forgejo, paperless and loki, and
     # none of those oneshots are ordered against each other — so all of them
     # must leave the parent as root:root 0755 or the last one to run locks the
     # others out of their own subtree. See the note in server/README.md.
