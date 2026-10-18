@@ -15,11 +15,16 @@ jobs:
   # one runner each. `builtins.attrNames` forces only the attrset keys, so this
   # builds nothing (~1-2 min) and keeps the list dynamic — a new check in
   # flake.nix is picked up with no CI edit (flake stays the source of truth).
+  # Split by name: `test-*` (VM tests) get a runner each; everything else
+  # (lint, host-assertions) is seconds of work and shares one runner, so those
+  # don't hold runner slots the VM tests queue for. A future heavy check not
+  # named `test-*` would land in the shared bucket.
   discover-checks:
     name: discover checks
     runs-on: ubuntu-latest
     outputs:
       checks: ${{ steps.list.outputs.checks }}
+      light: ${{ steps.list.outputs.light }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,11 +34,17 @@ jobs:
           nix_conf: experimental-features = nix-command flakes
       - id: list
         run: |
-          echo "checks=$(nix eval --json .#checks.x86_64-linux --apply builtins.attrNames)" >> "$GITHUB_OUTPUT"
+          isTest='n: builtins.match "test-.*" n != null'
+          echo "checks=$(nix eval --json .#checks.x86_64-linux \
+            --apply "cs: builtins.filter ($isTest) (builtins.attrNames cs)")" >> "$GITHUB_OUTPUT"
+          echo "light=$(nix eval --raw .#checks.x86_64-linux \
+            --apply "cs: toString (map (n: \".#checks.x86_64-linux.\${n}\")
+              (builtins.filter (n: !(($isTest) n)) (builtins.attrNames cs)))")" >> "$GITHUB_OUTPUT"
 
   # Build the packages no upstream cache has — Hyprland (with its hypr* libs,
-  # aquamarine, glaze and the portal) and Noctalia, both following our nixpkgs —
-  # once, and push them to the public desktop-nix Cachix cache. Every other job
+  # aquamarine, glaze and the portal) and Noctalia, both following our nixpkgs,
+  # plus the Greenhouse backend/web (public source, own nixpkgs) — once, and
+  # push them to the public desktop-nix Cachix cache. Every other job
   # waits for this and pulls them, instead of ~12 runners each compiling them
   # (~20-25 min apiece). Only these package closures are pushed (cachix skips
   # what cache.nixos.org already has); host configs never are, as the cache is
@@ -53,12 +64,38 @@ jobs:
           name: desktop-nix
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       # These derivations are identical on every workstation host, so one
-      # host's attributes cover all of them.
+      # host's attributes cover all of them. Greenhouse is taken straight from
+      # the flake inputs, exactly as modules/nixos/server/greenhouse.nix does
+      # (same drvPath); uncached, home-server and test-greenhouse each spent
+      # ~10 min fetching ~1600 crate/npm tarballs and compiling the backend.
       - run: |
           nix build -L --no-link \
             .#nixosConfigurations.private-laptop.config.programs.hyprland.package \
             .#nixosConfigurations.private-laptop.config.programs.hyprland.portalPackage \
             .#nixosConfigurations.private-laptop.config.home-manager.users.maudi.programs.noctalia.package
+          nix build -L --no-link --impure --expr '
+            let i = (builtins.getFlake "git+file://${toString ./.}").inputs;
+            in [ i.greenhouse-backend.packages.x86_64-linux.default
+                 i.greenhouse-web.packages.x86_64-linux.default ]'
+
+  # The cheap checks (lint, host-assertions) in one job; see discover-checks.
+  # --keep-going so one failing lint doesn't hide the others.
+  light-checks:
+    name: lint + assertions
+    needs: [discover-checks, warm-cache]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@v30
+        with:
+          nix_conf: experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v17
+        with:
+          name: desktop-nix
+          skipPush: true
+      - run: nix build -L --no-link --keep-going ${{ needs.discover-checks.outputs.light }}
 
   # One runner per check, all in parallel. This replaces a single `nix flake
   # check -L` that built every host toplevel and booted all eight VM tests
@@ -87,13 +124,14 @@ jobs:
           persist-credentials: false
       # The dev environment (Ticket 08) enlarges every host/VM closure, which
       # can exhaust the runner's root disk. Reclaim space from preinstalled SDKs
-      # before building.
+      # before building. Backgrounded, since the delete alone took ~2 min of
+      # every leg: it finishes long before the build fills the disk, and
+      # background processes live until the job ends.
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+          sudo nohup sh -c 'rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-          sudo docker image prune --all --force >/dev/null 2>&1 || true
-          df -h /
+            docker image prune --all --force' >/dev/null 2>&1 &
       # nixos-test so the VM tests run.
       - uses: nixbuild/nix-quick-install-action@v30
         with:
@@ -133,13 +171,14 @@ jobs:
           persist-credentials: false
       # The dev environment (Ticket 08) enlarges every host closure, which can
       # exhaust the runner's root disk. Reclaim space from preinstalled SDKs
-      # before building.
+      # before building. Backgrounded, since the delete alone took ~2 min of
+      # every leg: it finishes long before the build fills the disk, and
+      # background processes live until the job ends.
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+          sudo nohup sh -c 'rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-          sudo docker image prune --all --force >/dev/null 2>&1 || true
-          df -h /
+            docker image prune --all --force' >/dev/null 2>&1 &
       - uses: nixbuild/nix-quick-install-action@v30
         with:
           nix_conf: experimental-features = nix-command flakes
