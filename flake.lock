@@ -1146,17 +1146,17 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1792349324,
-        "narHash": "sha256-64gLGY0PYa04WI25KYaA7jX15334UgOzUWlI++AmFuk=",
+        "lastModified": 1792357026,
+        "narHash": "sha256-Un+s2UrD00Lv12TBMfRRNrnFA1nRLpVDTifiTa43G9g=",
         "owner": "OpenGreenhouseManager",
         "repo": "weather_station_wrapper",
-        "rev": "8efabd08f0cacd99bcd7a3453d57eed2f6796c13",
+        "rev": "387024ae592fd8e1c530abd50046c6f1c1f00419",
         "type": "github"
       },
       "original": {
         "owner": "OpenGreenhouseManager",
+        "ref": "main",
         "repo": "weather_station_wrapper",
-        "rev": "8efabd08f0cacd99bcd7a3453d57eed2f6796c13",
         "type": "github"
       }
     },
