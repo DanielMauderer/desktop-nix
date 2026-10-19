@@ -1,7 +1,7 @@
 # dev
 
 Per-user dev environment — wired in by `base` on every workstation. It owns
-`gh`, `claude-code`, `harlequin`, direnv, and the personal Claude Code config.
+`gh`, `claude-code`, direnv, and the personal Claude Code config.
 
 It deliberately owns **no language toolchain**. The `neovim` module keeps editor
 tooling (LSP, formatters, DAP) on Neovim's own wrapper PATH; everything else
@@ -9,7 +9,7 @@ comes from the project you are standing in.
 
 | File         | Configures                                                      |
 |--------------|-----------------------------------------------------------------|
-| `default.nix`| `gh`, `claude-code`, `harlequin` (SQL TUI), direnv + nix-direnv, `NG_CLI_ANALYTICS=false`. |
+| `default.nix`| `gh`, `claude-code`, direnv + nix-direnv, `NG_CLI_ANALYTICS=false`. |
 | `claude.nix` | Links the personal Claude config (`claude/`) into `~/.claude`.   |
 
 ## Where tools come from

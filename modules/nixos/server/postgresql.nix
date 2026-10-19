@@ -89,7 +89,7 @@ in
     # invalidates two host assertions, which is the intended friction.
     ensureDatabases = [ ];
 
-    # Admin login for interactive clients (harlequin/psql) from a workstation:
+    # Admin login for interactive clients (vim-dadbod/psql) from a workstation:
     # `ssh -L 5432:/run/postgresql/.s.PGSQL.5432 home-server` makes the
     # connection arrive on the socket as sshd's `maudi` process, so peer auth
     # maps it onto this role — SSH key is the credential, still no TCP and no

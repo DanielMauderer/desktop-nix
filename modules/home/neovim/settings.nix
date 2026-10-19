@@ -37,6 +37,8 @@
     gofumpt # go
     jq # json
     sqruff # sql (conform <leader>fs)
+    # Database client
+    postgresql # psql — vim-dadbod's Postgres backend
     # Debuggers / DAP adapters
     gdb # C / C++ / Rust via gdb DAP
     vscode-js-debug # js-debug-adapter for TS / JS
@@ -181,6 +183,9 @@
       vim-sleuth
       persistent-breakpoints-nvim
       nvim-origami
+      vim-dadbod
+      vim-dadbod-ui
+      vim-dadbod-completion
     ])
     ++ [
       ember
@@ -564,15 +569,35 @@
         default = { "lsp", "path", "snippets", "buffer" },
         per_filetype = {
           toml = { "lsp", "path", "snippets", "buffer", "crates" },
+          sql = { "snippets", "dadbod", "buffer" },
         },
         providers = {
           crates = {
             name = "crates",
             module = "crates.src.blink",
           },
+          dadbod = {
+            name = "Dadbod",
+            module = "vim_dadbod_completion.blink",
+          },
         },
       },
     })
+
+    -- ══ vim-dadbod-ui ════════════════════════════════════════════════════════
+    -- home-server's cluster is socket-only; reach it through the SSH tunnel
+    --   ssh -L 5432:/run/postgresql/.s.PGSQL.5432 home-server
+    -- which lands as `maudi` on the socket (peer auth, no password). One entry
+    -- per database: a Postgres connection only sees the database it names.
+    vim.g.db_ui_use_nerd_fonts = 1
+    vim.g.db_ui_save_location = vim.fn.stdpath("data") .. "/db_ui"
+    vim.g.dbs = {
+      gh_auth = "postgresql://maudi@localhost:5432/greenhouse_auth",
+      gh_data = "postgresql://maudi@localhost:5432/greenhouse_data",
+      gh_device = "postgresql://maudi@localhost:5432/greenhouse_device",
+      gh_scripting = "postgresql://maudi@localhost:5432/greenhouse_scripting",
+    }
+    vim.keymap.set("n", "<leader>D", "<cmd>DBUIToggle<CR>", { desc = "Toggle [D]atabase UI" })
 
     -- ══ snacks ═══════════════════════════════════════════════════════════════
     require("snacks").setup({

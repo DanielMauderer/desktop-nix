@@ -13,7 +13,8 @@ Neovim (home-manager) — imported on every host.
 
 The whole editor config is **declarative** (DECISIONS 024, revised): no Lua files,
 no runtime plugin git-clones — a `nixos-rebuild` builds it. LSP servers, formatters
-and DAP adapters come from Nix (`extraPackages`); Mason is not used
+and DAP adapters come from Nix (`extraPackages`), as does `psql` for
+vim-dadbod (`<leader>D`; connections in `vim.g.dbs`); Mason is not used
 (Mason-downloaded binaries break under NixOS dynamic linking). `rust_analyzer` is
 managed by rustaceanvim; the language runtimes themselves come from
 `modules/home/dev`.
