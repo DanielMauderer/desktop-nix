@@ -88,13 +88,29 @@ in
     # uses for :4000), scram-sha-256 host rules and a sops-held password — and it
     # invalidates two host assertions, which is the intended friction.
     ensureDatabases = [ ];
-    ensureUsers = [ ];
+
+    # Admin login for interactive clients (harlequin/psql) from a workstation:
+    # `ssh -L 5432:/run/postgresql/.s.PGSQL.5432 home-server` makes the
+    # connection arrive on the socket as sshd's `maudi` process, so peer auth
+    # maps it onto this role — SSH key is the credential, still no TCP and no
+    # password. Read + write (DML) across the cluster — the grant is below.
+    ensureUsers = [ { name = "maudi"; } ];
 
     # True socket-only. mkForce because upstream sets this in `config`, not as a
     # mkDefault — see the header for why `enableTCPIP = false` alone leaves a
     # loopback listener behind.
     settings.listen_addresses = lib.mkForce "";
   };
+
+  # `ensureClauses` only renders `ALTER USER … WITH <attr>`, so a role grant has
+  # no upstream option. Append it to postgresql-setup instead: that unit runs as
+  # `postgres` after every start, and mkAfter puts this behind the ensureUsers
+  # block that creates the role. Re-granting an existing membership is a NOTICE,
+  # not an error, so it is idempotent. Like ensureUsers it never revokes:
+  # removing this line leaves the grant in place until it is REVOKEd by hand.
+  systemd.services.postgresql-setup.script = lib.mkAfter ''
+    psql -d postgres -v ON_ERROR_STOP=1 -tAc 'GRANT pg_read_all_data, pg_write_all_data TO maudi'
+  '';
 
   # Nightly dump onto the mirrored ZFS pool — the analogue of forgejo.nix's
   # `forgejo dump` and paperless.nix's `document_exporter`, and the only copy of

@@ -9,6 +9,7 @@
   home.packages = with pkgs; [
     gh
     claude-code
+    harlequin # SQL TUI (Postgres/DuckDB/SQLite adapters bundled)
   ];
 
   # Personal opt-out, not a project setting — keeps `ng` from prompting.
