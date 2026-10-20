@@ -4,6 +4,7 @@
     ./hyprland.nix
     ./noctalia.nix
     ./kanshi.nix
+    ./udiskie.nix
     ./packages.nix
   ];
 

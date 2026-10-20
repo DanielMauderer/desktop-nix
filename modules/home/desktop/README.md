@@ -10,6 +10,7 @@ gradient borders read from `config.lib.stylix.colors`.
 | `hyprland.nix`  | Hyprland settings: keybinds (Noctalia IPC), window rules, workspaces. |
 | `noctalia.nix`  | Noctalia shell: bar, launcher, notifications, control center, OSD, lock screen, wallpaper, session menu, idle → auto-lock/suspend, and the pinned Nix Monitor community plugin (bar widget + panel: nixpkgs revision, generations, store size). Replaces waybar/rofi/swaync/swaylock/swayidle/swaybg/wlogout. |
 | `kanshi.nix`    | Monitor profiles; the `laptop-internal` fallback (host profiles prepend). |
+| `udiskie.nix`   | udiskie: automounts USB sticks / SD cards to `/run/media/$USER`, with notifications + tray icon. |
 | `packages.nix`  | Desktop user packages.                                        |
 
 The packaged hypr scripts (`pkgs/`) are passed to these files via the

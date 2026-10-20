@@ -6,7 +6,7 @@ wired in by `./home.nix`.
 
 | File          | Configures                                                       |
 |---------------|-----------------------------------------------------------------|
-| `hyprland.nix`| The Hyprland Wayland session (from the upstream flake), portals, polkit agent. |
+| `hyprland.nix`| The Hyprland Wayland session (from the upstream flake), portals, polkit agent, udisks2 (for udiskie). |
 | `greetd.nix`  | greetd greeter that launches the Hyprland session.              |
 | `packages.nix`| System-level desktop packages.                                  |
 | `theming.nix` | stylix — palette derived from `wallpaper.png` at build time.    |

@@ -18,4 +18,7 @@ in
   };
 
   programs.dconf.enable = true;
+
+  # Removable-media backend for udiskie (home-manager).
+  services.udisks2.enable = true;
 }

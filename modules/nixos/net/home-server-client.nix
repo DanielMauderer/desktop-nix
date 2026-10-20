@@ -1,6 +1,11 @@
 # WireGuard client + NFS auto-mount for the home-server. `enable`-gated so an
 # un-enrolled host (no committed sops key) still builds under keyless CI.
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.services.homeServerClient;
 in
@@ -76,6 +81,25 @@ in
       serviceConfig = {
         Restart = "on-failure";
         RestartSec = 30;
+      };
+    };
+
+    # wg resolves the endpoint hostname only once, so a WAN IP change (DDNS)
+    # leaves the tunnel silently dead until restart. `wg set … endpoint`
+    # re-resolves on every call; re-apply it periodically.
+    systemd.services.wg0-endpoint-refresh = {
+      description = "Re-resolve the wg0 home-server endpoint";
+      unitConfig.ConditionPathExists = "/sys/class/net/wg0";
+      serviceConfig.Type = "oneshot";
+      script = ''
+        ${pkgs.wireguard-tools}/bin/wg set wg0 peer ${cfg.serverPublicKey} endpoint ${cfg.endpoint}
+      '';
+    };
+    systemd.timers.wg0-endpoint-refresh = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2min";
+        OnUnitActiveSec = "5min";
       };
     };
 
