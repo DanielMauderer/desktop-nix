@@ -17,12 +17,12 @@ _: {
       }
       {
         type = "kernel";
-        key = " ├  ";
+        key = " ├  ";
         keyColor = "31";
       }
       {
         type = "shell";
-        key = " └  ";
+        key = " └  ";
         keyColor = "31";
       }
       "break"
@@ -43,17 +43,17 @@ _: {
       }
       {
         type = "cursor";
-        key = " ├  ";
+        key = " ├  ";
         keyColor = "32";
       }
       {
         type = "terminal";
-        key = " ├  ";
+        key = " ├  ";
         keyColor = "32";
       }
       {
         type = "terminalfont";
-        key = " └  ";
+        key = " └  ";
         keyColor = "32";
       }
       "break"
@@ -66,7 +66,7 @@ _: {
       {
         type = "cpu";
         format = "{1} ({3}) @ {7} GHz";
-        key = " ├  ";
+        key = " ├  ";
         keyColor = "33";
       }
       {
@@ -77,7 +77,7 @@ _: {
       }
       {
         type = "memory";
-        key = " ├  ";
+        key = " ├  ";
         keyColor = "33";
       }
       {
@@ -92,7 +92,7 @@ _: {
       }
       {
         type = "monitor";
-        key = " └  ";
+        key = " └  ";
         keyColor = "33";
       }
       "break"
