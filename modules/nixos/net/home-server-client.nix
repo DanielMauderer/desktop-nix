@@ -76,30 +76,32 @@ in
     # wg-quick resolves the endpoint once and exits on failure (no network yet,
     # or a router's DNS-rebind filter at home), leaving wg0 down for good.
     # Retry until it resolves; oneshot units support Restart=on-failure.
-    systemd.services.wg-quick-wg0 = {
-      unitConfig.StartLimitIntervalSec = 0;
-      serviceConfig = {
-        Restart = "on-failure";
-        RestartSec = 30;
+    systemd = {
+      services.wg-quick-wg0 = {
+        unitConfig.StartLimitIntervalSec = 0;
+        serviceConfig = {
+          Restart = "on-failure";
+          RestartSec = 30;
+        };
       };
-    };
 
-    # wg resolves the endpoint hostname only once, so a WAN IP change (DDNS)
-    # leaves the tunnel silently dead until restart. `wg set … endpoint`
-    # re-resolves on every call; re-apply it periodically.
-    systemd.services.wg0-endpoint-refresh = {
-      description = "Re-resolve the wg0 home-server endpoint";
-      unitConfig.ConditionPathExists = "/sys/class/net/wg0";
-      serviceConfig.Type = "oneshot";
-      script = ''
-        ${pkgs.wireguard-tools}/bin/wg set wg0 peer ${cfg.serverPublicKey} endpoint ${cfg.endpoint}
-      '';
-    };
-    systemd.timers.wg0-endpoint-refresh = {
-      wantedBy = [ "timers.target" ];
-      timerConfig = {
-        OnBootSec = "2min";
-        OnUnitActiveSec = "5min";
+      # wg resolves the endpoint hostname only once, so a WAN IP change (DDNS)
+      # leaves the tunnel silently dead until restart. `wg set … endpoint`
+      # re-resolves on every call; re-apply it periodically.
+      services.wg0-endpoint-refresh = {
+        description = "Re-resolve the wg0 home-server endpoint";
+        unitConfig.ConditionPathExists = "/sys/class/net/wg0";
+        serviceConfig.Type = "oneshot";
+        script = ''
+          ${pkgs.wireguard-tools}/bin/wg set wg0 peer ${cfg.serverPublicKey} endpoint ${cfg.endpoint}
+        '';
+      };
+      timers.wg0-endpoint-refresh = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "2min";
+          OnUnitActiveSec = "5min";
+        };
       };
     };
 
