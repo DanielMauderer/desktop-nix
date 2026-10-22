@@ -8,6 +8,7 @@
   programs.git = {
     enable = true;
     package = pkgs.git;
+    lfs.enable = true;
 
     settings = {
       user.name = "Daniel Mauderer";
