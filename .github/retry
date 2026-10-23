@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run "$@" up to 3 times. CI's nix builds fail now and then on network flakes
+# (a source fetch or git clone that dies mid-way); a retry is cheap because
+# everything that already built or downloaded stays in the store.
+for attempt in 1 2 3; do
+  "$@" && exit 0
+  [ "$attempt" -lt 3 ] && echo "::warning::attempt $attempt failed, retrying in 30s" && sleep 30
+done
+exit 1
