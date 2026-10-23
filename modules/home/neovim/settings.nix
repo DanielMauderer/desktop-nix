@@ -25,7 +25,9 @@
     lua-language-server # lua_ls
     gopls # go
     clang-tools # clangd + clang-format
-    vscode-langservers-extracted # html / cssls / jsonls
+    vscode-langservers-extracted # html / cssls / jsonls / eslint
+    vtsls # typescript / javascript
+    angular-language-server # angularls (templates; probes the project's node_modules)
     yaml-language-server # yamlls
     wgsl-analyzer # wgsl_analyzer
     rust-analyzer # for rustaceanvim (excludes itself from lspconfig)
@@ -517,8 +519,15 @@
         lua = { "stylua" },
         python = { "isort", "ruff_format", "ruff_organize_imports" },
         rust = { "rustfmt", lsp_format = "fallback" },
-        javascript = { "prettierd" },
-        typescript = { "prettierd" },
+        -- prettierd over vtsls/html/cssls formatting: projects pin style in .prettierrc
+        javascript = { "prettierd", lsp_format = "fallback" },
+        javascriptreact = { "prettierd", lsp_format = "fallback" },
+        typescript = { "prettierd", lsp_format = "fallback" },
+        typescriptreact = { "prettierd", lsp_format = "fallback" },
+        html = { "prettierd", lsp_format = "fallback" },
+        htmlangular = { "prettierd", lsp_format = "fallback" },
+        css = { "prettierd", lsp_format = "fallback" },
+        scss = { "prettierd", lsp_format = "fallback" },
         json = { "jq" },
         sql = { "sqruff", lsp_format = "fallback" },
       },
@@ -1251,9 +1260,24 @@
         capabilities = { offsetEncoding = "utf-8" },
       },
       html = {
-        filetypes = { "html", "twig", "hbs" },
+        filetypes = { "html", "htmlangular", "twig", "hbs" },
       },
       cssls = {},
+      vtsls = {
+        settings = {
+          -- use the project's typescript from node_modules when present
+          vtsls = { autoUseWorkspaceTsdk = true },
+          typescript = {
+            preferences = { importModuleSpecifier = "non-relative" },
+            inlayHints = {
+              parameterNames = { enabled = "literals" },
+              functionLikeReturnTypes = { enabled = true },
+            },
+          },
+        },
+      },
+      angularls = {},
+      eslint = {},
       jsonls = {
         settings = {
           json = {
@@ -1295,7 +1319,7 @@
       end
 
       local function get_available_servers()
-        return { "lua_ls", "gopls", "clangd", "html", "cssls", "jsonls", "yamlls" }
+        return { "lua_ls", "gopls", "clangd", "html", "cssls", "jsonls", "yamlls", "vtsls", "angularls", "eslint" }
       end
 
       local function get_server_status(server_name)
