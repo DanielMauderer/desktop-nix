@@ -55,7 +55,11 @@ in
   home-manager.users.maudi = {
     # Teams, work-only: Electron wrapper around the web client (Microsoft's
     # native Linux client is discontinued).
-    home.packages = [ pkgs.teams-for-linux ];
+    # glab: GitLab CLI for the work GitLab.
+    home.packages = [
+      pkgs.teams-for-linux
+      pkgs.glab
+    ];
 
     # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
     local.idleSuspendSeconds = 1800;
