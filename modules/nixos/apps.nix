@@ -32,49 +32,51 @@
       pkgs.imhex
     ];
 
-    # merle ships no .desktop file. merle-view takes exactly one path, hence %f.
-    xdg.desktopEntries.merle-view = {
-      name = "merle";
-      genericName = "RAW Photo Viewer";
-      exec = "merle-view %f";
-      terminal = false;
-      categories = [
-        "Graphics"
-        "Viewer"
-      ];
-      mimeType = [
-        "image/x-canon-cr2"
-        "image/x-canon-cr3"
-      ];
-    };
+    xdg = {
+      # merle ships no .desktop file. merle-view takes exactly one path, hence %f.
+      desktopEntries.merle-view = {
+        name = "merle";
+        genericName = "RAW Photo Viewer";
+        exec = "merle-view %f";
+        terminal = false;
+        categories = [
+          "Graphics"
+          "Viewer"
+        ];
+        mimeType = [
+          "image/x-canon-cr2"
+          "image/x-canon-cr3"
+        ];
+      };
 
-    # Declarative mimeapps.list. force replaces the file that apps used to edit
-    # in place, so every handler they had registered is carried over here.
-    xdg.configFile."mimeapps.list".force = true;
-    xdg.mimeApps = {
-      enable = true;
-      defaultApplications =
-        lib.genAttrs [
-          "image/png"
-          "image/jpeg"
-          "image/gif"
-          "image/webp"
-          "image/bmp"
-          "image/tiff"
-          "image/svg+xml"
-          "image/avif"
-          "image/heif"
-          "image/jxl"
-          "image/qoi"
-          "image/x-adobe-dng"
-        ] (_: "imv.desktop")
-        // {
-          "image/x-canon-cr2" = "merle-view.desktop";
-          "image/x-canon-cr3" = "merle-view.desktop";
-          "application/zip" = "thunar.desktop";
-          "x-scheme-handler/discord" = "vesktop.desktop";
-          "x-scheme-handler/claude-cli" = "claude-code-url-handler.desktop";
-        };
+      # Declarative mimeapps.list. force replaces the file that apps used to edit
+      # in place, so every handler they had registered is carried over here.
+      configFile."mimeapps.list".force = true;
+      mimeApps = {
+        enable = true;
+        defaultApplications =
+          lib.genAttrs [
+            "image/png"
+            "image/jpeg"
+            "image/gif"
+            "image/webp"
+            "image/bmp"
+            "image/tiff"
+            "image/svg+xml"
+            "image/avif"
+            "image/heif"
+            "image/jxl"
+            "image/qoi"
+            "image/x-adobe-dng"
+          ] (_: "imv.desktop")
+          // {
+            "image/x-canon-cr2" = "merle-view.desktop";
+            "image/x-canon-cr3" = "merle-view.desktop";
+            "application/zip" = "thunar.desktop";
+            "x-scheme-handler/discord" = "vesktop.desktop";
+            "x-scheme-handler/claude-cli" = "claude-code-url-handler.desktop";
+          };
+      };
     };
   };
 }
