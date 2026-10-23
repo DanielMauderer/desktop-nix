@@ -96,6 +96,11 @@
     # nixpkgs follows either, but tracks main: fixes land with the daily lock
     # update (or `nix flake update weather-station-wrapper`).
     weather-station-wrapper.url = "github:OpenGreenhouseManager/weather_station_wrapper/main";
+    # merle RAW viewer (modules/nixos/apps.nix). Own crate, so it tracks main like
+    # weather-station-wrapper: new commits land with the daily lock update (or
+    # `nix flake update merle`). No nixpkgs follows, so it only rebuilds when
+    # main moves, not on every nixpkgs bump.
+    merle.url = "github:DanielMauderer/merle/main";
   };
 
   outputs =

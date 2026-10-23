@@ -6,7 +6,7 @@ headless home-server deliberately omits.
 
 Imports:
 - `../core` — the machine-agnostic baseline (see `core/README.md`).
-- `../apps.nix` — GUI apps (Spotify, Zen Browser, mpv, imv) + the unfree allowlist.
+- `../apps.nix` — GUI apps (Spotify, Zen Browser, mpv, imv, merle) + the unfree allowlist + MIME defaults (merle for CR2/CR3, imv for other images).
 - `../dev` — system-side dev (Podman).
 - `../virtualisation` — libvirt/KVM.
 - `./audio.nix` — PipeWire.

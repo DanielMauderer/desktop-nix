@@ -25,7 +25,7 @@
       }
       {
         # phone
-        publicKey = "o1LPn3uqdy10BNDF99guNTKGjDQ4palODeH+FHkMORk=";
+        publicKey = "7WkjXPcbA2BoGpKodtR6AJz0yUQUDh14Zr3y/KE6rTA=";
         allowedIPs = [ "10.100.0.4/32" ];
       }
     ];
