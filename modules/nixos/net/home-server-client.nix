@@ -73,6 +73,19 @@ in
       ];
     };
 
+    # Services behind the tunnel speak plain HTTP/NFS and rely on wg0 for
+    # encryption. Without wg0 its route is gone and that traffic would follow
+    # the default route (or wg1) in cleartext, so refuse it instead.
+    networking.nftables.tables.wg0-leak-guard = {
+      family = "inet";
+      content = ''
+        chain output {
+          type filter hook output priority filter; policy accept;
+          ip daddr 10.100.0.0/24 oifname != "wg0" reject
+        }
+      '';
+    };
+
     # wg-quick resolves the endpoint once and exits on failure (no network yet,
     # or a router's DNS-rebind filter at home), leaving wg0 down for good.
     # Retry until it resolves; oneshot units support Restart=on-failure.

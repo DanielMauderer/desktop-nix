@@ -318,6 +318,20 @@
             assertion = !cfg.services.homeServerTelemetry.enable || cfg.services.homeServerClient.enable;
           }
           {
+            # Telemetry and NFS to 10.100.0.0/24 are unencrypted on their own;
+            # home-server-client.nix rejects that traffic unless it leaves via
+            # wg0, so a down tunnel can't put journal lines on café wifi.
+            name = "VPN-subnet traffic never leaves outside wg0";
+            assertion =
+              !cfg.services.homeServerClient.enable
+              || (
+                cfg.networking.nftables.enable
+                && lib.hasInfix ''ip daddr 10.100.0.0/24 oifname != "wg0" reject'' (
+                  cfg.networking.nftables.tables.wg0-leak-guard.content or ""
+                )
+              );
+          }
+          {
             # telemetry.nix's exposure claim: the data path is entirely outbound.
             # The client pushes (`remote_write`) and never serves — no exporter
             # listener to admit, and no `receive_http`, which is the server's half
