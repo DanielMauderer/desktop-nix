@@ -28,6 +28,7 @@
       inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.twilight
       pkgs.mpv
       pkgs.imv
+      pkgs.zathura
       inputs.merle.packages.${pkgs.stdenv.hostPlatform.system}.default
       pkgs.imhex
     ];
@@ -72,6 +73,7 @@
           // {
             "image/x-canon-cr2" = "merle-view.desktop";
             "image/x-canon-cr3" = "merle-view.desktop";
+            "application/pdf" = "org.pwmt.zathura.desktop";
             "application/zip" = "thunar.desktop";
             "x-scheme-handler/discord" = "vesktop.desktop";
             "x-scheme-handler/claude-cli" = "claude-code-url-handler.desktop";
