@@ -56,10 +56,26 @@ in
     # Teams, work-only: Electron wrapper around the web client (Microsoft's
     # native Linux client is discontinued).
     # glab: GitLab CLI for the work GitLab.
+    # git-spice: stacked MRs (split-branch skill). nixpkgs ships it only as `gs`,
+    # which collides with Ghostscript, so add an unambiguous `git-spice` name.
     home.packages = [
       pkgs.teams-for-linux
       pkgs.glab
+      (pkgs.symlinkJoin {
+        name = "git-spice";
+        paths = [ pkgs.git-spice ];
+        postBuild = "ln -s gs $out/bin/git-spice";
+      })
     ];
+
+    # Personal GitLab-workflow Claude skills, usable in any work repo. Linked
+    # per skill so ~/.claude/skills (claude.ai-synced skills) stays writable.
+    home.file = lib.genAttrs' [ "fix-pipeline" "fix-mr-comments" "split-branch" ] (
+      name:
+      lib.nameValuePair ".claude/skills/${name}/SKILL.md" {
+        source = ./claude-skills/${name}/SKILL.md;
+      }
+    );
 
     # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
     local.idleSuspendSeconds = 1800;
