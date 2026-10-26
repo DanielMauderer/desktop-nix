@@ -200,13 +200,6 @@ let
       endpoint {
         url = "http://${cfg.serverHost}:${toString cfg.lokiPort}/loki/api/v1/push"
       }
-
-      // Unlike the metrics path there is no reason to drop these on an outage:
-      // warnings are low volume and the whole point is to still have them after
-      // the thing that caused them. Backed by the unit's StateDirectory.
-      wal {
-        enabled = true
-      }
     }
   '';
 in
