@@ -305,6 +305,8 @@
         topdelete = { text = "‾" },
         changedelete = { text = "~" },
       },
+      current_line_blame = true,
+      current_line_blame_opts = { delay = 50 },
       on_attach = function(bufnr)
         local gs = package.loaded.gitsigns
         local function map(mode, l, r, opts)
@@ -352,6 +354,7 @@
           gs.diffthis("~")
         end, { desc = "git diff against last commit" })
         map("n", "<leader>TB", gs.toggle_current_line_blame, { desc = "[T]oggle git [b]lame line" })
+        map("n", "<leader>gb", "<cmd>Gitsigns blame<CR>", { desc = "[G]it [b]lame file" })
         map("n", "<leader>Td", gs.toggle_deleted, { desc = "[T]oggle git show [d]eleted" })
         map({ "o", "x" }, "ih", ":<C-U>Gitsigns select_hunk<CR>", { desc = "select git hunk" })
       end,
@@ -676,7 +679,7 @@
       { "<leader>sS", function() Snacks.picker.lsp_workspace_symbols() end, "LSP Workspace Symbols" },
       { "<leader>gW", function() Snacks.picker.lsp_workspace_symbols() end, "LSP Workspace Symbols" },
       { "<leader>gd", function() Snacks.picker.git_log_file() end, "[G]it [D]eltas on buffer" },
-      { "<leader>gb", function() Snacks.picker.git_branches() end, "[G]it [B]ranches" },
+      { "<leader>gB", function() Snacks.picker.git_branches() end, "[G]it [B]ranches" },
       { "<leader>gf", function() Snacks.picker.git_diff() end, "[G]it Di[f]fs" },
     }
     for _, m in ipairs(snacks_keys) do
