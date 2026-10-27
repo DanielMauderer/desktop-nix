@@ -9,7 +9,7 @@ home-server, which gets the same shell and nothing else).
 | `kitty.nix`    | kitty terminal.                                                |
 | `fastfetch.nix`| fastfetch system info.                                         |
 | `lazygit.nix`  | lazygit (delta as the diff pager).                             |
-| `git.nix`      | git identity (Daniel Mauderer) + config, delta pager, git-lfs. |
+| `git.nix`      | git + jj identity (`local.git.email`), SSH commit signing, delta, git-lfs. |
 | `jujutsu.nix`  | jj (jujutsu) VCS + `jjui` TUI — identity, stacked-branch setup. |
 
 `default.nix` also adds the CLI tools (eza, bat, fd, ripgrep, fzf, tree, btop,

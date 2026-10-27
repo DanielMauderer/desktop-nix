@@ -7,9 +7,18 @@
   imports = [ ./claude.nix ];
 
   home.packages = with pkgs; [
-    gh
     claude-code
   ];
+
+  # Settings only — the auth token lives in the keyring (`gh auth login` once
+  # per host), so it never ends up in the store.
+  programs.gh = {
+    enable = true;
+    settings = {
+      git_protocol = "ssh";
+      aliases.co = "pr checkout";
+    };
+  };
 
   # Personal opt-out, not a project setting — keeps `ng` from prompting.
   home.sessionVariables.NG_CLI_ANALYTICS = "false";

@@ -77,6 +77,9 @@ in
       }
     );
 
+    # Every commit on this machine, personal repos included, uses the work address.
+    local.git.email = "daniel.mauderer@medicalvalues.de";
+
     # Keep the 5-min lock but lengthen Noctalia's auto-suspend to 30 min here.
     local.idleSuspendSeconds = 1800;
 

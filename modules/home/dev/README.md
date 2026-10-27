@@ -9,7 +9,7 @@ comes from the project you are standing in.
 
 | File         | Configures                                                      |
 |--------------|-----------------------------------------------------------------|
-| `default.nix`| `gh`, `claude-code`, direnv + nix-direnv, `NG_CLI_ANALYTICS=false`. |
+| `default.nix`| `gh` (SSH protocol; token in keyring), `claude-code`, direnv + nix-direnv, `NG_CLI_ANALYTICS=false`. |
 | `claude.nix` | Links the personal Claude config (`claude/`) into `~/.claude`.   |
 
 ## Where tools come from

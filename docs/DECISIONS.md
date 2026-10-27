@@ -342,3 +342,7 @@ matters lives here; the rest is in the Nix code and `git log`.
   closures are never pushed, because the cache is public. `cache-nix-action`
   was dropped: its per-key `/nix` tarballs, trimmed to fit the 10 GB quota,
   never kept the expensive builds.
+- **Commit identity is per host, not per repo.** One `local.git.email` (outlook
+  by default, the work address on work-laptop) feeds git and jj; every commit
+  is SSH-signed with the host's `~/.ssh/id_ed25519`. `.mailmap` folds older
+  identities into one.

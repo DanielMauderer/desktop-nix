@@ -11,13 +11,8 @@
     enable = true;
     package = pkgs.jujutsu;
 
+    # Identity and signing: set in git.nix next to git's own.
     settings = {
-      # Duplicated from git.nix — jj reads its own identity, not git's.
-      user = {
-        name = "Daniel Mauderer";
-        email = "daniel090798@gmail.com";
-      };
-
       ui = {
         # Bare `jj` errors out otherwise.
         default-command = "log";
