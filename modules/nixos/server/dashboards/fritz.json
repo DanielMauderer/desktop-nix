@@ -2,7 +2,7 @@
   "id": null,
   "uid": "home-server-fritz",
   "title": "FRITZ!Box — internet line",
-  "description": "WAN throughput, data volume and line quality from the FRITZ!Box over TR-064 (fritz.nix, job=\"fritz\"). Current rates are the router's own byte-rate gauge; volumes are increase() over the 32-bit WAN byte counters, which survives wraps and reconnects to within one scrape. DSL panels stay empty on cable/fibre. Edit modules/nixos/server/dashboards/fritz.json.",
+  "description": "WAN throughput, data volume and line quality from the FRITZ!Box over TR-064 (fritz.nix, job=\"fritz\"). Current rates are the router's own byte-rate gauge; volumes are increase() over the WAN byte counters (64-bit on this firmware), which handles router reboots. DSL panels stay empty on cable/fibre. Edit modules/nixos/server/dashboards/fritz.json.",
   "tags": ["nixos", "fritzbox", "network"],
   "timezone": "browser",
   "schemaVersion": 39,
