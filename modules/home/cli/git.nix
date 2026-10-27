@@ -29,50 +29,52 @@ in
   };
 
   config = {
-    programs.delta = {
-      enable = true;
-      enableGitIntegration = true;
-    };
-
     xdg.configFile."git/allowed_signers".text = lib.concatLines allowedSigners;
 
-    programs.git = {
-      enable = true;
-      package = pkgs.git;
-      lfs.enable = true;
+    programs = {
+      delta = {
+        enable = true;
+        enableGitIntegration = true;
+      };
 
-      settings = {
+      git = {
+        enable = true;
+        package = pkgs.git;
+        lfs.enable = true;
+
+        settings = {
+          user = {
+            inherit name signingKey;
+            inherit (config.local.git) email;
+          };
+          gpg = {
+            format = "ssh";
+            ssh.allowedSignersFile = "${config.xdg.configHome}/git/allowed_signers";
+          };
+          commit.gpgSign = true;
+          tag.gpgSign = true;
+          init.defaultBranch = "main";
+          pull.rebase = true;
+          push.autoSetupRemote = true;
+        };
+      };
+
+      # jj reads its own identity and signing config, not git's.
+      jujutsu.settings = {
         user = {
-          inherit name signingKey;
+          inherit name;
           inherit (config.local.git) email;
         };
-        gpg = {
-          format = "ssh";
-          ssh.allowedSignersFile = "${config.xdg.configHome}/git/allowed_signers";
+        # Sign at push time rather than on every rewrite: jj rewrites commits
+        # constantly, and each signature may cost a passphrase prompt.
+        signing = {
+          behavior = "drop";
+          backend = "ssh";
+          key = signingKey;
+          backends.ssh.allowed-signers = "${config.xdg.configHome}/git/allowed_signers";
         };
-        commit.gpgSign = true;
-        tag.gpgSign = true;
-        init.defaultBranch = "main";
-        pull.rebase = true;
-        push.autoSetupRemote = true;
+        git.sign-on-push = true;
       };
-    };
-
-    # jj reads its own identity and signing config, not git's.
-    programs.jujutsu.settings = {
-      user = {
-        inherit name;
-        inherit (config.local.git) email;
-      };
-      # Sign at push time rather than on every rewrite: jj rewrites commits
-      # constantly, and each signature may cost a passphrase prompt.
-      signing = {
-        behavior = "drop";
-        backend = "ssh";
-        key = signingKey;
-        backends.ssh.allowed-signers = "${config.xdg.configHome}/git/allowed_signers";
-      };
-      git.sign-on-push = true;
     };
   };
 }
