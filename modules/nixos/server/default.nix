@@ -17,6 +17,7 @@ _: {
     ./nixos-metrics.nix
     ./backup-metrics.nix
     ./blackbox.nix
+    ./fritz.nix
     ./alerts.nix
     ./logs.nix
     ./grafana.nix

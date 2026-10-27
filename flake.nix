@@ -2473,7 +2473,7 @@
                 'curl -fsS -u "admin:$PW" '
                 "'http://127.0.0.1:3030/api/search?type=dash-db' "
                 "| jq -e '[.[].uid] | sort == "
-                "[\"fleet-clients\",\"home-server-host\",\"home-server-logs\","
+                "[\"fleet-clients\",\"home-server-fritz\",\"home-server-host\",\"home-server-logs\","
                 "\"home-server-nixos\",\"home-server-services\","
                 "\"home-server-stack\",\"home-server-uptime\"]'",
                 timeout=60,

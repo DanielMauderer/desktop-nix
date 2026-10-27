@@ -55,6 +55,7 @@ let
   grafanaPort = 3030; # grafana.nix
   ntfyMetricsPort = 9686; # ntfy.nix — its dedicated loopback metrics listener
   postgresPort = 9187; # postgresql.nix — the exporter is declared next to the db
+  fritzPort = 9787; # fritz.nix — upstream's default exporter port
 
   # forgejo.nix. The one scrape target on this box that is not loopback-bound:
   # Forgejo serves /metrics from its main listener, which reverse-proxy.nix
@@ -239,6 +240,7 @@ in
     ++ lib.optional config.services.prometheus.exporters.postgres.enable (
       localJob "postgres" postgresPort
     )
+    ++ lib.optional config.services.prometheus.exporters.fritz.enable (localJob "fritz" fritzPort)
     ++ lib.optional config.services.forgejo.enable forgejoJob;
   };
 
