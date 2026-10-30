@@ -9,6 +9,7 @@ _: {
     ./forgejo.nix
     ./forgejo-runner.nix
     ./paperless.nix
+    ./immich.nix
     ./ntfy.nix
     ./postgresql.nix
     ./greenhouse.nix

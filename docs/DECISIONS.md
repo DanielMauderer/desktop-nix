@@ -176,6 +176,18 @@ matters lives here; the rest is in the Nix code and `git log`.
   module owned it — an untraversable pool root kills any unprivileged service
   with a `WorkingDirectory` on the pool at systemd's `CHDIR` step. Mode only;
   ownership stays as-is, since `maudi` owns the mountpoint used for the share.
+- **Photo library = native `services.immich`, public through the reverse proxy,
+  originals read-only** — home-server. Public like ntfy rather than VPN-only
+  like Paperless, because the point is sharing with people who are not on the
+  VPN; Immich has no self-signup and share links can carry a password and an
+  expiry. The RAW shoots stay on the NFS share as an *external library* that
+  the server unit sees as `ReadOnlyPaths`, so the folder layout on the pool
+  remains the source of truth and Immich can never delete an original. Auto-import
+  is Immich's own library watcher plus a nightly scan, not a custom unit. SD
+  cards are imported on a workstation into the share instead of on the
+  server: a card reader on a headless box would need a hand-written udev +
+  systemd copy job, which no photo server provides. Database on the shared
+  cluster, settings in Nix (admin settings page read-only).
 - **Push notifications = native `services.ntfy-sh`, public through the reverse proxy, closed by
   default** — home-server. The exposure call is the opposite of Paperless's and
   for the same reason: a notification that only arrives while the phone is on the

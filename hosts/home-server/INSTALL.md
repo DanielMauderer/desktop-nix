@@ -347,7 +347,39 @@ in the greenhouse UI as a device at `http://127.0.0.1:6001`. Runtime config
 (`POST /config`) lives in `/var/lib/private/weather-station-wrapper/config.json`.
 On every start, the port, keys and base URL are reset from Nix.
 
-## 10. Verify
+## 10. Immich (photo library)
+
+Immich comes up with the rest of the system and is published at once as
+`photos.mauderer.work`. **The first visitor creates the admin account**, so do
+step 1 right after the `switch` that adds it.
+
+1. **Claim the admin account.** Browse `https://photos.mauderer.work` and sign
+   up. That account is the admin; there is no self-signup after it.
+2. **Add the shoots as an external library.** *Administration → External
+   Libraries → Create library* (owner: you), then add the import path
+   `/hdd_pool_1/share/photos` (edit `photosDir` in `immich.nix` if the shoots
+   live somewhere else on the share) and *Scan*. Immich only reads them. The
+   first scan of a big RAW archive and its thumbnails takes hours. Face and
+   object search follow after that, on the CPU.
+3. **Share.** Either create an account for someone (*Administration → Users*)
+   and share albums with them, or send a share link from an album (*Share →
+   Create link*, optionally with a password and an expiry date).
+
+Worth knowing:
+
+- **Auto-import.** Copy a shoot into the share (on a client that mounts it:
+  `/mnt/home-server/photos`), from darktable, Rapid Photo Downloader or a file
+  manager. The watcher picks it up within seconds; the nightly 03:00 scan
+  catches anything missed.
+- **Settings are in Nix.** The admin settings page is read-only; change
+  `services.immich.settings` in `immich.nix` and rebuild.
+- **Uploads through the web or the phone app** pass Cloudflare, which caps a
+  single request at 100 MB. Large RAW files and videos go in via the share.
+- **Backups.** Immich's database is in the shared cluster, so the nightly
+  `pg_dumpall` already covers it. Its own media (uploads, thumbnails) is on the
+  pool under `/hdd_pool_1/services/immich`.
+
+## 11. Verify
 
 - On the server: `journalctl -u sops-nix` shows the WireGuard key decrypted;
   `wg show` lists `wg0` with the two client peers.
@@ -397,5 +429,8 @@ On every start, the port, keys and base URL are reset from Nix.
   `logcli` isn't installed, so use Grafana's *Explore* on the Loki datasource
   with `{job="systemd-journal"}` — journal lines should appear within a minute
   of `systemctl status alloy` going green.
+- **Immich:** `systemctl status immich-server immich-machine-learning` and
+  `curl -fsS http://127.0.0.1:2283/api/server/ping` (expect `{"res":"pong"}`).
+  `nft list ruleset | grep 2283` must print nothing: the port is loopback-only.
 - Once verified, delete `secrets-seed/` on the desktop.
 - Rollback drill: break something, `switch`, reboot, pick the prior generation.
