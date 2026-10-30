@@ -7,8 +7,9 @@ Gaming + development workstation (at home). Install guide: [INSTALL.md](INSTALL.
 - **Kernel:** **CachyOS** (`linuxPackages_cachyos`) + `scx` sched-ext scheduler,
   via chaotic-cx/nyx — desktop only
 - **Modules:** `base` + `desktop` + `gaming` (Steam, gamemode, gamescope, AMD
-  GPU/LACT, MangoHud) + `waydroid` + `net` (home-server VPN client — `ssh
-  home-server` + the NFS share, mounted over the LAN; enrolled per INSTALL.md)
+  GPU/LACT, MangoHud) + `waydroid` + `darktable` (RAW editor) + `net`
+  (home-server VPN client — `ssh home-server` + the NFS share, mounted over the
+  LAN; enrolled per INSTALL.md)
 - **Monitoring:** pushes host metrics (60s) and warning-level journal to the
   server's Grafana over `wg0` — one low-priority Alloy process, no inbound port,
   *Workstations — fleet* dashboard at `http://10.100.0.1:3030`. See
