@@ -319,42 +319,23 @@
         "type": "gitlab"
       }
     },
-    "greenhouse-backend": {
+    "greenhouse": {
       "inputs": {
         "nixpkgs": "nixpkgs_2",
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1792188235,
-        "narHash": "sha256-epW9KOZYZDtRJLrQ03H2nq0FVgYs+t5KDY7GKuEPv5s=",
+        "lastModified": 1793480886,
+        "narHash": "sha256-xmMdZjqcxh5/iUKwG6P8v0tJw1cg0H77ZZzJ4mCAGZA=",
         "owner": "OpenGreenhouseManager",
-        "repo": "greenhouse_backend",
-        "rev": "58e5e03ba8aa3aaccb16199a3e4fb4b2ebe0e64e",
+        "repo": "greenhouse",
+        "rev": "c5a2717c235295aa8598f623493450ed526787e7",
         "type": "github"
       },
       "original": {
         "owner": "OpenGreenhouseManager",
-        "ref": "v1.1.0",
-        "repo": "greenhouse_backend",
-        "type": "github"
-      }
-    },
-    "greenhouse-web": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_3"
-      },
-      "locked": {
-        "lastModified": 1792188286,
-        "narHash": "sha256-lk9uL4d4t8WOwe1RkIZxrpzdXCR5UCyG8Qw/Ru8zz90=",
-        "owner": "OpenGreenhouseManager",
-        "repo": "greenhouse_web",
-        "rev": "5155f0b016c2a1e869946ce2677a0f4db4b90734",
-        "type": "github"
-      },
-      "original": {
-        "owner": "OpenGreenhouseManager",
-        "ref": "v1.1.0",
-        "repo": "greenhouse_web",
+        "ref": "v1.2.0",
+        "repo": "greenhouse",
         "type": "github"
       }
     },
@@ -719,7 +700,7 @@
     },
     "merle": {
       "inputs": {
-        "nixpkgs": "nixpkgs_4"
+        "nixpkgs": "nixpkgs_3"
       },
       "locked": {
         "lastModified": 1792691894,
@@ -751,11 +732,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1786599213,
-        "narHash": "sha256-yNJd40f11EzXBjSByCB7IPpeFFAdeoSKKM67dGkfFoU=",
+        "lastModified": 1792502884,
+        "narHash": "sha256-IoNisKcGbUjdd45qCqywGMCYmZ5EnkxezvLII0FWwNA=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0e251e24a4f24e036a084b6b4b2d2491af4167f4",
+        "rev": "02c087f3fe673c9e317f206a627cb6b910336dbe",
         "type": "github"
       },
       "original": {
@@ -766,22 +747,6 @@
       }
     },
     "nixpkgs_3": {
-      "locked": {
-        "lastModified": 1791956154,
-        "narHash": "sha256-jBYGPi4udQ9uo4KQp9m2J0546nJVQitG15gvZSaVVAs=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "55bfb4d7437bd4e09ab7cba58a43bd68eb310044",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_4": {
       "locked": {
         "lastModified": 1791048980,
         "narHash": "sha256-KgItSKML8Xvte0B7/uGnBDsYzSnnKHcOaiUbgWBXLXw=",
@@ -797,7 +762,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_4": {
       "locked": {
         "lastModified": 1793341285,
         "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
@@ -813,7 +778,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_6": {
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1792094642,
         "narHash": "sha256-zp8ToDMnqZcu4o4IH9pdwXFXGp7yLm/M0dEnNWnyd7I=",
@@ -957,12 +922,11 @@
         "disko": "disko",
         "ember-theme": "ember-theme",
         "git-hooks": "git-hooks",
-        "greenhouse-backend": "greenhouse-backend",
-        "greenhouse-web": "greenhouse-web",
+        "greenhouse": "greenhouse",
         "home-manager": "home-manager_2",
         "hyprland": "hyprland",
         "merle": "merle",
-        "nixpkgs": "nixpkgs_5",
+        "nixpkgs": "nixpkgs_4",
         "nixvim": "nixvim",
         "noctalia": "noctalia",
         "noctalia-community-plugins": "noctalia-community-plugins",
@@ -977,16 +941,16 @@
     "rust-overlay": {
       "inputs": {
         "nixpkgs": [
-          "greenhouse-backend",
+          "greenhouse",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1786762605,
-        "narHash": "sha256-iQpYIhInh8gRx+cSnPtX+Yp2Gg9kr2h+MehETCqRgDo=",
+        "lastModified": 1792653800,
+        "narHash": "sha256-E8zFJilWlORqzIUJizyhZ/0WKBOizuM6s1nRSgPRomo=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "ad8ebb59d84bcf3780c46f107e1d99eb4ca2fe7f",
+        "rev": "5f267b7f323a4d6df0b9c0e3eaa043cbe85386f2",
         "type": "github"
       },
       "original": {
@@ -1179,7 +1143,7 @@
     },
     "weather-station-wrapper": {
       "inputs": {
-        "nixpkgs": "nixpkgs_6"
+        "nixpkgs": "nixpkgs_5"
       },
       "locked": {
         "lastModified": 1792357026,

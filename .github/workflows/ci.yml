@@ -89,8 +89,8 @@ jobs:
             .#nixosConfigurations.private-laptop.config.home-manager.users.maudi.programs.noctalia.package
           .github/retry nix build -L --no-link --impure --expr '
             let i = (builtins.getFlake "git+file://${toString ./.}").inputs;
-            in [ i.greenhouse-backend.packages.x86_64-linux.default
-                 i.greenhouse-web.packages.x86_64-linux.default ]'
+            in [ i.greenhouse.packages.x86_64-linux.backend
+                 i.greenhouse.packages.x86_64-linux.web ]'
 
   # The cheap checks (lint, host-assertions) in one job; see discover-checks.
   # --keep-going so one failing lint doesn't hide the others.

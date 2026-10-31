@@ -1,6 +1,6 @@
 # Greenhouse (OpenGreenhouseManager): the Rust backend services and the Angular
-# web app, built from tag-pinned flake inputs (`greenhouse-backend`,
-# `greenhouse-web` in flake.nix) and run as native units. Replaces the former
+# web app, built from the tag-pinned `greenhouse` monorepo flake input
+# (flake.nix) and run as native units. Replaces the former
 # Ansible + podman deployment (OpenGreenhouseManager/ansible-playbook, archived).
 # A release is: bump the tag in flake.nix, push, let CI promote `release`.
 #
@@ -37,8 +37,8 @@
 }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
-  backend = inputs.greenhouse-backend.packages.${system}.default;
-  web = inputs.greenhouse-web.packages.${system}.default;
+  backend = inputs.greenhouse.packages.${system}.backend;
+  web = inputs.greenhouse.packages.${system}.web;
 
   sopsFile = ../../../secrets/home-server/greenhouse.yaml;
 

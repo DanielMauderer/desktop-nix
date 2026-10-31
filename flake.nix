@@ -86,12 +86,12 @@
       flake = false;
     };
 
-    # Greenhouse app (modules/nixos/server/greenhouse.nix), pinned to release
-    # tags: bump the tag to deploy. Deliberately NOT following nixpkgs, so the
-    # Rust/Angular builds only change on a tag bump instead of rebuilding in CI
-    # and on the server with every daily lock update.
-    greenhouse-backend.url = "github:OpenGreenhouseManager/greenhouse_backend/v1.1.0";
-    greenhouse-web.url = "github:OpenGreenhouseManager/greenhouse_web/v1.1.0";
+    # Greenhouse app (modules/nixos/server/greenhouse.nix): a monorepo with one
+    # version for backend and web, pinned to its release tag: bump the tag to
+    # deploy. Deliberately NOT following nixpkgs, so the Rust/Angular builds
+    # only change on a tag bump instead of rebuilding in CI and on the server
+    # with every daily lock update.
+    greenhouse.url = "github:OpenGreenhouseManager/greenhouse/v1.2.0";
     # Weather station datasource (modules/nixos/server/weather-station.nix). No
     # nixpkgs follows either, but tracks main: fixes land with the daily lock
     # update (or `nix flake update weather-station-wrapper`).
