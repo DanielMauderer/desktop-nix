@@ -12,6 +12,7 @@ System-level (NixOS) modules. Each group has its own README.
 | `gaming`         | CachyOS kernel, `scx`, Steam, gamemode, gamescope, AMD GPU/LACT. Desktop only. |
 | `waydroid`       | Android container (opt-in: private-laptop + desktop).         |
 | `darktable`      | darktable RAW photo editor (opt-in: private-laptop + desktop). |
+| `sunshine`       | Sunshine game-stream host for Moonlight (TV streaming). Desktop only. |
 | `server`         | home-server services: WireGuard server, SSH-over-VPN, reverse-proxy, forge, document archive, observability (Prometheus/Loki/Grafana), ZFS, NFS. |
 
 `apps.nix` (GUI app allowlist) lives directly under `modules/nixos/`.

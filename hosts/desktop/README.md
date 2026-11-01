@@ -7,7 +7,8 @@ Gaming + development workstation (at home). Install guide: [INSTALL.md](INSTALL.
 - **Kernel:** **CachyOS** (`linuxPackages_cachyos`) + `scx` sched-ext scheduler,
   via chaotic-cx/nyx — desktop only
 - **Modules:** `base` + `desktop` + `gaming` (Steam, gamemode, gamescope, AMD
-  GPU/LACT, MangoHud) + `waydroid` + `darktable` (RAW editor) + `net`
+  GPU/LACT, MangoHud) + `waydroid` + `darktable` (RAW editor) + `sunshine`
+  (game-stream host for Moonlight on the TV; pair at `https://localhost:47990`) + `net`
   (home-server VPN client — `ssh home-server` + the NFS share, mounted over the
   LAN; enrolled per INSTALL.md)
 - **Monitoring:** pushes host metrics (60s) and warning-level journal to the

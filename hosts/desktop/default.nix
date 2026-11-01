@@ -12,6 +12,7 @@
     ../../modules/nixos/waydroid
     ../../modules/nixos/discord
     ../../modules/nixos/darktable
+    ../../modules/nixos/sunshine
     ../../modules/nixos/net
     ./hardware.nix
     ./hardware/hardware-configuration.nix
