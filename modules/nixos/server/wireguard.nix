@@ -28,6 +28,11 @@
         publicKey = "7WkjXPcbA2BoGpKodtR6AJz0yUQUDh14Zr3y/KE6rTA=";
         allowedIPs = [ "10.100.0.4/32" ];
       }
+      {
+        # work-laptop
+        publicKey = "kegPobpzLK8P5zk7dZwSnWu8gH3cHV0JiMlas714hVA=";
+        allowedIPs = [ "10.100.0.5/32" ];
+      }
     ];
   };
 

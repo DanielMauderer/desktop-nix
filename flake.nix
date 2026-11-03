@@ -313,7 +313,7 @@
             # Telemetry pushes to 10.100.0.1, which only exists once the wg0
             # tunnel is up: enabling it without the client is a host that retries
             # forever and never appears in Grafana. An implication rather than an
-            # equality, so work-laptop — neither enrolled nor monitored — passes.
+            # equality, so work-laptop — enrolled but not monitored — passes.
             name = "telemetry is enabled only alongside the home-server tunnel";
             assertion = !cfg.services.homeServerTelemetry.enable || cfg.services.homeServerClient.enable;
           }

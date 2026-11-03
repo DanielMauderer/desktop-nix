@@ -22,6 +22,13 @@ in
   networking.hostName = "work-laptop";
   system.stateVersion = "25.05";
 
+  # home-server VPN client (wg0, split-tunnel 10.100.0.0/24): `ssh home-server` +
+  # the NFS share. Roams, so nfsHost stays at the VPN IP (the default).
+  services.homeServerClient = {
+    enable = true;
+    address = "10.100.0.5/32";
+  };
+
   # Work VPN (wg1) and personal secrets. Everything company-specific lives
   # inside the sops files, not in this repo's plaintext:
   # - secrets/work-laptop/vpn.yaml  `vpn-wg-conf`: the full wg-quick config

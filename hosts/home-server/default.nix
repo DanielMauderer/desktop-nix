@@ -32,5 +32,6 @@ _: {
   users.users.maudi.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAm+h4JjyhM3plsb2UFpq4FuaFvy00uzVr3fpYWVnALH maudi@desktop"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMJ4O/SkjRdmZevXvA3L9ou9rdx1fCbBPAQU1MykZwHR maudi@private-laptop"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOJtntfmNWMrSWSeY1aCAVlAbVznwscKjpVF0Z4EWCSs maudi@work-laptop"
   ];
 }

@@ -73,6 +73,22 @@ The tunnel is a full IPv4 tunnel (`wg1`); `wg0` stays reserved for the
 home-server client. The old NM connection also set a VPN DNS server; if internal
 names don't resolve, add a `DNS =` line to `vpn-wg-conf` (`sops edit`).
 
+### 3b. home-server VPN client (`wg0`, `ssh home-server` + the NFS share)
+
+Enrolled as peer `10.100.0.5` (`modules/nixos/server/wireguard.nix`);
+`services.homeServerClient` is on in `default.nix`, and the `~/.ssh/id_ed25519`
+public key is in the server's `authorizedKeys`. The private key lives in
+`secrets/work-laptop/wireguard.yaml` (`home-server-wg-key`) — run
+`sops updatekeys` on it together with the files above. To re-key, follow
+[private-laptop/INSTALL.md §2b](../private-laptop/INSTALL.md) with this host's
+paths. Rebuild the **server first** so the peer is admitted, then:
+
+```sh
+sudo wg show wg0                          # handshake with 10.100.0.1
+ssh home-server
+ls /mnt/home-server                       # triggers the automount
+```
+
 ## 4. Verify — "ready for Monday" gates (⛔ before wiping the old SSD)
 
 - ⛔ Dual-external dock (DP-5 + DP-6, internal off) and single HDMI dock both work.

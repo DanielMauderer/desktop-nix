@@ -6,9 +6,9 @@ Work laptop — heavy development, policy-bound. Install guide:
 - **Role:** heavy dev
 - **GPU:** Intel iGPU (verify exact model at install) — VAAPI hardware decode
 - **Kernel:** default nixpkgs
-- **Modules:** `base` + `desktop`. No gaming, no waydroid. WireGuard client +
-  sops secrets are wired in (commented template in `default.nix`, enabled at
-  install once the secret is enrolled).
+- **Modules:** `base` + `desktop` + `net` (home-server VPN client on `wg0`,
+  peer `10.100.0.5` — `ssh home-server` + the NFS share, mounted over the VPN).
+  No gaming, no waydroid. Work VPN on `wg1` + sops secrets, see INSTALL.md.
 - **Disk:** disko **LUKS2 + ext4 root + ESP**, zram swap.
 - **Monitors:** kanshi profiles `work-laptop-docked-dual` (DP-5 + DP-6, internal
   off) and `work-laptop-docked-hdmi` (eDP-1 + HDMI-A-1); undocked falls back to
