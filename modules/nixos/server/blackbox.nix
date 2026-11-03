@@ -56,6 +56,7 @@ let
     "ntfy.mauderer.work" # ntfy.nix
     "git.mauderer.work" # forgejo.nix
     "greenhouse.mauderer.work" # greenhouse.nix
+    "photos.mauderer.work" # immich.nix
   ];
 
   # Loopback health endpoints, one per service that has one. These overlap with
@@ -66,6 +67,7 @@ let
     forgejo = "http://127.0.0.1:4000/api/healthz";
     ntfy = "http://127.0.0.1:2586/v1/health";
     grafana = "http://127.0.0.1:3030/api/health";
+    immich = "http://127.0.0.1:2283/api/server/ping";
   };
 
   # A public resolver rather than the box's own: the question is whether the

@@ -59,6 +59,19 @@ let
 
     # greenhouse.nix: its own loopback-only nginx vhost (SPA + /api).
     "greenhouse.${domain}" = proxy 8080 { };
+
+    # immich.nix. Upstream's recommended settings: RAW files and videos are
+    # large and slow to upload. Cloudflare still caps a single request at
+    # 100 MB on the free plan, so big uploads belong on the share, not here.
+    "photos.${domain}" = proxy 2283 {
+      extraConfig = ''
+        client_max_body_size 50000M;
+        proxy_request_buffering off;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        send_timeout 600s;
+      '';
+    };
   };
 in
 {

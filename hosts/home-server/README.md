@@ -4,7 +4,7 @@ Headless services host — the only non-desktop machine. Install guide:
 [INSTALL.md](INSTALL.md).
 
 - **Role:** headless home server (containers + storage + VPN + the git forge +
-  the document archive + push notifications + the shared database + the
+  the document archive + the photo library + push notifications + the shared database + the
   observability stack)
 - **Kernel:** LTS (not CachyOS)
 - **Modules:** `core` (the machine-agnostic baseline — boot, nix, networking,
@@ -18,6 +18,9 @@ Headless services host — the only non-desktop machine. Install guide:
   git-SSH on 2222, LAN/VPN only) with an opt-in **Actions runner** that executes
   jobs as podman containers, a **Paperless-ngx document archive** (VPN-only on
   `10.100.0.1:28981`, never proxied; data on the pool, inbox on the NFS share),
+  an **Immich photo library** (`photos.mauderer.work` via the proxy, so photos can
+  be shared without VPN or share access; indexes the RAW shoots on the share
+  read-only as an external library and auto-imports new files),
   an **ntfy push-notification server** (`ntfy.mauderer.work` via the proxy, so
   notifications reach the phone off-LAN; closed by default — deny-all, no
   self-signup, services publish with a token), a shared **PostgreSQL** server

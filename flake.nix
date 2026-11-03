@@ -633,6 +633,43 @@
               unit != null && builtins.elem "zfs-mount.service" unit.after;
           }
 
+          # --- Photo library: immich.nix ---
+          {
+            # Public only through nginx: the listener itself is loopback, and
+            # the port never joins the globally-open set.
+            name = "Immich listens on loopback only and is not firewalled open";
+            assertion =
+              let
+                i = cfg.services.immich;
+              in
+              i.enable
+              && i.host == "127.0.0.1"
+              && !i.openFirewall
+              && !(builtins.elem i.port cfg.networking.firewall.allowedTCPPorts);
+          }
+          {
+            name = "Immich share links use the public HTTPS name";
+            assertion = cfg.services.immich.settings.server.externalDomain == "https://photos.mauderer.work";
+          }
+          {
+            # The RAW originals on the share are the source of truth; Immich
+            # must never be able to delete or rewrite them.
+            name = "Immich sees the photo share read-only";
+            assertion = builtins.any (lib.hasPrefix "/hdd_pool_1/share/") (
+              cfg.systemd.services.immich-server.serviceConfig.ReadOnlyPaths or [ ]
+            );
+          }
+          {
+            name = "Immich media lives on the ZFS pool and waits for it";
+            assertion =
+              let
+                unit = cfg.systemd.services.immich-data-dirs or null;
+              in
+              lib.hasPrefix "/hdd_pool_1/" cfg.services.immich.mediaLocation
+              && unit != null
+              && builtins.elem "zfs-mount.service" unit.after;
+          }
+
           # --- Observability: metrics.nix + logs.nix + grafana.nix ---
           {
             # Loopback-bound and never firewalled open: the expression browser
