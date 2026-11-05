@@ -1868,8 +1868,8 @@
             ''
               ${hyprlandLuaCheck "work-laptop"}
               conf=${kanshiConfig "work-laptop"}
-              grep -q 'output "GIGA-BYTE TECHNOLOGY CO. LTD. M27Q \*" position 0,0' "$conf"
-              grep -q 'output "GIGA-BYTE TECHNOLOGY CO. LTD. M27Q 0x\*" position 2560,0' "$conf"
+              grep -q 'output "GIGA-BYTE TECHNOLOGY CO., LTD. M27Q \*" position 2560,0' "$conf"
+              grep -q 'output "GIGA-BYTE TECHNOLOGY CO., LTD. M27Q 0x\*" position 0,0' "$conf"
               # kanshi parses before connecting, so without a display a valid
               # config fails only at connect; a parse error means a bad config.
               ! ${pkgs.kanshi}/bin/kanshi -c "$conf" 2>&1 | grep -q 'failed to parse'

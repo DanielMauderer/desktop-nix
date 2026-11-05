@@ -133,15 +133,17 @@ in
             }
             # Match by EDID, not connector: the dock renumbers DP-n on replug.
             # Both M27Qs report the same bogus serial, so left/right follows
-            # head enumeration order. The globs must differ: kanshi rejects the
-            # whole config on a duplicate criteria string within a profile.
+            # kanshi's head order (first entry takes the first matching head);
+            # the positions below were picked to match the physical desk layout.
+            # The globs must differ: kanshi rejects the whole config on a
+            # duplicate criteria string within a profile.
             {
-              criteria = "GIGA-BYTE TECHNOLOGY CO. LTD. M27Q *";
-              position = "0,0";
+              criteria = "GIGA-BYTE TECHNOLOGY CO., LTD. M27Q *";
+              position = "2560,0";
             }
             {
-              criteria = "GIGA-BYTE TECHNOLOGY CO. LTD. M27Q 0x*";
-              position = "2560,0";
+              criteria = "GIGA-BYTE TECHNOLOGY CO., LTD. M27Q 0x*";
+              position = "0,0";
             }
           ];
         };
