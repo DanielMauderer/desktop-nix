@@ -16,8 +16,13 @@ _: {
       # No language-specific aliases (cargo, npm, …): those tools only exist
       # inside a project's devShell, so the aliases belong there too.
 
-      # System management. Rebuilds from the local flake checkout, host by hostname.
-      update = "sudo nixos-rebuild switch --flake ~/desktop-nix";
+      # System management (host picked by hostname).
+      # update: exactly what the daily autoUpgrade runs (modules/nixos/core/updates.nix)
+      # — the CI-gated release branch, no local checkout needed (e.g. the server).
+      update = "sudo nixos-rebuild switch -L --refresh --flake github:DanielMauderer/desktop-nix/release";
+      # update-local: the ~/desktop-nix checkout incl. uncommitted edits. Fast-forward
+      # pull first so a stale lock can't roll the system back; aborts if that fails.
+      update-local = "git -C ~/desktop-nix pull --ff-only && sudo nixos-rebuild switch -L --flake ~/desktop-nix";
       shutdown = "systemctl poweroff";
       reboot = "systemctl reboot";
       suspend = "systemctl suspend";

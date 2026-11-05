@@ -14,7 +14,7 @@
 - The system and user environment are **declarative**. Do NOT suggest `dnf`,
   `rpm-ostree`, `brew`, or `toolbox` — none of them exist on this machine.
 - System packages: add to the relevant module under `~/desktop-nix/modules/nixos/`,
-  then `sudo nixos-rebuild switch --flake ~/desktop-nix` (the `update` alias).
+  then `sudo nixos-rebuild switch --flake ~/desktop-nix` (the `update-local` alias).
 - User CLI tools: home-manager modules under `~/desktop-nix/modules/home/`.
 - Per-project toolchains: **always** a Nix devShell + direnv, never a global
   install. Add a `flake.nix` with the toolchain in `mkShell` and an `.envrc`

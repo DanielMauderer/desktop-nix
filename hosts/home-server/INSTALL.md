@@ -89,7 +89,7 @@ sudo passwd maudi           # set a real password (config ships none)
 
 Enable the clients **last**, once the server is reachable: uncomment
 `services.homeServerClient.enable = true;` in `hosts/desktop/default.nix` and
-`hosts/private-laptop/default.nix`, then `update` on each.
+`hosts/private-laptop/default.nix`, then `update-local` on each.
 
 ## 5. Forgejo (the forge + its Actions runner)
 
