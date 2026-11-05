@@ -10,9 +10,11 @@ Work laptop — heavy development, policy-bound. Install guide:
   peer `10.100.0.5` — `ssh home-server` + the NFS share, mounted over the VPN).
   No gaming, no waydroid. Work VPN on `wg1` + sops secrets, see INSTALL.md.
 - **Disk:** disko **LUKS2 + ext4 root + ESP**, zram swap.
-- **Monitors:** kanshi profiles `work-laptop-docked-dual` (DP-5 + DP-6, internal
-  off) and `work-laptop-docked-hdmi` (eDP-1 + HDMI-A-1); undocked falls back to
-  `laptop-internal`.
+- **Monitors:** kanshi profiles `work-laptop-docked-dual` (both M27Qs matched by
+  EDID, since the dock renumbers DP-n; internal off) and
+  `work-laptop-docked-hdmi` (eDP-1 + HDMI-A-1); undocked falls back to
+  `laptop-internal`. With two externals, a Hyprland Lua hook pins workspaces 1-5
+  to the left one and 6-10 to the right one.
 - **Work apps:** `teams-for-linux`, `glab` (GitLab CLI), `git-spice` (stacked MRs;
   also linked as `git-spice`, since nixpkgs only ships `gs`) — host-only, via
   home-manager.

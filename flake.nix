@@ -1868,8 +1868,8 @@
             ''
               ${hyprlandLuaCheck "work-laptop"}
               conf=${kanshiConfig "work-laptop"}
-              grep -q 'output "DP-5" position 0,0' "$conf"
-              grep -q 'output "DP-6" position 2560,0' "$conf"
+              grep -q 'output "GIGA-BYTE TECHNOLOGY CO. LTD. M27Q \*" position 0,0' "$conf"
+              grep -q 'output "GIGA-BYTE TECHNOLOGY CO. LTD. M27Q \*" position 2560,0' "$conf"
               grep -q 'output "HDMI-A-1" position 1920,0' "$conf"
               # The fallback must be LAST so docked setups match first.
               test "$(grep '^profile' "$conf" | tail -1)" = 'profile laptop-internal {'
