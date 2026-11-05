@@ -475,6 +475,24 @@
           leave_dirs_open = true,
         },
         use_libuv_file_watcher = true,
+        -- Show dotfiles and git-ignored files (.env, local flake.nix, …);
+        -- ignored ones are still dimmed via git status highlighting.
+        filtered_items = {
+          hide_dotfiles = false,
+          hide_gitignored = false,
+          never_show = {
+            ".git",
+            "target", -- Rust/cargo
+            "node_modules",
+            "dist", -- TS/Angular build output
+            ".angular", -- Angular CLI cache
+            ".cache",
+            ".direnv",
+            ".claude",
+            ".cursor",
+            ".gitlab",
+          },
+        },
         window = {
           mappings = {
             ["<2-LeftMouse>"] = "open_with_window_picker",
