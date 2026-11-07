@@ -7,3 +7,6 @@ Sunshine game-stream host for Moonlight clients (the TV) — desktop only.
   home LAN only (IPv4 `192.168.178.0/24` on `enp34s0`). The web
   UI (TCP 47990) is deliberately not opened: set credentials and pair Moonlight
   from the desktop at `https://localhost:47990`.
+- `sunshine-display` (on PATH) — prep command for `apps.json`: `match` switches
+  DP-3 to the Moonlight client's mode when DP-3 offers it, `restore` runs
+  `kanshictl reload`.
