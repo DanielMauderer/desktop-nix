@@ -1817,7 +1817,7 @@
                 {
                   name = "no gaming stack (scx + steam disabled)";
                   assertion =
-                    !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
+                    !cfg.services.scx-loader.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
                 }
                 # Waydroid is opt-in on private-laptop.
                 {
@@ -1847,7 +1847,7 @@
                 {
                   name = "no gaming stack (scx + steam disabled)";
                   assertion =
-                    !cfg.services.scx.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
+                    !cfg.services.scx-loader.enable && !cfg.programs.steam.enable && !cfg.hardware.graphics.enable32Bit;
                 }
                 # Waydroid is deliberately absent from the work laptop.
                 {
@@ -1897,7 +1897,8 @@
                 }
                 {
                   name = "sched-ext scx_lavd enabled";
-                  assertion = cfg.services.scx.enable && cfg.services.scx.scheduler == "scx_lavd";
+                  assertion =
+                    cfg.services.scx-loader.enable && cfg.services.scx-loader.config.default_sched == "scx_lavd";
                 }
                 {
                   name = "Steam enabled with 32-bit graphics + gamemode";
@@ -3166,11 +3167,9 @@
             # Running the CachyOS kernel (uname -r is e.g. "7.0.12-cachyos").
             machine.succeed("uname -r | grep -q cachyos")
 
-            # sched-ext: the scx service is active and configured for scx_lavd.
-            # The scheduler is selected via the SCX_SCHEDULER env var (ExecStart
-            # just execs "$SCX_SCHEDULER"), so assert on Environment, not ExecStart.
-            machine.wait_for_unit("scx.service")
-            machine.succeed("systemctl show -p Environment scx.service | grep -q SCX_SCHEDULER=scx_lavd")
+            # sched-ext: scx_loader is running and starts scx_lavd by default.
+            machine.wait_for_unit("scx_loader.service")
+            machine.succeed("grep -q 'default_sched = \"scx_lavd\"' /etc/scx_loader.toml")
 
             # Steam + companions are installed (steam pulls 32-bit libs).
             machine.succeed("test -x /run/current-system/sw/bin/steam")

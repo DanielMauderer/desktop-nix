@@ -4,7 +4,7 @@ Gaming + development workstation (at home). Install guide: [INSTALL.md](INSTALL.
 
 - **Role:** gaming + dev
 - **GPU/CPU:** AMD dGPU (mesa/RADV) + AMD CPU (`kvm-amd`, `amd-ucode`)
-- **Kernel:** **CachyOS** (`linuxPackages_cachyos`) + `scx` sched-ext scheduler,
+- **Kernel:** **CachyOS** (`linuxPackages_cachyos`) + `scx_lavd` sched-ext scheduler (`scx-loader`),
   via chaotic-cx/nyx — desktop only
 - **Modules:** `base` + `desktop` + `gaming` (Steam, gamemode, gamescope, AMD
   GPU/LACT, MangoHud) + `waydroid` + `darktable` (RAW editor) + `sunshine`

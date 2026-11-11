@@ -120,7 +120,7 @@ ping 10.100.0.1                       # wg0 still up alongside it
 
 ## 3. Verify
 
-- `uname -r` contains `cachyos`; `systemctl is-active scx` and `SCX_SCHEDULER=scx_lavd`.
+- `uname -r` contains `cachyos`; `systemctl is-active scx_loader` and `scxctl get` shows `scx_lavd`.
 - `vulkaninfo | grep -i radv` shows the AMD driver.
 - `hyprctl monitors` — DP-3 @ 2560x1440@144, DP-2 @ 1920x1080@60.
 - A Proton title and a native title both launch; MangoHud overlay and LACT work.

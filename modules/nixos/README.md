@@ -9,7 +9,7 @@ System-level (NixOS) modules. Each group has its own README.
 | `desktop`        | Hyprland session, greeter, portals, theming; wires the home desktop module. |
 | `dev`            | System-side dev: Podman + podman-compose.                      |
 | `virtualisation` | libvirt/KVM + virt-manager, OVMF, TPM.                         |
-| `gaming`         | CachyOS kernel, `scx`, Steam, gamemode, gamescope, AMD GPU/LACT. Desktop only. |
+| `gaming`         | CachyOS kernel, `scx-loader`, Steam, gamemode, gamescope, AMD GPU/LACT. Desktop only. |
 | `waydroid`       | Android container (opt-in: private-laptop + desktop).         |
 | `darktable`      | darktable RAW photo editor (opt-in: private-laptop + desktop). |
 | `sunshine`       | Sunshine game-stream host for Moonlight (TV streaming). Desktop only. |
