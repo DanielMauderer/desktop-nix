@@ -1918,6 +1918,11 @@
                   assertion = builtins.elem "amdgpu.ppfeaturemask=0xffffffff" cfg.boot.kernelParams;
                 }
                 {
+                  # Discord's VAAPI encoder hangs the Vega 64 while streaming.
+                  name = "Discord streams with software encoding";
+                  assertion = cfg.local.discord.softwareEncoding;
+                }
+                {
                   name = "MangoHud enabled in maudi's home";
                   assertion = cfg.home-manager.users.maudi.programs.mangohud.enable;
                 }

@@ -8,3 +8,6 @@ Discord chat client — opt-in per host. Imported only from the hosts that want 
   Wayland screenshare had no audio, so we switched to upstream `discord`.
   `discord` is unfree; its name is allow-listed in
   `modules/nixos/apps.nix` (`nixpkgs.config.allowUnfreePredicate`).
+  `local.discord.softwareEncoding` wraps it with `LIBVA_DRIVER_NAME=null` so
+  streams use software OpenH264 — set on desktop, where Discord's VAAPI encoder
+  hangs the Vega 64 beyond recovery.

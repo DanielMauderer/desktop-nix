@@ -19,6 +19,9 @@
   ];
 
   networking.hostName = "desktop";
+
+  # Discord's VAAPI stream encoder hangs the Vega 64 (unrecoverable reset).
+  local.discord.softwareEncoding = true;
   system.stateVersion = "25.05";
 
   services = {
