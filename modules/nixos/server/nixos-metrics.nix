@@ -3,11 +3,12 @@
 #
 # The box updates itself. `modules/nixos/core/updates.nix` runs
 # `system.autoUpgrade` daily against `github:DanielMauderer/desktop-nix/release`
-# with `allowReboot = false`, and .github/workflows/update-lock.yml bumps
-# flake.lock nightly through an auto-merging PR. Both of those can stop working
-# without anything going red: a failed `nixos-upgrade.service` is one journal
-# line, a lock-bump workflow that lost its PAT just stops opening PRs, and a
-# kernel update with `allowReboot = false` sits there until somebody notices.
+# (rebooting itself when needed, see auto-reboot.nix), and
+# .github/workflows/update-lock.yml bumps flake.lock nightly through an
+# auto-merging PR. Both of those can stop working without anything going red:
+# a failed `nixos-upgrade.service` is one journal line, a lock-bump workflow
+# that lost its PAT just stops opening PRs, and a kernel update whose reboot
+# keeps missing its window sits there unbooted.
 # None of that is visible in metrics.nix's exporters, because none of it is a
 # property of the hardware.
 #
@@ -92,8 +93,8 @@ let
 
     # --- Pending reboot ---------------------------------------------------
     # 1 when the booted kernel/initrd is not the one the current generation
-    # would boot. `allowReboot = false` in updates.nix means nothing clears
-    # this on its own; it is a prompt for a human.
+    # would boot. auto-reboot.nix normally clears this overnight; a 1 that
+    # persists means the automatic reboot is not happening.
     reboot=0
     for component in ${lib.escapeShellArgs rebootRelevant}; do
       booted=$(readlink -f "/run/booted-system/$component" 2>/dev/null || echo missing-booted)

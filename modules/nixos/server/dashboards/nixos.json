@@ -15,7 +15,7 @@
     {
       "type": "stat",
       "title": "Reboot pending",
-      "description": "Booted kernel/initrd differs from the activated generation. autoUpgrade runs with allowReboot = false, so nothing clears this on its own.",
+      "description": "Booted kernel/initrd differs from the activated generation. autoUpgrade reboots the server between 00:00 and 05:00 when needed, so this should clear overnight.",
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
       "id": 1,
       "datasource": { "type": "prometheus", "uid": "prometheus" },

@@ -1,6 +1,7 @@
-# Daily pull-and-switch from the CI-gated `release` branch. No auto-reboot, so
-# kernel/initrd changes take effect on the next manual reboot. What actually
-# moves the fleet forward is the scheduled CI lock bump, not autoUpgrade itself.
+# Daily pull-and-switch from the CI-gated `release` branch. No auto-reboot on
+# the workstations, so kernel/initrd changes take effect on the next manual
+# reboot. The home-server turns it on (modules/nixos/server/auto-reboot.nix).
+# What actually moves the fleet forward is the scheduled CI lock bump, not autoUpgrade itself.
 { lib, ... }:
 {
   system.autoUpgrade = {
@@ -9,6 +10,6 @@
     flags = [ "-L" ];
     dates = "daily";
     randomizedDelaySec = "45min";
-    allowReboot = false;
+    allowReboot = lib.mkDefault false;
   };
 }
