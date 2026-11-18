@@ -48,8 +48,9 @@ store). The `test-secrets` nixosTest proves this end-to-end in `nix flake check`
 ## Update automation
 
 - `update-lock.yml` (daily CI) runs `nix flake update` → PR → auto-merges on
-  green. Hosts run `system.autoUpgrade` daily (`allowReboot = false`) from the
-  committed `flake.lock`.
+  green. Hosts run `system.autoUpgrade` daily from the committed `flake.lock`.
+  Workstations keep `allowReboot = false`; the home-server overrides it
+  (`modules/nixos/server/auto-reboot.nix`) to reboot overnight when needed.
 - **Every host tracks the CI-gated `release` branch** (default in `updates.nix`),
   which only fast-forwards to a `main` commit whose full CI (flake-check + every
   per-host `build-hosts` job) is green (`promote-release.yml`) — so no host ever

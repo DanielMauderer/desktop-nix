@@ -238,11 +238,11 @@ let
       uid = "hs-reboot-pending";
       title = "Reboot pending";
       expr = "nixos_reboot_required == 1";
-      # autoUpgrade runs with allowReboot = false, so this is a nudge, not an
-      # incident. A week of grace keeps a routine kernel bump from paging on the
-      # night it lands.
-      for = "7d";
-      summary = "A newer kernel has been activated but not booted for a week.";
+      # autoUpgrade reboots this host itself (auto-reboot.nix), but only inside
+      # the 00:00-05:00 window. Two days of grace covers a run that missed the
+      # window and is retried the next night; past that, the auto-reboot is broken.
+      for = "2d";
+      summary = "A newer kernel has been activated but not booted for two days; the automatic reboot is not happening.";
     }
     {
       uid = "hs-textfile-stale";

@@ -277,6 +277,10 @@
         commonAssertions host cfg
         ++ [
           {
+            name = "workstation never auto-reboots after an update";
+            assertion = !cfg.system.autoUpgrade.allowReboot;
+          }
+          {
             name = "stylix enabled with a wallpaper";
             assertion = cfg.stylix.enable && cfg.stylix.image != null;
           }
@@ -401,6 +405,10 @@
         host: cfg:
         commonAssertions host cfg
         ++ [
+          {
+            name = "server reboots itself after an update when needed";
+            assertion = cfg.system.autoUpgrade.allowReboot && cfg.system.autoUpgrade.rebootWindow != null;
+          }
           {
             name = "SSH daemon enabled";
             assertion = cfg.services.openssh.enable;

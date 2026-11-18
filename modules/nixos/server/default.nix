@@ -16,6 +16,7 @@ _: {
     ./weather-station.nix
     ./metrics.nix
     ./nixos-metrics.nix
+    ./auto-reboot.nix
     ./backup-metrics.nix
     ./blackbox.nix
     ./fritz.nix
