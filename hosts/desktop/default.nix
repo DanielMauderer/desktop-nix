@@ -24,6 +24,9 @@
   local.discord.softwareEncoding = true;
   system.stateVersion = "25.05";
 
+  # No built-in webcam: the phone stands in via DroidCam (client + v4l2loopback).
+  programs.droidcam.enable = true;
+
   services = {
     # Always at home, so the share mounts direct over the LAN (SSH still rides the
     # tunnel). `enable` stays off until enrollment.
