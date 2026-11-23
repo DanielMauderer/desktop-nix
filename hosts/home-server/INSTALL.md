@@ -361,7 +361,12 @@ step 1 right after the `switch` that adds it.
    live somewhere else on the share) and *Scan*. Immich only reads them. The
    first scan of a big RAW archive and its thumbnails takes hours. Face and
    object search follow after that, on the CPU.
-3. **Share.** Either create an account for someone (*Administration → Users*)
+3. **Albums from folders.** *Account Settings → API Keys → New API Key* (all
+   permissions; the albums will belong to this user). Store it with
+   `sops secrets/home-server/immich.yaml` as `immich-album-api-key: <key>` and
+   rebuild. `immich-albums.timer` then creates one album per shoot folder every
+   hour; `systemctl start immich-albums` runs it now.
+4. **Share.** Either create an account for someone (*Administration → Users*)
    and share albums with them, or send a share link from an album (*Share →
    Create link*, optionally with a password and an expiry date).
 

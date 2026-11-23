@@ -10,6 +10,7 @@ _: {
     ./forgejo-runner.nix
     ./paperless.nix
     ./immich.nix
+    ./immich-albums.nix
     ./ntfy.nix
     ./postgresql.nix
     ./greenhouse.nix

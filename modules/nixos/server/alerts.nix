@@ -101,6 +101,8 @@ let
     # up only as metrics quietly going stale.
     "nixos-metrics"
     "backup-metrics"
+    # Hourly album sync — a revoked API key otherwise just stops new albums.
+    "immich-albums"
   ];
 
   ntfyUrl = "${ntfyLocal}/${alertTopic}?${ntfyParams}";
