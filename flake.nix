@@ -262,8 +262,8 @@
           assertion = cfg.security.auditd.enable && cfg.security.audit.enable;
         }
         {
-          name = "security updates applied daily";
-          assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "daily";
+          name = "release branch checked for updates every 10 minutes";
+          assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "*:0/10";
         }
         {
           name = "tracks the CI-gated release branch";

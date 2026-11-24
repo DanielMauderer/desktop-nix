@@ -65,7 +65,8 @@ matters lives here; the rest is in the Nix code and `git log`.
   unchanged (ember colorscheme, same keymaps). Config in `modules/home/neovim/`.
 
 ## Updates
-- **Daily `system.autoUpgrade`** from the committed `flake.lock`; CI bumps the
+- **`system.autoUpgrade` every 10 minutes, gated by `git ls-remote`** on `release`
+  (rebuild only when it moved; a daily timer missed late promotions) from the committed `flake.lock`; CI bumps the
   lock (`update-lock.yml`). Workstations never auto-reboot; the home-server
   reboots itself between 00:00 and 05:00 when kernel/initrd/modules changed.
 - **All hosts track the CI-gated `release` branch**, which only advances to a
