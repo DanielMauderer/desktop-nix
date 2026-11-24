@@ -8,8 +8,8 @@
     enable = true;
     flake = lib.mkDefault "github:DanielMauderer/desktop-nix/release";
     flags = [ "-L" ];
-    dates = "daily";
-    randomizedDelaySec = "45min";
+    dates = lib.mkDefault "daily";
+    randomizedDelaySec = lib.mkDefault "45min";
     allowReboot = lib.mkDefault false;
   };
 }
