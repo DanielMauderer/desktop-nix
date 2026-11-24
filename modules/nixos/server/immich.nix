@@ -12,8 +12,12 @@
 # Immich section of hosts/home-server/INSTALL.md.
 #
 # Exposure (no new WAN ports; the WAN surface stays UDP 51820 + TCP 80/443):
-#   2283  HTTP, bound to 127.0.0.1 and never firewalled open. The only path in
-#         is nginx over loopback, which the firewall accepts unconditionally.
+#   2283  HTTP, listening on all interfaces but admitted only on wg0 (never on
+#         the WAN). Public traffic comes in through nginx over loopback, which
+#         the firewall accepts without a rule. VPN clients (the phone app) talk
+#         to http://10.100.0.1:2283 directly, which skips Cloudflare's 100 MB
+#         limit per request, so large videos back up too. Plain HTTP is fine
+#         because WireGuard already encrypts the tunnel.
 #   3003  machine learning, upstream's own loopback listener.
 #
 # Storage:
@@ -50,9 +54,11 @@ in
   services.immich = {
     enable = true;
 
-    # An explicit address, not upstream's "localhost": nginx proxies to
-    # 127.0.0.1, and "localhost" may resolve to ::1 first.
-    host = "127.0.0.1";
+    # All IPv4 interfaces, so both nginx (127.0.0.1) and VPN peers
+    # (10.100.0.1) reach it; the firewall rule below decides who gets in. Not
+    # bound to 10.100.0.1 alone: that would tie startup to wireguard-wg0, the
+    # same reason grafana.nix listens everywhere.
+    host = "0.0.0.0";
     port = httpPort;
     openFirewall = false;
 
@@ -79,6 +85,10 @@ in
       };
     };
   };
+
+  # Admit the API on the VPN interface only, never the WAN (same pattern as
+  # grafana.nix). The port is never added to `allowedTCPPorts`.
+  networking.firewall.interfaces.wg0.allowedTCPPorts = [ httpPort ];
 
   systemd.services.immich-server.serviceConfig.ReadOnlyPaths = [ photosDir ];
 

@@ -378,8 +378,12 @@ Worth knowing:
   catches anything missed.
 - **Settings are in Nix.** The admin settings page is read-only; change
   `services.immich.settings` in `immich.nix` and rebuild.
-- **Uploads through the web or the phone app** pass Cloudflare, which caps a
-  single request at 100 MB. Large RAW files and videos go in via the share.
+- **Uploads through `photos.mauderer.work`** pass Cloudflare, which caps a
+  single request at 100 MB. On the phone, add the VPN address as well, so
+  backups skip Cloudflare: *app Settings → Networking → Automatic URL
+  switching*, under *External network* put `http://10.100.0.1:2283` first and
+  `https://photos.mauderer.work` second. The app uses the first one that
+  answers. Large RAW files still go in via the share.
 - **Backups.** Immich's database is in the shared cluster, so the nightly
   `pg_dumpall` already covers it. Its own media (uploads, thumbnails) is on the
   pool under `/hdd_pool_1/services/immich`.

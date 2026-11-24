@@ -643,17 +643,17 @@
 
           # --- Photo library: immich.nix ---
           {
-            # Public only through nginx: the listener itself is loopback, and
-            # the port never joins the globally-open set.
-            name = "Immich listens on loopback only and is not firewalled open";
+            # Public only through nginx; direct access only on the VPN
+            # interface. The port never joins the globally-open set.
+            name = "Immich is admitted on wg0 only and is not firewalled open";
             assertion =
               let
                 i = cfg.services.immich;
               in
               i.enable
-              && i.host == "127.0.0.1"
               && !i.openFirewall
-              && !(builtins.elem i.port cfg.networking.firewall.allowedTCPPorts);
+              && !(builtins.elem i.port cfg.networking.firewall.allowedTCPPorts)
+              && builtins.elem i.port (cfg.networking.firewall.interfaces.wg0.allowedTCPPorts or [ ]);
           }
           {
             name = "Immich share links use the public HTTPS name";
