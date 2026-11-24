@@ -18,6 +18,7 @@ _: {
     ./metrics.nix
     ./nixos-metrics.nix
     ./auto-reboot.nix
+    ./update-check.nix
     ./backup-metrics.nix
     ./blackbox.nix
     ./fritz.nix

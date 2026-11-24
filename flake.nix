@@ -262,8 +262,8 @@
           assertion = cfg.security.auditd.enable && cfg.security.audit.enable;
         }
         {
-          name = "release branch checked for updates every 10 minutes";
-          assertion = cfg.system.autoUpgrade.enable && cfg.system.autoUpgrade.dates == "*:0/10";
+          name = "autoUpgrade enabled";
+          assertion = cfg.system.autoUpgrade.enable;
         }
         {
           name = "tracks the CI-gated release branch";
@@ -276,6 +276,10 @@
         host: cfg:
         commonAssertions host cfg
         ++ [
+          {
+            name = "security updates applied daily";
+            assertion = cfg.system.autoUpgrade.dates == "daily";
+          }
           {
             name = "workstation never auto-reboots after an update";
             assertion = !cfg.system.autoUpgrade.allowReboot;
@@ -405,6 +409,10 @@
         host: cfg:
         commonAssertions host cfg
         ++ [
+          {
+            name = "release branch checked for updates every 10 minutes";
+            assertion = cfg.system.autoUpgrade.dates == "*:0/10";
+          }
           {
             name = "server reboots itself after an update when needed";
             assertion = cfg.system.autoUpgrade.allowReboot && cfg.system.autoUpgrade.rebootWindow != null;

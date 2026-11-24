@@ -7,7 +7,7 @@
 # switch whenever they land, so most updates need no reboot. The window keeps the
 # 10-minute runs from rebooting the box during the day: a kernel that lands
 # outside it is staged with `nixos-rebuild boot`, and the first run inside the
-# window reboots into it (core/updates.nix lets that run past its "release
+# window reboots into it (update-check.nix lets that run past its "release
 # hasn't moved" gate).
 _: {
   system.autoUpgrade = {
